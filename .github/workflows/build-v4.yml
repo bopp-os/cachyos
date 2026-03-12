@@ -54,9 +54,9 @@ jobs:
         if: env.SKIP_BUILD != 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Free disk space
-        if: env.SKIP_BUILD != 'true'
-        uses: hastd/free-disk-space@68572aeaadb7f76bd408246328e95926323402b5 # v0.1.2
+    #   - name: Free disk space
+    #     if: env.SKIP_BUILD != 'true'
+    #     uses: hastd/free-disk-space@68572aeaadb7f76bd408246328e95926323402b5 # v0.1.2
 
       - name: Get current date
         id: date
