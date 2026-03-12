@@ -111,7 +111,7 @@ jobs:
           fi
           done <<< "$META_LABELS"
 
-          sudo podman build "${BUILD_ARGS[@]}" --build-arg TARGET_CPU_MARCH="znver4" --tag "$IMAGE_NAME:$DEFAULT_TAG" .
+          sudo podman build "${BUILD_ARGS[@]}" --isolation=chroot --build-arg TARGET_CPU_MARCH="znver4" --tag "$IMAGE_NAME:$DEFAULT_TAG" .
 
       - name: Rechunk Image
         if: env.SKIP_BUILD != 'true'
