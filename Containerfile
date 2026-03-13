@@ -14,7 +14,8 @@ FROM docker.io/cachyos/cachyos-${TARGET_CPU_MARCH/znver4/v4} AS aur_builder
 USER root
 
 # Minimal setup: just enough to build packages
-RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+# Dynamic cache ID ensures builder isolation for different architectures
+RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     pacman-key --init && \
     pacman-key --populate archlinux cachyos && \
     pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring && \
@@ -25,7 +26,7 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
     chown -R builduser:builduser /home/builduser
 
 # Build Scopebuddy
-RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     git clone https://aur.archlinux.org/scopebuddy-git.git /tmp/scopebuddy && \
     chown -R builduser:builduser /tmp/scopebuddy && \
     cd /tmp/scopebuddy && \
@@ -50,18 +51,15 @@ RUN touch /var/log/pacman.log
 RUN grep "= */var" /etc/pacman.conf | sed "/= *\/var/s/.*=// ; s/ //" | xargs -n1 sh -c 'mkdir -p "/usr/lib/sysimage/$(dirname $(echo $1 | sed "s@/var/@@"))" && mv -v "$1" "/usr/lib/sysimage/$(echo "$1" | sed "s@/var/@@")"' '' && \
     sed -i -e "/= *\/var/ s/^#//" -e "s@= */var@= /usr/lib/sysimage@g" -e "/DownloadUser/d" -e "/^#IgnorePkg/a IgnorePkg = mesa-git lib32-mesa-git" /etc/pacman.conf
 
-# This guarantees the user.component hook is present and fires 
-# during the master pacman installation block below.
+# PRE-INSTALL CONFIGURATION & HOOKS
+# Copy hooks and configs EARLY so they fire during the master pacman block.
 COPY files/usr/share /usr/share
 COPY files/etc /etc
 COPY files/usr/lib /usr/lib
 
-# Copy just the CPU script so we can use it immediately
-COPY --chmod=0755 files/usr/libexec/1-set-cpu-repo.sh /usr/libexec/
-
 # Initialize keyrings
 RUN --mount=type=tmpfs,dst=/run \
-    --mount=type=cache,target=/usr/lib/sysimage/cache/pacman/pkg \
+    --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     pacman-key --init && \
     pacman-key --populate archlinux cachyos && \
     pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && \
@@ -82,7 +80,7 @@ RUN --mount=type=tmpfs,dst=/run \
 
 # Add Chaotic-AUR repository
 RUN --mount=type=tmpfs,dst=/run \
-    --mount=type=cache,target=/usr/lib/sysimage/cache/pacman/pkg \
+    --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com && \
     pacman-key --lsign-key 3056513887B78AEB && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
@@ -92,9 +90,26 @@ RUN --mount=type=tmpfs,dst=/run \
 RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
     echo 'i18n_vars="/usr/share/kbd/consolefonts  /usr/share/kbd/keymaps"' >> /usr/lib/dracut/dracut.conf.d/boppos-cachyos.conf
 
-# Set CPU-specific repository and perform the system upgrade
-RUN --mount=type=cache,target=/usr/lib/sysimage/cache/pacman/pkg \
-    /usr/libexec/1-set-cpu-repo.sh "$TARGET_CPU_MARCH" && \
+# ==========================================
+# CPU ARCHITECTURE REPOSITORY SETUP
+# ==========================================
+RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    # Surgical Cleanup: Remove partials and old metadata for this tier's cache
+    rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
+    pacman -Sc --noconfirm && \
+    \
+    if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
+        echo "Injecting znver4 repositories for Zen 4/5 optimization..." && \
+        printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
+        awk -v repo_file="/tmp/znver4-repos.conf" '/^#?\[cachyos-v4\]/ && !done { system("cat " repo_file); done=1 } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
+        mv /etc/pacman.conf.tmp /etc/pacman.conf && \
+        rm -f /tmp/znver4-repos.conf && \
+        pacman -Syy && \
+        # Reinstall all packages using command substitution to avoid pipe-stdin issues
+        PKGS=$(pacman -Qqn) && pacman -S --noconfirm $PKGS ; \
+    else \
+        echo "Architecture $TARGET_CPU_MARCH detected. Using standard image repositories." ; \
+    fi && \
     pacman -Syu --noconfirm
 
 # Remove base kernels/handheld packages if present in the base image
@@ -105,7 +120,7 @@ RUN --mount=type=tmpfs,dst=/run \
 # MASTER PACKAGE INSTALLATION
 # ==========================================
 RUN --mount=type=tmpfs,dst=/run \
-    --mount=type=cache,target=/usr/lib/sysimage/cache/pacman/pkg \
+    --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     pacman -Sy --noconfirm --needed \
         # --- System Core ---
         linux-cachyos linux-cachyos-headers systemd systemd-sysvcompat \
@@ -160,16 +175,14 @@ RUN --mount=type=tmpfs,dst=/run \
 # POST-INSTALL CONFIGURATION
 # ==========================================
 
-# Master copy of all custom OS files. 
-# Placed here so our custom configs and scripts (like steamos-update) 
-# overwrite the defaults installed by pacman.
+# Master copy of custom executables. Overwrites defaults (like steamos-update).
 COPY files/usr/bin /usr/bin
 COPY files/usr/libexec /usr/libexec
 RUN chmod -R 0755 /usr/bin /usr/libexec /usr/share/libalpm/scripts
 
 # Install AUR packages from Stage 1
 COPY --from=aur_builder /home/builduser/packages/ /tmp/aur-pkgs/
-RUN --mount=type=cache,target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     pacman -U --noconfirm /tmp/aur-pkgs/scopebuddy-git*.pkg.tar.zst && \
     rm -rf /tmp/aur-pkgs
 
@@ -207,8 +220,7 @@ RUN --mount=type=tmpfs,dst=/run \
     printf 'reproducible=yes\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc "' | tee "/usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf" && \
     dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\.img$' | tail -n 1)/initramfs.img"
 
-# Preserve /opt contents by moving them to /usr/lib/opt
-# They will be exposed back to the user via the var-opt.mount OverlayFS
+# Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
     if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
         mv /opt/* /usr/lib/opt/ || true; \
