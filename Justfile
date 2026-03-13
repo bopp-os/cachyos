@@ -29,3 +29,22 @@ switch tag='v3':
     @echo "Switching system to {{full_image}}:{{tag}}..."
     sudo bootc switch \
         "{{full_image}}:{{tag}}"
+
+# Manually apply kernel arguments to the currently running system for local testing
+apply-local-kargs:
+    @echo "Applying kernel arguments locally..."
+    sudo ostree admin kargs edit-in-place \
+        --append-if-missing="amd_pstate=active" \
+        --append-if-missing="amdgpu.ppfeaturemask=0xffffffff" \
+        --append-if-missing="split_lock_detect=off" \
+        --append-if-missing="nowatchdog" \
+        --append-if-missing="nmi_watchdog=0" \
+        --append-if-missing="mitigations=off" \
+        --append-if-missing="sysrq_always_enabled=1" \
+        --append-if-missing="usbcore.autosuspend=-1" \
+        --append-if-missing="iommu=pt" \
+        --append-if-missing="preempt=full" \
+        --append-if-missing="amdgpu.gpu_recovery=1" \
+        --append-if-missing="transparent_hugepage=madvise" \
+        --append-if-missing="transparent_hugepage.defrag=defer+madvise"
+    @echo "Kernel arguments updated. Please reboot to apply changes."

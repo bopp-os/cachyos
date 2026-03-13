@@ -18,4 +18,5 @@ flatpak install --user -y flathub \
     com.bitwarden.desktop \
     com.vysp3r.ProtonPlus \
     org.kde.gwenview \
-    org.kde.kcalc
+    org.kde.kcalc \
+    io.github.kolunmi.Bazaar

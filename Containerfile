@@ -118,6 +118,10 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
 RUN --mount=type=tmpfs,dst=/run \
     pacman -Rns --noconfirm linux linux-cachyos-deckify linux-cachyos-deckify-headers cachyos-handheld plasma-login-manager || echo "Unwanted base packages not found, skipping."
 
+# Ensure Discover and PackageKit are completely removed so the OS relies purely on bootc/flatpak
+RUN --mount=type=tmpfs,dst=/run \
+    pacman -Rns --noconfirm discover packagekit packagekit-qt5 packagekit-qt6 || echo "Discover/PackageKit not found, skipping."
+
 # ==========================================
 # MASTER PACKAGE INSTALLATION
 # ==========================================
