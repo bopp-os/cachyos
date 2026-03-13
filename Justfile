@@ -22,8 +22,10 @@ build arch='v3':
 # Push the built image(s) to the container registry.
 push arch='v3':
     @echo "Pushing {{full_image}}:{{arch}}..."
-    sudo podman push "{{full_image}}:{{arch}}"
+    sudo podman push \
+        "{{full_image}}:{{arch}}"
 
 switch tag='v3':
     @echo "Switching system to {{full_image}}:{{tag}}..."
-    sudo bootc switch "{{full_image}}:{{tag}}"
+    sudo bootc switch \
+        "{{full_image}}:{{tag}}"

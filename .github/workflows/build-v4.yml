@@ -87,7 +87,7 @@ jobs:
           sep-annotations: " "
 
       - name: Cache Pacman Packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: pacman-cache
           key: pacman-${{ env.DEFAULT_TAG }}-${{ github.run_id }}

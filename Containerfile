@@ -95,6 +95,8 @@ RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
 # ==========================================
 RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     # Surgical Cleanup: Remove partials and old metadata for this tier's cache
+    # lua is a package that often causes issues if left in a half-updated state, so we target it specifically.
+    rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
     rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
     pacman -Sc --noconfirm && \
     \
@@ -155,7 +157,7 @@ RUN --mount=type=tmpfs,dst=/run \
         starship zoxide eza iotop-c smartmontools \
         # --- Development Base & CLI Tools ---
         base-devel meld procps-ng curl file git github-cli ripgrep fd fzf jq man-db man-pages \
-        byobu openssh openssl wget paru \
+        byobu openssh openssl wget paru just \
         nano micro vi unrar unzip xz nfs-utils btop konsave \
         # --- Languages & IDEs ---
         nodejs npm rust python-pip python-pipx \
