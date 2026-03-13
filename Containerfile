@@ -189,6 +189,9 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
 # Configure Flatpak
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
+# Fix sudo/pkexec permissions without nuking the whole bin folder
+RUN chmod 4755 /usr/bin/sudo /usr/bin/pkexec
+
 # Configure shell environment
 RUN /usr/libexec/3-shell-config.sh
 
