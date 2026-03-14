@@ -32,6 +32,13 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
     cd /tmp/scopebuddy && \
     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
 
+# Build autofs
+RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+    git clone https://aur.archlinux.org/autofs.git /tmp/autofs && \
+    chown -R builduser:builduser /tmp/autofs && \
+    cd /tmp/autofs && \
+    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
+
 # ==========================================
 # STAGE 2: System Build
 # ==========================================
@@ -162,7 +169,7 @@ RUN --mount=type=tmpfs,dst=/run \
         # --- Development Base & CLI Tools ---
         base-devel meld procps-ng curl file git github-cli ripgrep fd fzf jq man-db man-pages \
         byobu openssh openssl wget paru just cosign \
-        nano micro vi unrar unzip xz nfs-utils btop konsave \
+        nano nano-syntax-highlighting micro vi unrar unzip xz nfs-utils btop konsave \
         # --- Languages & IDEs ---
         nodejs npm rust gcc-go python-pip python-pipx \
         cargo-binstall cargo-update visual-studio-code-bin \
@@ -189,7 +196,7 @@ RUN chmod -R 0755 /usr/bin /usr/libexec /usr/share/libalpm/scripts
 # Install AUR packages from Stage 1
 COPY --from=aur_builder /home/builduser/packages/ /tmp/aur-pkgs/
 RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    pacman -U --noconfirm /tmp/aur-pkgs/scopebuddy-git*.pkg.tar.zst && \
+    pacman -U --noconfirm /tmp/aur-pkgs/*.pkg.tar.zst && \
     rm -rf /tmp/aur-pkgs
 
 # Configure Flatpak
