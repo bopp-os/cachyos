@@ -47,6 +47,7 @@ sign arch='v3':
 switch tag='v3':
     @echo "Switching system to {{full_image}}:{{tag}}..."
     sudo bootc switch \
+        --transport containers-storage \
         "{{full_image}}:{{tag}}"
 
 # Manually apply kernel arguments to the currently running system for local testing

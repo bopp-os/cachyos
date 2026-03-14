@@ -129,7 +129,7 @@ RUN --mount=type=tmpfs,dst=/run \
     pacman -Sy --noconfirm --needed \
         # --- System Core ---
         linux-cachyos linux-cachyos-headers systemd systemd-sysvcompat \
-        dbus dbus-broker-units dbus-glib glib2 polkit shadow lua-luv fuse2 fusef2s \
+        dbus dbus-broker-units dbus-glib glib2 polkit shadow lua-luv fuse2 fuse3 fuse2fs \
         dracut ostree bootc skopeo amd-ucode intel-ucode linux-firmware sof-firmware \
         libdisplay-info lib32-libdisplay-info \
         # --- Graphics & Drivers ---
@@ -225,12 +225,12 @@ RUN systemctl enable NetworkManager.service && \
     systemctl enable ananicy-cpp.service && \
     systemctl enable scx_loader.service && \
     systemctl enable inputplumber.service && \
-    systemctl enable cachyos-boppos-brew-setup.service &&\
+    systemctl enable brew-setup.service && \
     systemctl enable docker.service && \
     systemctl enable sddm.service && \
     systemctl enable usr-share-sddm-themes.mount && \
     systemctl enable var-opt.mount && \
-    systemctl --global enable cachyos-boppos-install-flatpaks.service
+    systemctl --global enable install-flatpaks.service
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
