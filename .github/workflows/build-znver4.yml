@@ -130,13 +130,14 @@ jobs:
           IMAGE_REF="localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
 
           # Run with --network=none to bypass CNI plugin requirements
-          # Run with --isolation=chroot to avoid nested cgroup crashes entirely
-          sudo podman run --rm --network=none --isolation=chroot --mount=type=image,source=$IMAGE_REF,target=/chunkah \
+          # Run with --cgroups=disabled to prevent nested cgroup creation crashes
+          sudo podman run --rm --network=none --cgroups=disabled --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
             quay.io/jlebon/chunkah build --label containers.bootc=1 --max-layers 256 | sudo podman load > /tmp/podman_load_output.txt
 
           IMAGE_ID=$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $3}')
           sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
+
       # TODO: remove me when we have a new podman in 26.04 runners
       # needed because old podman doesn't push layer annotations for
       # the rechunker at all
