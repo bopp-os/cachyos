@@ -130,7 +130,8 @@ jobs:
           IMAGE_REF="localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
 
           # Run with --network=none to bypass CNI plugin requirements
-          sudo podman run --rm --network=none --mount=type=image,source=$IMAGE_REF,target=/chunkah \
+          # Run with --cgroup-manager=cgroupfs to avoid nested cgroup v2 crashes
+          sudo podman run --rm --network=none --cgroup-manager=cgroupfs --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
             quay.io/jlebon/chunkah build --label containers.bootc=1 --max-layers 256 | sudo podman load > /tmp/podman_load_output.txt
 
