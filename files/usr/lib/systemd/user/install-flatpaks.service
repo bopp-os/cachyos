@@ -4,7 +4,7 @@ After=graphical-session.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/libexec/5-install-flatpaks.sh
+ExecStart=/usr/libexec/boppos-install-flatpaks.sh
 
 [Install]
 WantedBy=graphical-session.target
