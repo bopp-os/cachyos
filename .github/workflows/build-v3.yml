@@ -2,15 +2,10 @@
 name: Build container image (v3)
 on:
   pull_request:
-   branches:
-     - main
-  schedule:
-    - cron: "30 06 * * SUN" # 06:30am UTC on sunday
-  push:
     branches:
       - main
-    paths-ignore:
-      - "**/README.md"
+  schedule:
+    - cron: "30 06 * * SUN" # 06:30am UTC on sunday
   workflow_dispatch:
 
 env:
