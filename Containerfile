@@ -13,31 +13,34 @@ FROM docker.io/cachyos/cachyos-${BASE_IMAGE_TAG} AS aur_builder
 
 USER root
 
+# Add a cache-busting layer. By adding a file from a URL that is always
+# different, we invalidate the cache for all subsequent layers in this stage.
+# This ensures that build dependencies are not from a stale cache.
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=hex" /dev/null
+
 # Minimal setup: just enough to build packages
 # Dynamic cache ID ensures builder isolation for different architectures
 RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     pacman-key --init && \
     pacman-key --populate archlinux cachyos && \
-    pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring && \
-    pacman -Sy --noconfirm --needed base-devel git sudo && \
+    pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-rate-mirrors && \
+    # Rate mirrors to avoid 404s on stale mirrors and force-refresh dbs
+    cachyos-rate-mirrors && \
+    pacman -Syyu --noconfirm --needed base-devel git sudo && \
     useradd -m builduser && \
     echo "builduser ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
     mkdir -p /home/builduser/packages && \
     chown -R builduser:builduser /home/builduser
 
-# Build Scopebuddy
+# Build AUR Packages
 RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    git clone https://aur.archlinux.org/scopebuddy-git.git /tmp/scopebuddy && \
-    chown -R builduser:builduser /tmp/scopebuddy && \
-    cd /tmp/scopebuddy && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
-
-# Build autofs
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    git clone https://aur.archlinux.org/autofs.git /tmp/autofs && \
-    chown -R builduser:builduser /tmp/autofs && \
-    cd /tmp/autofs && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
+    (git clone https://aur.archlinux.org/scopebuddy-git.git /tmp/scopebuddy && \
+     chown -R builduser:builduser /tmp/scopebuddy && cd /tmp/scopebuddy && \
+     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg) && \
+    (git clone https://aur.archlinux.org/autofs.git /tmp/autofs && \
+     chown -R builduser:builduser /tmp/autofs && cd /tmp/autofs && \
+     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg) && \
+    rm -rf /tmp/scopebuddy /tmp/autofs
 
 # ==========================================
 # STAGE 2: System Build
@@ -64,6 +67,9 @@ COPY files/usr/share /usr/share
 COPY files/etc /etc
 COPY files/usr/lib /usr/lib
 
+# Copy rated mirrorlists from the builder stage to improve efficiency and consistency
+COPY --from=aur_builder /etc/pacman.d/ /etc/pacman.d/
+
 # Initialize keyrings
 RUN --mount=type=tmpfs,dst=/run \
     --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
@@ -71,8 +77,7 @@ RUN --mount=type=tmpfs,dst=/run \
     pacman-key --populate archlinux cachyos && \
     pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && \
     pacman-key --lsign-key F3B607488DB35A47 && \
-    pacman -Sy --noconfirm --needed cachyos-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-hooks chwd cachyos-rate-mirrors lsb-release && \
-    cachyos-rate-mirrors
+    pacman -Sy --noconfirm --needed cachyos-keyring cachyos-hooks chwd lsb-release
 
 # Generate en_US.UTF-8 locale
 RUN sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
@@ -101,6 +106,10 @@ RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
 # CPU ARCHITECTURE REPOSITORY SETUP
 # ==========================================
 RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    # Add a cache-busting layer. By adding a file from a URL that is always
+    # different, we invalidate the cache for all subsequent layers. This ensures
+    # that package installation and updates are not skipped on rebuilds.
+    (ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=hex" /dev/null) && \
     # Surgical Cleanup: Remove partials and old metadata for this tier's cache
     # lua is a package that often causes issues if left in a half-updated state, so we target it specifically.
     rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
