@@ -83,10 +83,12 @@ jobs:
           sep-tags: " "
           sep-annotations: " "
 
-      - name: Strip Local Cache Mount
+      - name: Strip Local Mounts for CI
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
-          sed -i 's|--mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg||g' Containerfile
+          # Use a regex to universally strip all --mount flags (tmpfs, cache, bind) 
+          # from the Containerfile so it runs safely under --isolation=chroot
+          sed -i 's/--mount=[^ ]* //g' Containerfile
 
       - name: Build Image
         id: build_image
