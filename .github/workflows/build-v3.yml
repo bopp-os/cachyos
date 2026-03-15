@@ -186,3 +186,11 @@ jobs:
           REMOTE_IMAGE_DIGEST: ${{ steps.push.outputs.remote_image_digest }}
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+
+      - name: Clean workspace
+        if: success() && steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          # Clean up the _work folder to save space, but only on success
+          # so we can investigate failures if needed.
+          sudo rm -rf ${{ github.workspace }}/*
+          sudo rm -rf ${{ github.workspace }}/.[!.]* || true

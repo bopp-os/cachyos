@@ -10,7 +10,8 @@ ARG TARGET_CPU_MARCH=v3
 ARG BASE_IMAGE_TAG=v3
 
 FROM docker.io/cachyos/cachyos-${BASE_IMAGE_TAG} AS aur_builder
-
+ARG TARGET_CPU_MARCH
+ARG BASE_IMAGE_TAG
 USER root
 
 # Minimal setup: just enough to build packages
@@ -22,6 +23,7 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
     pacman-key --lsign-key F3B607488DB35A47 && \
     pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
     pacman-key --lsign-key 3056513887B78AEB && \
+    sed -i 's/^#*ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
     pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-hooks chwd cachyos-rate-mirrors lsb-release && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
     cachyos-rate-mirrors && \
