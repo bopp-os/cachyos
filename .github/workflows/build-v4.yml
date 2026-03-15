@@ -122,14 +122,15 @@ jobs:
             --build-arg BASE_IMAGE_TAG="$BASE_TAG" \
             --tag "$IMAGE_NAME:$DEFAULT_TAG" .
 
-      - name: Rechunk Image
+        - name: Rechunk Image
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
           set -xeuo pipefail
 
           IMAGE_REF="localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
 
-          sudo podman run --rm --mount=type=image,source=$IMAGE_REF,target=/chunkah \
+          # Run with --network=none to bypass CNI plugin requirements
+          sudo podman run --rm --network=none --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
             quay.io/jlebon/chunkah build --label containers.bootc=1 --max-layers 256 | sudo podman load > /tmp/podman_load_output.txt
 
