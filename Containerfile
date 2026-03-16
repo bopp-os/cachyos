@@ -140,14 +140,14 @@ RUN --mount=type=tmpfs,dst=/run \
         linux-cachyos linux-cachyos-headers systemd systemd-sysvcompat \
         dbus dbus-broker-units dbus-glib glib2 polkit shadow lua-luv \
         fuse2 fuse3 fuse2fs ntfs-3g dosfstools exfatprogs btrfs-progs lvm2 mdadm cryptsetup \
-        libdisplay-info lib32-libdisplay-info gvfs gvs-mtp gvfs-smb \
+        libdisplay-info lib32-libdisplay-info gvfs gvfs-mtp gvfs-smb \
         amd-ucode intel-ucode linux-firmware sof-firmware alsa-firmware wireless-regdb linux-firmware-marvell \
         dracut ostree bootc skopeo \
         # --- CachyOS Meta Packages ---
         cachyos-gaming-meta cachyos-gaming-applications \
         cachyos-settings cachyos-kde-settings cachyos-micro-settings \
         cachyos-wallpapers cachyos-themes-sddm cachyos-emerald-kde-theme-git cachyos-nord-gtk-theme-git \
-        cachyos-plymouth-theme cachyos-plymouth-bootanimation cachyos-plymouth-spinner \
+        cachyos-plymouth-theme cachyos-plymouth-bootanimation \
         cachyos-ananicy-rules cachyos-zsh-config cachyos-fish-config \
         # --- Graphics & Drivers ---
         mesa lib32-mesa mesa-utils vulkan-icd-loader vulkan-mesa-layers lib32-vulkan-mesa-layers \
@@ -168,7 +168,7 @@ RUN --mount=type=tmpfs,dst=/run \
         ffmpegthumbnailer ffmpegthumbs kdegraphics-thumbnailers \
         kimageformats qt6-imageformats \
         # --- Printing & Scanning ---
-        cups cups-pdf system-config-printer system-config-printer-udev sane \
+        cups cups-pdf system-config-printer sane \
         # --- Fonts & Themes ---
         ttf-ms-fonts ttf-dejavu ttf-bitstream-vera ttf-nerd-fonts-symbols noto-fonts-emoji noto-fonts-cjk \
         ttf-jetbrains-mono ttf-fira-code ttf-cascadia-code ttf-firacode-nerd ttf-meslo-nerd \
