@@ -7,11 +7,12 @@ flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flath
 flatpak install --user -y flathub \
     net.mullvad.MullvadBrowser \
     com.calibre_ebook.calibre \
+    it.mijorus.gearlever \
     org.kde.okular \
     org.inkscape.Inkscape \
     org.videolan.VLC \
     com.obsproject.Studio \
-    dev.vencord.Vesktop \
+    com.discordapp.Discord \
     io.github.flattool.Warehouse \
     com.github.tchx84.Flatseal \
     com.bitwarden.desktop \

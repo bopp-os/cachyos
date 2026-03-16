@@ -138,43 +138,65 @@ RUN --mount=type=tmpfs,dst=/run \
     pacman -Sy --noconfirm --needed \
         # --- System Core ---
         linux-cachyos linux-cachyos-headers systemd systemd-sysvcompat \
-        dbus dbus-broker-units dbus-glib glib2 polkit shadow lua-luv fuse2 fuse3 fuse2fs \
-        dracut ostree bootc skopeo amd-ucode intel-ucode linux-firmware sof-firmware \
-        libdisplay-info lib32-libdisplay-info \
+        dbus dbus-broker-units dbus-glib glib2 polkit shadow lua-luv \
+        fuse2 fuse3 fuse2fs ntfs-3g dosfstools exfatprogs btrfs-progs lvm2 mdadm cryptsetup \
+        libdisplay-info lib32-libdisplay-info gvfs gvs-mtp gvfs-smb \
+        amd-ucode intel-ucode linux-firmware sof-firmware alsa-firmware wireless-regdb linux-firmware-marvell \
+        dracut ostree bootc skopeo \
+        # --- CachyOS Meta Packages ---
+        cachyos-gaming-meta cachyos-gaming-applications \
+        cachyos-settings cachyos-kde-settings cachyos-micro-settings \
+        cachyos-wallpapers cachyos-themes-sddm cachyos-emerald-kde-theme-git cachyos-nord-gtk-theme-git \
+        cachyos-plymouth-theme cachyos-plymouth-bootanimation cachyos-plymouth-spinner \
+        cachyos-ananicy-rules cachyos-zsh-config cachyos-fish-config \
         # --- Graphics & Drivers ---
-        mesa lib32-mesa mesa-utils vulkan-icd-loader vulkan-radeon lib32-vulkan-radeon vulkan-tools \
-        # --- Desktop Environment & Display Manager ---
-        plasma-desktop plasma-workspace xorg-xwayland plasma-pa plasma-nm \
-        qt5-wayland qt6-wayland breeze-gtk cachyos-emerald-kde-theme-git cachyos-plymouth-theme \
-        cachyos-plymouth-bootanimation dolphin konsole sddm sddm-kcm cachyos-themes-sddm \
-        powerdevil kscreen kdeconnect ark ffmpegthumbnailer \
-        polkit polkit-kde-agent kwallet-pam udisks2 ptyxis \
-        xdg-desktop-portal xdg-desktop-portal-kde kate python-gobject \
-        ffmpegthumbs kdegraphics-thumbnailers kimageformats qt6-imageformats \
-        kio-extras kio-fuse kio-admin kde-gtk-config colord-kde \
-        flatpak-kcm partitionmanager plasma-disks plasma-systemmonitor spectacle \
+        mesa lib32-mesa mesa-utils vulkan-icd-loader vulkan-mesa-layers lib32-vulkan-mesa-layers \
+        vulkan-radeon lib32-vulkan-radeon libva-mesa-driver lib32-libva-mesa-driver \
+        vulkan-intel lib32-vulkan-intel intel-media-driver vulkan-nouveau lib32-vulkan-nouveau \
+        # --- Desktop Environment (KDE Plasma) Core ---
+        plasma-desktop plasma-workspace xorg-xwayland qt5-wayland qt6-wayland \
+        breeze-gtk sddm-kcm powerdevil kscreen polkit-kde-agent \
+        xdg-desktop-portal xdg-desktop-portal-kde xdg-desktop-portal-gtk kde-gtk-config colord-kde \
+        # --- Desktop Integration & Services ---
+        plasma-pa plasma-nm kwallet-pam udisks2 python-gobject \
+        kio-extras kio-fuse kio-admin flatpak-kcm xdg-utils \
+        gtk3 gtk4 nss libnotify libxss libappindicator-gtk3 libsecret \
+        # --- Desktop Applications & Utilities ---
+        dolphin konsole ptyxis kate ark spectacle kdeconnect \
+        partitionmanager plasma-disks plasma-systemmonitor \
+        # --- Media & Thumbnails ---
+        ffmpegthumbnailer ffmpegthumbs kdegraphics-thumbnailers \
+        kimageformats qt6-imageformats \
+        # --- Printing & Scanning ---
+        cups cups-pdf system-config-printer system-config-printer-udev sane \
         # --- Fonts & Themes ---
-        ttf-ms-fonts ttf-dejavu ttf-bitstream-vera noto-fonts noto-fonts-emoji noto-fonts-cjk \
-        ttf-jetbrains-mono ttf-fira-code ttf-cascadia-code \
-        cachyos-settings cachyos-kde-settings cachyos-micro-settings cachyos-wallpapers \
+        ttf-ms-fonts ttf-dejavu ttf-bitstream-vera ttf-nerd-fonts-symbols noto-fonts-emoji noto-fonts-cjk \
+        ttf-jetbrains-mono ttf-fira-code ttf-cascadia-code ttf-firacode-nerd ttf-meslo-nerd \
         # --- Power & Hardware Management ---
         power-profiles-daemon cpupower upower accountsservice rtkit xdg-user-dirs mousetweaks radeontool \
+        # --- Audio Core ---
+        pipewire-pulse pipewire-alsa pipewire-jack wireplumber pavucontrol alsa-utils alsa-plugins \
         # --- Gaming Core & Utilities ---
-        steam lutris heroic-games-launcher-bin gamescope xdotool yad \
-        cachyos-gaming-applications faugus-launcher umu-launcher proton-cachyos wine-cachyos winboat \
-        sunshine lact coolercontrol openrgb openrgb-plugin-effects-git wireplumber nvtop \
-        mangohud goverlay pipewire-pulse libdvdcss gst-libav mpv-git ffmpeg pavucontrol \
+        xdotool yad winboat proton-cachyos wine gamescope-session-git \
+        sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop \
+        libdvdcss gst-libav mpv-git ffmpeg \
         inputplumber lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid \
         # --- Shells & Prompts ---
         bash zsh fish bash-preexec bash-completion zsh-completions \
-        atuin starship zoxide eza iotop-c smartmontools \
-        # --- Development Base & CLI Tools ---
-        base-devel meld procps-ng curl file git github-cli ripgrep fd fzf jq man-db man-pages \
-        byobu openssh openssl wget paru just cosign \
-        nano nano-syntax-highlighting micro vi nfs-utils btop konsave \
-        unp unarj unrar unzip bzip2 p7zip unace cpio sharutils cabextract rpmextract xz \
+        atuin starship \
+        # --- Modern CLI Tools & Utilities ---
+        zoxide eza tldr ripgrep fd fzf jq btop iotop-c konsave byobu \
+        # --- System & Network Utilities ---
+        procps-ng curl wget file man-db man-pages openssh openssl \
+        nfs-utils smartmontools \
+        # --- Text Editors ---
+        nano nano-syntax-highlighting micro vi \
+        # --- Development Base & Build Tools ---
+        base-devel meld git github-cli paru just cosign \
+        # --- Archiving & Compression ---
+        unp unarj unrar unzip zip bzip2 p7zip unace cpio sharutils cabextract rpmextract xz \
         # --- Languages & IDEs ---
-        nodejs npm rust gcc-go python-pip python-pipx \
+        nodejs npm rust go python-pip python-pipx \
         cargo-binstall cargo-update visual-studio-code-bin \
         # --- Networking & VPNs ---
         networkmanager networkmanager-openvpn wpa_supplicant iwd ethtool dnsutils \
@@ -184,8 +206,7 @@ RUN --mount=type=tmpfs,dst=/run \
         # --- Containers & Virtualization ---
         podman podman-compose docker docker-compose distrobox flatpak fwupd \
         # --- Sched-ext & Performance ---
-        scx-scheds-git scx-tools-git scx-manager \
-        ananicy-cpp cachyos-ananicy-rules gamescope-session-cachyos
+        scx-scheds-git scx-tools-git scx-manager
 
 # ==========================================
 # POST-INSTALL CONFIGURATION
@@ -206,7 +227,7 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 # Fix suid permissions
-RUN chmod 4755 \
+RUN for f in \
     /usr/bin/sudo \
     /usr/bin/pkexec \
     /usr/bin/su \
@@ -218,7 +239,16 @@ RUN chmod 4755 \
     /usr/bin/newgrp \
     /usr/bin/mount \
     /usr/bin/umount \
-    /usr/bin/fusermount3
+    /usr/bin/fusermount \
+    /usr/bin/fusermount3 \
+    /usr/bin/chage \
+    /usr/bin/expiry \
+    /usr/bin/gpasswd \
+    /usr/bin/ksu \
+    /usr/bin/sg \
+    /usr/lib/dbus-daemon-launch-helper \
+    /usr/lib/ssh/ssh-keysign \
+    ; do if [ -f "$f" ]; then chmod 4755 "$f"; fi; done
 
 RUN systemd-sysusers
 
