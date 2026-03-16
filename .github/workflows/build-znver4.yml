@@ -142,10 +142,26 @@ jobs:
           IMAGE_REF="localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
           ARCHIVE_PATH="${{ github.workspace }}/rechunked_image.tar"
 
+          # Start a background process to monitor the archive size every 30 seconds
+          (
+            while true; do
+              if [ -f "$ARCHIVE_PATH" ]; then
+                echo "Progress: rechunked_image.tar is currently $(sudo du -h "$ARCHIVE_PATH" | cut -f1)"
+              else
+                echo "Progress: Waiting for chunkah to begin writing..."
+              fi
+              sleep 30
+            done
+          ) &
+          MONITOR_PID=$!
+
           # Write the chunkah stream to disk to prevent pipe deadlocks and RAM exhaustion
-          sudo podman run --rm --network=none --cgroups=disabled --mount=type=image,source=$IMAGE_REF,target=/chunkah \
+          sudo podman run --rm --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
             quay.io/jlebon/chunkah build --label containers.bootc=1 --max-layers 256 > "$ARCHIVE_PATH"
+
+          # Stop the monitor once chunkah finishes
+          kill $MONITOR_PID || true
 
           # Load the completed archive back into podman
           sudo podman load -i "$ARCHIVE_PATH" > /tmp/podman_load_output.txt
