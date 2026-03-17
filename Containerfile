@@ -19,9 +19,11 @@ USER root
 RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     pacman-key --init && \
     pacman-key --populate archlinux cachyos && \
+    pacman -Sy --noconfirm --needed curl && \
     for key in F3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB 3056513887B78AEB; do \
-        curl -sL --retry 3 "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x$key" -o /tmp/key.asc && \
-        pacman-key --add /tmp/key.asc && rm -f /tmp/key.asc || exit 1; \
+        curl -sSfL --retry 3 "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x$key" -o /tmp/key.asc || \
+        curl -sSfL --retry 3 "https://keys.openpgp.org/pks/lookup?op=get&options=mr&search=0x$key" -o /tmp/key.asc || { echo "Failed to download key $key"; exit 1; }; \
+        pacman-key --add /tmp/key.asc && rm -f /tmp/key.asc || { echo "Failed to add key $key to pacman-key"; exit 1; }; \
     done && \
     pacman-key --lsign-key F3B607488DB35A47 && \
     pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
