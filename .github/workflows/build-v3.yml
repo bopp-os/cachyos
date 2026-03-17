@@ -52,6 +52,16 @@ jobs:
             echo "should_skip=true" >> $GITHUB_OUTPUT # Set an output variable
           fi
 
+      - name: Cleanup Runner Environment
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          echo "Cleaning up any zombie podman/buildah processes from previous cancelled runs..."
+          sudo pkill -9 -f podman || true
+          sudo pkill -9 -f buildah || true
+          sudo pkill -9 -f chunkah || true
+          sudo rm -f /var/lib/containers/storage/libpod/bolt_state.db.lock || true
+          echo "Cleanup complete."
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
