@@ -98,6 +98,7 @@ COPY --from=aur_builder /etc/pacman.d /etc/pacman.d
 RUN rm -rf /etc/pacman.d/gnupg && \
     pacman-key --init && \
     pacman-key --populate archlinux cachyos && \
+    pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
     pacman -Sy --noconfirm --needed curl && \
     for key in F3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB 3056513887B78AEB; do \
         curl -sSfL --retry 3 "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x$key" -o /tmp/key.asc || \
