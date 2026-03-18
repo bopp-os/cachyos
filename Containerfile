@@ -32,7 +32,7 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
     pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-hooks chwd cachyos-rate-mirrors lsb-release && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
     cachyos-rate-mirrors && \
-    echo -e '\n[bootc]\nSigLevel = Required\nServer=https://github.com/hecknt/arch-bootc-pkgs/releases/download/$repo' >> /etc/pacman.conf && \
+    echo -e '\n[bootc]\nSigLevel = Never\nServer=https://github.com/hecknt/arch-bootc-pkgs/releases/download/$repo' >> /etc/pacman.conf && \
     echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf && \
     if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
         printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
@@ -78,7 +78,8 @@ COPY --from=aur_builder /etc/pacman.conf /etc/pacman.conf
 COPY --from=aur_builder /etc/pacman.d /etc/pacman.d
 
 # Re-initialize and trust keys in the system stage to avoid GPGME environment issues
-RUN pacman-key --init && \
+RUN rm -rf /etc/pacman.d/gnupg && \
+    pacman-key --init && \
     pacman-key --populate archlinux cachyos && \
     pacman -Sy --noconfirm --needed curl && \
     for key in F3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB 3056513887B78AEB; do \

@@ -1,0 +1,15 @@
+[Unit]
+Description=OverlayFS for SDDM
+DefaultDependencies=no
+After=systemd-tmpfiles-setup.service
+Conflicts=umount.target
+Before=umount.target sddm.service
+
+[Mount]
+What=overlay
+Where=/usr/share/sddm
+Type=overlay
+Options=lowerdir=/usr/share/sddm,upperdir=/var/sddm_themes/upper,workdir=/var/sddm_themes/work,index=off,metacopy=off,uuid=off
+
+[Install]
+WantedBy=multi-user.target
