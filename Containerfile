@@ -33,7 +33,7 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
     pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
     pacman-key --lsign-key 3056513887B78AEB && \
     sed -i 's/^#*ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
-    pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-hooks chwd cachyos-rate-mirrors lsb-release && \
+    pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-hooks chwd cachyos-rate-mirrors lsb-release gpgme && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
     cachyos-rate-mirrors && \
     echo -e '\n[bootc]\nSigLevel = Never\nServer=https://github.com/hecknt/arch-bootc-pkgs/releases/download/$repo' >> /etc/pacman.conf && \
@@ -162,7 +162,7 @@ RUN --mount=type=tmpfs,dst=/run \
         fuse2 fuse3 fuse2fs ntfs-3g dosfstools exfatprogs btrfs-progs lvm2 mdadm cryptsetup \
         libdisplay-info lib32-libdisplay-info gvfs gvfs-mtp gvfs-smb \
         amd-ucode intel-ucode linux-firmware sof-firmware alsa-firmware wireless-regdb linux-firmware-marvell \
-        dracut ostree bootc skopeo \
+        dracut ostree bootc skopeo gpgme gnupg ufw \
         # --- CachyOS Meta Packages ---
         cachyos-gaming-meta cachyos-gaming-applications \
         cachyos-settings cachyos-kde-settings cachyos-micro-settings \
@@ -191,7 +191,7 @@ RUN --mount=type=tmpfs,dst=/run \
         cups cups-pdf system-config-printer sane \
         # --- Fonts & Themes ---
         ttf-ms-fonts ttf-dejavu ttf-bitstream-vera ttf-nerd-fonts-symbols noto-fonts-emoji noto-fonts-cjk \
-        ttf-jetbrains-mono ttf-fira-code ttf-cascadia-code ttf-firacode-nerd ttf-meslo-nerd \
+        ttf-jetbrains-mono ttf-fira-code ttf-cascadia-code ttf-firacode-nerd ttf-meslo-nerd ttf-liberation \
         # --- Power & Hardware Management ---
         power-profiles-daemon cpupower upower accountsservice rtkit xdg-user-dirs mousetweaks radeontool \
         # --- Audio Core ---
@@ -202,21 +202,22 @@ RUN --mount=type=tmpfs,dst=/run \
         libdvdcss gst-libav mpv-git ffmpeg \
         inputplumber lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid \
         # --- Shells & Prompts ---
-        bash zsh fish bash-preexec bash-completion zsh-completions \
+        bash zsh fish bash-preexec bash-completion zsh-completions oh-my-zsh-git \
         atuin starship \
         # --- Modern CLI Tools & Utilities ---
         zoxide eza tldr ripgrep fd fzf jq btop iotop-c konsave byobu \
+        conky ssystat htop neofetch glances procs bottom rsync rclone \
         # --- System & Network Utilities ---
         procps-ng curl wget file man-db man-pages openssh openssl \
         nfs-utils smartmontools \
         # --- Text Editors ---
         nano nano-syntax-highlighting micro vi \
         # --- Development Base & Build Tools ---
-        base-devel meld git github-cli paru just cosign \
+        base-devel meld git git-lfs tig github-cli paru just cosign \
         # --- Archiving & Compression ---
         unp unarj unrar unzip zip bzip2 p7zip unace cpio sharutils cabextract rpmextract xz \
         # --- Languages & IDEs ---
-        nodejs npm rust go python-pip python-pipx \
+        nodejs npm rust go python-pip python-pipx ruby php \
         cargo-binstall cargo-update visual-studio-code-bin \
         # --- Networking & VPNs ---
         networkmanager networkmanager-openvpn wpa_supplicant iwd ethtool dnsutils \
