@@ -27,6 +27,7 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
 # Dynamic cache ID ensures builder isolation for different architectures
 RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     pacman-key --init && \
+    echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
     pacman-key --populate archlinux cachyos && \
     pacman-key --recv-keys F3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB 3056513887B78AEB && \
     pacman-key --lsign-key F3B607488DB35A47 && \
@@ -70,7 +71,6 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
 FROM docker.io/cachyos/cachyos-${BASE_IMAGE_TAG} AS system
 ARG TARGET_CPU_MARCH
 ARG BASE_IMAGE_TAG
-ENV GPG_TTY=/dev/null
 ENV LANG=en_US.UTF-8
 
 # Conditionally wipe the system package cache
@@ -92,12 +92,14 @@ COPY --from=aur_builder /etc/pacman.d /etc/pacman.d
 # Re-initialize and trust keys in the system stage to avoid GPGME environment issues
 RUN rm -rf /etc/pacman.d/gnupg && \
     pacman-key --init && \
+    echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
     pacman-key --populate archlinux cachyos && \
     pacman-key --recv-keys F3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB 3056513887B78AEB && \
     pacman-key --lsign-key F3B607488DB35A47 && \
     pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
     pacman-key --lsign-key 3056513887B78AEB && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+
 
 # Ensure the log file exists
 RUN touch /var/log/pacman.log
