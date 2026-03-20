@@ -180,7 +180,7 @@ RUN --mount=type=tmpfs,dst=/run \
         breeze-gtk sddm-kcm powerdevil kscreen polkit-kde-agent \
         xdg-desktop-portal xdg-desktop-portal-kde xdg-desktop-portal-gtk kde-gtk-config colord-kde \
         # --- Desktop Integration & Services ---
-        plasma-pa plasma-nm kwallet-pam udisks2 python-gobject \
+        plasma plasma-pa plasma-nm kwallet-pam udisks2 python-gobject \
         kio-extras kio-fuse kio-admin flatpak-kcm xdg-utils libappimage \
         gtk3 gtk4 nss libnotify libxss libappindicator-gtk3 libsecret \
         # --- Desktop Applications & Utilities ---
@@ -197,11 +197,11 @@ RUN --mount=type=tmpfs,dst=/run \
         # --- Power & Hardware Management ---
         power-profiles-daemon cpupower upower accountsservice rtkit xdg-user-dirs mousetweaks radeontool \
         # --- Audio Core ---
-        pipewire-pulse pipewire-alsa pipewire-jack wireplumber pavucontrol alsa-utils alsa-plugins \
+        pipewire-pulse pipewire-alsa pipewire-jack wireplumber pavucontrol alsa-utils alsa-plugins pulseaudio-bluetooth \
         # --- Gaming Core & Utilities ---
         xorg-xwininfo xdotool yad winboat proton-cachyos wine gamescope-session-git \
         sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop \
-        libdvdcss gst-libav mpv-git ffmpeg \
+        libdvdcss gst-libav mpv-git ffmpeg vlc \
         inputplumber lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid \
         # --- Shells & Prompts ---
         bash zsh fish bash-preexec bash-completion zsh-completions oh-my-zsh-git \
@@ -223,7 +223,7 @@ RUN --mount=type=tmpfs,dst=/run \
         cargo-binstall cargo-update visual-studio-code-bin \
         # --- Networking & VPNs ---
         networkmanager networkmanager-openvpn wpa_supplicant iwd ethtool dnsutils \
-        modemmanager usb_modeswitch nss-mdns bluez bluez-utils bluez-libs \
+        modemmanager usb_modeswitch nss-mdns bluez bluez-utils bluez-libs bluez-obex bluedevil \
         openvpn wireguard-tools pptpclient helium-browser-bin \
         mullvad-vpn mullvad-vpn-daemon cloudflare-warp-bin tailscale \
         # --- Containers & Virtualization ---
