@@ -110,7 +110,7 @@ jobs:
 
           sudo podman run --rm --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-            quay.io/jlebon/chunkah build --label containers.bootc=1 --max-layers 256 | sudo podman load > /tmp/podman_load_output.txt
+            quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 256 | sudo podman load > /tmp/podman_load_output.txt
 
           IMAGE_ID=$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $3}')
           sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
