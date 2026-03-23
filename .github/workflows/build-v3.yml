@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: "30 06 * * SUN" # 06:30am UTC on sunday
+    - cron: "30 06 */2 * *" # 06:30am UTC every other day
   workflow_dispatch:
     inputs:
       no_cache:
