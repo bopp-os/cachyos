@@ -1,3 +1,5 @@
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/M4M81TUBKF)
+
 # CachyOS BoppOS 🚀
 
 **A high-performance, desktop-focused atomic (`bootc`) Linux image based on CachyOS.**
