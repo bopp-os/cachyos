@@ -203,8 +203,8 @@ RUN --mount=type=tmpfs,dst=/run \
         # --- Gaming Core & Utilities ---
         xorg-xwininfo xdotool yad winboat proton-cachyos wine gamescope-session-git \
         sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop \
-        libdvdcss gst-libav mpv-git ffmpeg vlc \
         inputplumber lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid \
+        goverlay pascube vkbasalt vkbasalt-cli libdvdcss gst-libav mpv-git ffmpeg vlc \
         # --- Shells & Prompts ---
         bash zsh fish bash-preexec bash-completion zsh-completions oh-my-zsh-git \
         atuin starship \
