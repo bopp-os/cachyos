@@ -58,8 +58,14 @@ jobs:
         run: |
           echo "🧹 Sweeping the runner for free space..."
           
-          # 1. Clean up APT cache
-          sudo apt-get clean
+          # 1. Clean up package cache (Apt for Debian/Ubuntu, Pacman for Arch/CachyOS)
+          if command -v apt-get &> /dev/null; then
+            echo "Detected apt. Cleaning cache..."
+            sudo apt-get clean
+          elif command -v pacman &> /dev/null; then
+            echo "Detected pacman. Cleaning cache..."
+            sudo pacman -Scc --noconfirm
+          fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman*
