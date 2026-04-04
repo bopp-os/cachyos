@@ -187,9 +187,10 @@ RUN --mount=type=tmpfs,dst=/run \
         plasma plasma-pa plasma-nm kwallet-pam udisks2 python-gobject \
         kio-extras kio-fuse kio-admin flatpak-kcm xdg-utils libappimage \
         gtk3 gtk4 nss libnotify libxss libappindicator-gtk3 libsecret \
-        # --- Desktop Applications & Utilities ---
-        dolphin dolphin-plugins konsole ptyxis kate ark spectacle kdeconnect \
-        partitionmanager plasma-disks plasma-systemmonitor gpu-screen-recorder-ui \
+        # --- KDE Utilities & Addons ---
+        dolphin dolphin-plugins konsole kate ark spectacle kdeconnect \
+        partitionmanager plasma-disks plasma-systemmonitor \
+        kdialog filelight yakuake kfind kwalletmanager sweeper \
         # --- Media & Thumbnails ---
         ffmpegthumbnailer ffmpegthumbs kdegraphics-thumbnailers \
         kimageformats qt6-imageformats \
@@ -207,6 +208,7 @@ RUN --mount=type=tmpfs,dst=/run \
         sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop \
         inputplumber lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid \
         goverlay pascube vkbasalt vkbasalt-cli libdvdcss gst-libav mpv-git ffmpeg vlc \
+        gpu-screen-recorder-ui \
         # --- Shells & Prompts ---
         bash zsh fish bash-preexec bash-completion zsh-completions oh-my-zsh-git \
         atuin starship \
@@ -231,7 +233,7 @@ RUN --mount=type=tmpfs,dst=/run \
         openvpn wireguard-tools pptpclient helium-browser-bin \
         mullvad-vpn mullvad-vpn-daemon cloudflare-warp-bin tailscale \
         # --- Containers & Virtualization ---
-        podman podman-compose docker docker-compose distrobox flatpak fwupd \
+        podman podman-compose docker docker-compose distrobox flatpak fwupd ptyxis \
         # --- Sched-ext & Performance ---
         scx-scheds-git scx-tools-git scx-manager
 
@@ -251,6 +253,13 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
 
 # Configure Flatpak
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+# Configure system-wide font rendering defaults
+RUN mkdir -p /etc/fonts/conf.d && \
+    ln -sf /usr/share/fontconfig/conf.avail/10-nerd-font-symbols.conf /etc/fonts/conf.d/10-nerd-font-symbols.conf && \
+    ln -sf /usr/share/fontconfig/conf.avail/10-sub-pixel-rgb.conf /etc/fonts/conf.d/10-sub-pixel-rgb.conf && \
+    ln -sf /usr/share/fontconfig/conf.avail/11-lcdfilter-default.conf /etc/fonts/conf.d/11-lcdfilter-default.conf && \
+    ln -sf /usr/share/fontconfig/conf.avail/10-hinting-slight.conf /etc/fonts/conf.d/10-hinting-slight.conf
 
 # Fix suid permissions
 RUN for f in \
