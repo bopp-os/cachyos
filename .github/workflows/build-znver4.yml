@@ -187,7 +187,7 @@ jobs:
           # Write the chunkah stream to disk to prevent pipe deadlocks and RAM exhaustion
           sudo podman run --rm --network=none --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-            quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 256 > "$ARCHIVE_PATH"
+            quay.io/coreos/chunkah build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 256 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
 
           # THE BATON PASS: Delete the massive unchunked image from Podman!
           echo "Freeing space: Deleting the original unchunked image from Podman..."
