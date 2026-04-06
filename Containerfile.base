@@ -232,6 +232,16 @@ RUN --mount=type=tmpfs,dst=/run \
 # POST-INSTALL CONFIGURATION
 # ==========================================
 
+# Configure Fonts: Remove conflicting configs and set up subpixel rendering and custom font configs for better visuals.
+RUN rm -f /etc/fonts/conf.d/*dejavu* && \
+    rm -f /etc/fonts/conf.d/20-unhint* && \
+    rm -f /etc/fonts/conf.d/65-wqy-zenhei.conf && \
+    ln -sf /usr/share/fontconfig/conf.avail/10-sub-pixel-rgb.conf /etc/fonts/conf.d/ && \
+    ln -sf /usr/share/fontconfig/conf.avail/11-lcdfilter-default.conf /etc/fonts/conf.d/ && \
+    ln -sf /usr/share/fontconfig/conf.avail/10-nerd-font-symbols.conf /etc/fonts/conf.d/ && \
+    ln -sf /usr/share/fontconfig/conf.avail/66-noto-sans.conf /etc/fonts/conf.d/ && \
+    ln -sf /usr/share/fontconfig/conf.avail/66-noto-serif.conf /etc/fonts/conf.d/
+
 # Master copy of custom executables. Overwrites defaults (like steamos-update).
 COPY files/usr/bin /usr/bin
 RUN chmod -R 0755 /usr/bin /usr/share/libalpm/scripts
