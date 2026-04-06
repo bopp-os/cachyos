@@ -181,7 +181,7 @@ RUN --mount=type=tmpfs,dst=/run \
         # --- Firmware & Microcode ---
         amd-ucode intel-ucode linux-firmware sof-firmware alsa-firmware wireless-regdb linux-firmware-marvell \
         # --- CachyOS Base Settings ---
-        cachyos-settings cachyos-micro-settings cachyos-ananicy-rules cachyos-zsh-config cachyos-fish-config cachyos-samba-settings cachyos-ksm-settings \
+        cachyos-settings cachyos-micro-settings cachyos-ananicy-rules cachyos-zsh-config cachyos-fish-config cachyos-samba-settings \
         # --- Graphics & Drivers ---
         mesa lib32-mesa mesa-utils vulkan-icd-loader vulkan-mesa-layers \
         vulkan-intel vulkan-radeon intel-media-driver vulkan-nouveau \
