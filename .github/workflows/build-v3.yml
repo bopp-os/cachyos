@@ -108,15 +108,6 @@ jobs:
           echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
 
-      - name: Cache Chunkah Stability Data
-        if: steps.check_compatibility.outputs.should_skip != 'true'
-        uses: actions/cache@v4
-        with:
-          path: /tmp/chunkah-history
-          key: chunkah-history-${{ env.DEFAULT_TAG }}-${{ github.run_id }}
-          restore-keys: |
-            chunkah-history-${{ env.DEFAULT_TAG }}-
-
       - name: Build & Rechunk Base Image
         id: build_rechunk_base
         if: steps.check_compatibility.outputs.should_skip != 'true'
@@ -166,20 +157,11 @@ jobs:
           IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           ARCHIVE_PATH="${{ github.workspace }}/rechunked_base.tar"
 
-          # Prepare the history directory and arguments
-          mkdir -p /tmp/chunkah-history
-          HISTORY_ARGS=""
-          if [ -f "/tmp/chunkah-history/history.json" ]; then
-            echo "Found previous chunkah stability data. Feeding it to the rechunker..."
-            HISTORY_ARGS="--history-in /history/history.json"
-          fi
-
-          # Run chunkah with volume mounted history directory
+          # Run chunkah
           sudo podman run --rm --network=none \
             --mount=type=image,source=$IMAGE_REF,target=/chunkah \
-            -v /tmp/chunkah-history:/history:Z \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-            quay.io/coreos/chunkah build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 256 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ $HISTORY_ARGS --history-out /history/history.json > "$ARCHIVE_PATH"
+            quay.io/coreos/chunkah build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 256 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
 
           sudo podman rmi -f "$IMAGE_REF"
           sudo podman system prune -f
