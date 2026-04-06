@@ -194,7 +194,7 @@ RUN --mount=type=tmpfs,dst=/run \
         bash zsh fish bash-preexec bash-completion zsh-completions oh-my-zsh-git \
         atuin starship \
         # --- CLI Utilities ---
-        zoxide eza ripgrep tealdeer fd fzf jq btop iotop-c konsave byobu \
+        zoxide eza ripgrep tealdeer fd fzf jq btop iotop-c konsave \
         conky sysstat htop neofetch glances procs bottom rsync rclone wl-clipboard \
         procps-ng curl wget file man-db man-pages openssh openssl \
         # --- Text Editors ---
