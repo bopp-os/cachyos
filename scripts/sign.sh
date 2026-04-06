@@ -42,4 +42,4 @@ echo "Signing image with digest: $DIGEST"
 # `sudo -E` is used to preserve the COSIGN_PRIVATE_KEY environment variable if it is set.
 # We also explicitly set REGISTRY_AUTH_FILE to ensure cosign finds the correct credentials,
 # mirroring the --authfile flag used in the Justfile's push recipe.
-sudo -E REGISTRY_AUTH_FILE=/etc/containers/auth.json cosign sign -y --new-bundle-format=false --use-signing-config=false $KEY_ARG "${FULL_IMAGE}:${ARCH}@${DIGEST}"
+sudo -E REGISTRY_AUTH_FILE=/etc/containers/auth.json cosign sign -y --new-bundle-format=false --use-signing-config=false $KEY_ARG "${FULL_IMAGE}:${ARCH}@${DIGEST}" < /dev/null

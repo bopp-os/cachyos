@@ -120,5 +120,5 @@ fi
 
 echo -e "\n${BLUE}CachyOS BoppOS update complete!${NC}"
 if [ "$RUN_OS" = true ]; then
-    echo "Note: If the OS was updated via bootc, please reboot to apply the changes."
+    echo -e "\nNote: If the OS was updated via bootc, please reboot to apply the changes."
 fi
