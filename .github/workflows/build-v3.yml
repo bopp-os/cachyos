@@ -175,41 +175,6 @@ jobs:
           sudo podman tag "$IMAGE_REF" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           echo "::endgroup::"
 
-      - name: Push Base Image to GHCR
-        if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
-        id: push_base
-        env:
-          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
-          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
-          MAX_RETRIES: 3
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -ex
-          
-          echo "::group::Pushing base"
-          CURRENT_IMAGE_NAME="cachyos-base"
-          
-          for tag in $IMAGE_TAGS; do
-            SUCCESS=false
-            for i in $(seq "${MAX_RETRIES}"); do
-              if sudo podman push --compression-format=zstd --compression-level=2 "localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"; then
-                SUCCESS=true
-                break
-              fi
-              echo "Push failed, retrying in $((5 * i)) seconds..."
-              sleep $((5 * i))
-            done
-            if [ "$SUCCESS" = "false" ]; then
-              echo "::error::Failed to push tag $tag after $MAX_RETRIES retries."
-              exit 1
-            fi
-          done
-          
-          REMOTE_DIGEST=$(sudo skopeo inspect --format '{{.Digest}}' "docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}")
-          echo "Captured remote digest: $REMOTE_DIGEST"
-          echo "${CURRENT_IMAGE_NAME}=${REMOTE_DIGEST}" >> digests.env
-          echo "::endgroup::"
-
       - name: Build Flavor Images
         id: build_flavors
         if: steps.check_compatibility.outputs.should_skip != 'true'
