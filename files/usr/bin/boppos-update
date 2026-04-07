@@ -6,43 +6,119 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}Starting CachyOS BoppOS System Update...${NC}\n"
+update_os() {
+    echo -e "${GREEN}==> Updating OS image (bootc)...${NC}"
+    sudo bootc upgrade
+}
 
-# 1. Update bootc deployment (OS update)
-echo -e "${GREEN}==> Updating OS image (bootc)...${NC}"
-sudo bootc upgrade
-
-# 2. Firmware updates
-echo -e "\n${GREEN}==> Checking for firmware updates (fwupd)...${NC}"
-if command -v fwupdmgr &> /dev/null; then
-    sudo fwupdmgr refresh || true
-    # Using || true so a lack of updates doesn't fail the script
-    sudo fwupdmgr update -y || true
-else
-    echo "fwupdmgr not found, skipping firmware updates."
-fi
-
-# 3. Flatpak updates
-echo -e "\n${GREEN}==> Updating Flatpaks...${NC}"
-if command -v flatpak &> /dev/null; then
+update_fw() {
+    echo -e "\n${GREEN}==> Checking for firmware updates (fwupd)...${NC}"
+    if command -v fwupdmgr &> /dev/null; then
+        sudo fwupdmgr refresh || true
+        sudo fwupdmgr update -y || true
+    else
+        echo "fwupdmgr not found, skipping firmware updates."
+    fi
     # Clean up stale temporary caches to prevent revokefs-fuse glib crashes
     sudo rm -rf /var/tmp/flatpak-cache-* 2>/dev/null || true
+}
 
-    # Update flatpaks. Using || prevents upstream flatpak crashes from halting the script.
-    flatpak update -y || {
-        echo -e "${BLUE}Warning: flatpak update encountered an error (likely a known FUSE bug). Run 'flatpak repair' if the issue persists.${NC}"
-    }
+update_flatpak() {
+    echo -e "\n${GREEN}==> Updating Flatpaks...${NC}"
+    if command -v flatpak &> /dev/null; then
+        flatpak update -y || {
+            echo -e "${BLUE}Warning: flatpak update encountered an error (likely a known FUSE bug). Run 'flatpak repair' if the issue persists.${NC}"
+        }
+    else
+        echo "flatpak not found, skipping."
+    fi
+}
+
+update_brew() {
+    echo -e "\n${GREEN}==> Updating Homebrew...${NC}"
+    if command -v brew &> /dev/null; then
+        brew update && brew upgrade
+    else
+        echo "Homebrew not found, skipping."
+    fi
+}
+
+update_distrobox() {
+    echo -e "\n${GREEN}==> Updating Distroboxes...${NC}"
+    if command -v distrobox &> /dev/null; then
+        distrobox upgrade --all || true
+    else
+        echo "distrobox not found, skipping."
+    fi
+}
+
+show_help() {
+    echo "Usage: boppos-update [OPTIONS]"
+    echo "Options:"
+    echo "  -o, --os         Update OS image (bootc)"
+    echo "  -w, --fw         Update firmware (fwupdmgr)"
+    echo "  -f, --flatpak    Update Flatpaks"
+    echo "  -b, --brew       Update Homebrew"
+    echo "  -d, --distrobox  Update all Distroboxes"
+    echo "  -a, --all        Run default updates (OS, FW, Flatpak, Brew)"
+    echo "                   Note: Distrobox updates must be called explicitly."
+    echo "  -h, --help       Show this help message"
+}
+
+# Parse arguments
+RUN_OS=false
+RUN_FW=false
+RUN_FLATPAK=false
+RUN_BREW=false
+RUN_DISTROBOX=false
+
+if [ "$#" -eq 0 ]; then
+    RUN_OS=true; RUN_FW=true; RUN_FLATPAK=true; RUN_BREW=true
 else
-    echo "flatpak not found, skipping."
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --os) RUN_OS=true ;;
+            --fw) RUN_FW=true ;;
+            --flatpak) RUN_FLATPAK=true ;;
+            --brew) RUN_BREW=true ;;
+            --distrobox) RUN_DISTROBOX=true ;;
+            --all) RUN_OS=true; RUN_FW=true; RUN_FLATPAK=true; RUN_BREW=true ;;
+            --help) show_help; exit 0 ;;
+            -[!-]* ) # Match short flags (a single dash followed by non-dash characters)
+                flags="${1#-}"
+                for (( i=0; i<${#flags}; i++ )); do
+                    case "${flags:$i:1}" in
+                        o) RUN_OS=true ;;
+                        w) RUN_FW=true ;;
+                        f) RUN_FLATPAK=true ;;
+                        b) RUN_BREW=true ;;
+                        d) RUN_DISTROBOX=true ;;
+                        a) RUN_OS=true; RUN_FW=true; RUN_FLATPAK=true; RUN_BREW=true ;;
+                        h) show_help; exit 0 ;;
+                        *) echo "Unknown parameter passed: -${flags:$i:1}"; show_help; exit 1 ;;
+                    esac
+                done
+                ;;
+            *) echo "Unknown parameter passed: $1"; show_help; exit 1 ;;
+        esac
+        shift
+    done
 fi
 
-# 4. Homebrew updates (if installed)
-echo -e "\n${GREEN}==> Updating Homebrew...${NC}"
-if command -v brew &> /dev/null; then
-    brew update && brew upgrade
-else
-    echo "Homebrew not found, skipping."
+echo -e "${BLUE}Starting CachyOS BoppOS System Update...${NC}\n"
+
+# Pre-authenticate sudo if OS or Firmware is being updated
+if [ "$RUN_OS" = true ] || [ "$RUN_FW" = true ]; then
+    sudo -v
 fi
+
+[ "$RUN_OS" = true ] && update_os
+[ "$RUN_FW" = true ] && update_fw
+[ "$RUN_FLATPAK" = true ] && update_flatpak
+[ "$RUN_BREW" = true ] && update_brew
+[ "$RUN_DISTROBOX" = true ] && update_distrobox
 
 echo -e "\n${BLUE}CachyOS BoppOS update complete!${NC}"
-echo "Note: If the OS was updated via bootc, please reboot to apply the changes."
+if [ "$RUN_OS" = true ]; then
+    echo -e "\nNote: If the OS was updated via bootc, please reboot to apply the changes."
+fi

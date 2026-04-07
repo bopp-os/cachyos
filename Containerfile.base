@@ -169,7 +169,7 @@ RUN --mount=type=tmpfs,dst=/run \
 RUN --mount=type=tmpfs,dst=/run \
     --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth mesa-git lib32-mesa-git || echo "Conflicting packages not found, skipping." && \
-    pacman -Sy --noconfirm --needed --assume-installed lib32-gst-plugins-base-libs --assume-installed lib32-libsoup \
+    pacman -Sy --noconfirm --needed --assume-installed lib32-gst-plugins-base-libs \
         # --- System Core ---
         linux-cachyos linux-cachyos-headers systemd systemd-sysvcompat \
         dbus dbus-broker-units dbus-glib glib2 polkit shadow lua-luv \
