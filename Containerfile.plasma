@@ -40,12 +40,6 @@ RUN COMPONENT_TAG="kde-media-themes" pacman -Sy --noconfirm --needed \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# --- Web Browsers ---
-RUN COMPONENT_TAG="web-browsers" pacman -Sy --noconfirm --needed \
-    helium-browser-bin cachyos-firefox-settings && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
 # Enable DE services
 RUN systemctl disable sddm.service || true && \
     systemctl disable gdm.service || true && \

@@ -272,6 +272,12 @@ RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_
     cachyos-gaming-meta cachyos-gaming-applications xorg-xwininfo xdotool yad winboat proton-cachyos wine gamescope-session-git sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid goverlay pascube vkbasalt vkbasalt-cli libdvdcss gst-libav mpv-git ffmpeg vlc gpu-screen-recorder-ui && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
+# --- Web Browsers ---
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="web-browsers" pacman -Sy --noconfirm --needed \
+    helium-browser-bin cachyos-firefox-settings && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
 # --- Shared Languages & IDEs ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="languages-ides" pacman -Sy --noconfirm --needed \
