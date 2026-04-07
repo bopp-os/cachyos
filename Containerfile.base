@@ -324,5 +324,10 @@ RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
 RUN mkdir -p /etc/pki/containers
 COPY cosign.pub /etc/pki/containers/bopp-os.pub
 
-RUN rm -f /README.md
+# Move all config from /etc to /usr/etc and clear /etc
+RUN mkdir -p /usr/etc && \
+    cp -a /etc/. /usr/etc/ && \
+    rm -rf /etc/* 2>/dev/null || true
+
+    RUN rm -f /README.md
 LABEL containers.bootc=1
