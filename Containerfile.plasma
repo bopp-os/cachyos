@@ -33,9 +33,8 @@ RUN COMPONENT_TAG="kde-utilities" pacman -Sy --noconfirm --needed \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# --- KDE Media & Thumbnailers ---
 RUN COMPONENT_TAG="kde-media" pacman -Sy --noconfirm --needed \
-    ffmpegthumbnailer ffmpegthumbs kdegraphics-thumbnailers kimageformats qt6-imageformats \
+    ffmpegthumbnailer ffmpegthumbs kdegraphics-thumbnailers kimageformats qt6-imageformats && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
