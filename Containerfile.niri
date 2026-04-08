@@ -13,7 +13,7 @@ FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
 RUN COMPONENT_TAG="niri-core" pacman -Sy --noconfirm --needed \
     niri cachyos-niri-noctalia fuzzel alacritty \
     xorg-xwayland xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk \
-    polkit-gnome greetd greetd-tuigreet && \
+    polkit-gnome greetd greetd-regreet cage && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
@@ -35,10 +35,20 @@ RUN COMPONENT_TAG="niri-themes-aesthetics" pacman -Sy --noconfirm --needed \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# Configure greetd to start Niri via tuigreet
+# Configure greetd to start a graphical GTK greeter (regreet) via cage
 RUN mkdir -p /etc/greetd && \
-    sed -i 's/^command = .*/command = "tuigreet --cmd niri-session"/' /etc/greetd/config.toml || \
-    printf "[terminal]\n$vt = 1\n[default_session]\ncommand = \"tuigreet --cmd niri-session\"\nuser = \"greeter\"\n" > /etc/greetd/config.toml
+    sed -i 's|^command = .*|command = "env GDK_SCALE=2 cage -s -- regreet"|' /etc/greetd/config.toml || \
+    printf '[terminal]\nvt = 1\n[default_session]\ncommand = "env GDK_SCALE=2 cage -s -- regreet"\nuser = "greeter"\n' > /etc/greetd/config.toml
+
+# Theme regreet (Background, Dark Mode, and GTK Theme)
+RUN printf '[background]\n\
+path = "/usr/share/backgrounds/cachyos-wallpapers/default.png"\n\
+fit = "Cover"\n\
+\n\
+[GTK]\n\
+application_prefer_dark_theme = true\n\
+theme_name = "CachyOS-Nord"\n\
+font_name = "Noto Sans 16"\n' > /etc/regreet.toml
 
 # Enable DE services
 RUN systemctl disable sddm.service || true && \
