@@ -157,6 +157,15 @@ mv /etc/shadow.new /etc/shadow
 mv /etc/gshadow.new /etc/gshadow
 echo "✅ Merged Arch system users/groups with existing local users."
 
+# Ensure the migrating user is in the wheel group
+usermod -aG wheel "$REAL_USER"
+echo "✅ Ensured $REAL_USER is in the wheel group."
+
+# Ensure wheel group has sudo privileges
+mkdir -p /etc/sudoers.d
+echo "%wheel      ALL=(ALL:ALL) ALL" > /etc/sudoers.d/10-wheel
+chmod 440 /etc/sudoers.d/10-wheel
+
 # ------------------------------------------------------------------------------
 # PHASE 3: OVERLAYFS CLEANUP
 # ------------------------------------------------------------------------------
