@@ -12,25 +12,43 @@ This is all very experimental. So use at your own risk.
 
 ## What's Changed (vs. Upstream)
 
-- **Desktop First:** Stripped away Steam Deck/handheld-specific UI elements and scaling tweaks in favor of a standard KDE Plasma desktop.
-- **Developer Ready:** Pre-installed essentials like Docker, VS Code, Node.js, Rust, and Python.
-- **Streamlined Management:** Integrated `just` for simplified building and introduced a custom `boppos-update` script for seamless OS updates.
+- **Desktop First:** Stripped away Steam Deck/handheld-specific UI elements and scaling tweaks in favor of standard desktop environments (with support for KDE Plasma, GNOME, and Niri).
+- **Developer Ready:** Pre-installed essentials like Distrobox, Homebrew (`brew`), Docker, VS Code, Node.js, Rust, and Python.
+- **Streamlined Management:** Integrated `just` for simplified building and introduced custom tools like `boppos-update` for seamless OS updates, `bopp-migrate` for transitioning from Fedora atomic systems, and `bopp-tpm-refresh` to easily handle LUKS/TPM2 decryption.
+- **Automated Flatpaks:** Includes user-level services to automatically install and maintain essential Flatpak applications upon first boot.
 
 ## Key Features
 
 - **High-Performance Base**: Built on [CachyOS](https://cachyos.org/), an Arch-based distribution with performance-tuned kernels and repositories.
 - **Atomic & Immutable**: Uses [bootc](https://bootc-dev.github.io/) for an atomic, image-based system that offers incredible stability and easy rollbacks.
-- **Desktop Optimized**: Stripped of all handheld UI elements and optimized for a traditional desktop experience with KDE Plasma.
+- **Desktop Choice**: Choose your preferred flavor: KDE Plasma, GNOME, or the Niri Wayland compositor.
 - **Modern Hardware Support**: Includes build-time support for `znver4` CPU optimizations for AMD Ryzen 7000 series processors.
 - **Gaming Ready**: Comes with a suite of pre-installed gaming software and utilities:
   - `cachyos-gaming-applications`, `proton-cachyos`, `wine-cachyos`
   - `sunshine`, `mangohud`, `goverlay`, `lact`
   - `faugus-launcher`, `umu-launcher`, `winboat`
-- **Developer Focused**: Includes essential development tools out of the box:
-  - `docker` & `docker-compose`
+- **Developer Focused**: Includes essential development environments and tools out of the box:
+  - Homebrew (`brew`) support integrated into the base image
+  - `distrobox`, `docker` & `docker-compose`
   - `nodejs`, `npm`, `rust`, `python-pip`, `python-pipx`
   - `visual-studio-code-bin`
+- **Seamless Setup & Migration**: Features custom scripts to transition safely from other atomic distributions (`bopp-migrate`) and automate Flatpak setup upon first boot.
+- **Hardware Encryption Utility**: Includes `bopp-tpm-refresh` to automatically re-enroll LUKS TPM2 encryption keys after system updates or migrations.
 - **Enhanced Shell**: A pre-configured shell environment with `starship`, `zoxide`, and `eza` for a modern terminal experience.
+
+## Migration Tool (`bopp-migrate`)
+
+⚠️ **WARNING: HIGHLY EXPERIMENTAL AND POTENTIALLY DESTRUCTIVE** ⚠️
+
+BoppOS includes an experimental migration script (`bopp-migrate`) designed to help users transition their `/etc` and `$HOME` configurations from a Fedora-based atomic OS (like Bazzite or Bluefin) to this Arch-based BoppOS image. 
+
+**Do NOT run this script unless you fully understand what it does.** It will forcefully manipulate user IDs, group IDs, and move hidden configuration folders in your home directory into a backup "Vault". While it attempts to preserve critical data (like SSH keys, browser profiles, and game data), **it is largely untested and could result in a broken system or data loss.** Always ensure you have a separate, verified backup of your home directory before attempting a migration.
+
+To use the migration tool, run it with `sudo` after booting into BoppOS for the first time:
+
+```bash
+sudo bopp-migrate
+```
 
 ## Build Instructions
 

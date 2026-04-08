@@ -1,0 +1,23 @@
+#!/bin/bash
+# bopp-tpm-refresh: Refreshes LUKS TPM2 enrollment for BoppOS
+
+# 1. Identify the LUKS partition
+LUKS_PART=$(lsblk -f -o NAME,FSTYPE | grep "crypto_LUKS" | head -n1 | awk '{print "/dev/"$1}')
+
+if [[ -z "$LUKS_PART" ]]; then
+    echo "❌ No LUKS encrypted partition detected. Skipping TPM refresh."
+    exit 0
+fi
+
+echo "🔐 Encrypted partition found: $LUKS_PART"
+echo "Your TPM2 PCRs likely changed during the rebase. We need to re-enroll."
+
+# 2. Perform the enrollment
+# Note: This will prompt the user for their existing recovery passphrase
+sudo systemd-cryptenroll --tpm2-device=auto --wipe-slot=tpm2 "$LUKS_PART"
+
+if [[ $? -eq 0 ]]; then
+    echo "✅ TPM2 successfully re-enrolled for BoppOS."
+else
+    echo "⚠️ TPM2 enrollment failed. You may need to use your passphrase at next boot."
+fi

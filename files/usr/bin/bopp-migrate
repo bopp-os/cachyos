@@ -1,0 +1,266 @@
+#!/bin/bash
+
+# ==============================================================================
+# BoppOS Migration Script (bopp-migrate)
+# Purpose: Transition /etc and $HOME from Fedora-based atomic OS to BoppOS (Arch)
+# ==============================================================================
+
+# Ensure the script is run with sudo for system tasks
+if [[ $EUID -ne 0 ]]; then
+   echo "❌ This script must be run with sudo (e.g., sudo bopp-migrate)"
+   exit 1
+fi
+
+# Configuration & Variables
+REAL_USER=${SUDO_USER:-$USER}
+USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+TIMESTAMP=$(date +%Y%m%d_%H%M)
+VAULT_NAME="BoppOS_Migration_$TIMESTAMP"
+VAULT_PATH="$USER_HOME/$VAULT_NAME"
+
+# Folders to NEVER move (Safety Filter)
+EXCLUDE_LIST=(
+    ".var"                    # Flatpak data
+    ".local/share/containers"  # Distrobox / Podman
+    ".steam"                  # Steam metadata
+    ".local/share/Steam"      # Steam Games
+    ".mozilla"                # Firefox profiles
+    ".config/google-chrome"   # Chrome profiles
+    ".config/BraveSoftware"   # Brave browser
+    ".config/opera"           # Opera browser
+    ".config/chromium"        # Chromium browser
+    ".config/vivaldi"         # Vivaldi browser
+    ".config/microsoft-edge"  # Edge browser
+    ".config/Code"            # VS Code configuration
+    ".vscode"                 # VS Code extensions
+    ".config/VSCodium"        # VSCodium configuration
+    ".vscode-oss"             # VSCodium extensions
+    ".thunderbird"            # Thunderbird email
+    ".config/discord"         # Discord (native)
+    ".config/vesktop"         # Vesktop
+    ".config/obs-studio"      # OBS Studio scenes/configs
+    ".config/sunshine"        # Sunshine game streaming
+    ".local/share/bottles"    # Bottles (Windows runners)
+    ".local/share/PrismLauncher" # Minecraft
+    ".local/share/lutris"     # Lutris game data
+    ".config/lutris"          # Lutris configurations
+    ".config/heroic"          # Heroic Games Launcher
+    ".config/faugus-launcher" # Faugus Launcher config
+    ".local/share/faugus-launcher" # Faugus Launcher data
+    ".local/share/waydroid"   # Waydroid Android environment
+    ".config/Bitwarden"       # Bitwarden desktop client
+    ".local/share/keyrings"   # GNOME Keyring / Secret Service data
+    ".local/share/kwalletd"   # KDE Wallet data
+    ".config/sops"            # SOPS secrets
+    ".config/1Password"       # 1Password desktop app data
+    ".ssh"                    # SSH Keys
+    ".gnupg"                  # GPG Keys
+    ".password-store"         # Pass CLI passwords
+)
+
+clear
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "                BoppOS MIGRATION TOOL (BETA)                   "
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "This script will attempt to resolve conflicts between your old"
+echo "Fedora-based configuration and your new Arch-based BoppOS image."
+echo ""
+echo "⚠️ WARNING: This will modify /etc and your home directory."
+echo "A full backup of /etc will be created before proceeding."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+read -p "Type 'MIGRATE' to confirm the risks and proceed: " CONFIRM
+if [[ "$CONFIRM" != "MIGRATE" ]]; then
+    echo "Migration cancelled."
+    exit 0
+fi
+
+# ------------------------------------------------------------------------------
+# PHASE 1: SYSTEM BACKUP & RESET
+# ------------------------------------------------------------------------------
+echo "--- [1/6] Backing up and resetting system configs (/etc) ---"
+
+# 1.1 Backup /etc
+mkdir -p /var/roothome/migration_backups
+tar -czf "/var/roothome/migration_backups/etc_pre_migration_$TIMESTAMP.tar.gz" /etc 2>/dev/null
+echo "✅ /etc backed up to /var/roothome/migration_backups/"
+
+# 1.2 Restore pristine Arch PAM & NSS
+cp -af /usr/etc/pam.d/* /etc/pam.d/
+cp -af /usr/etc/nsswitch.conf /etc/nsswitch.conf
+echo "✅ Restored Arch-native PAM and NSS configurations."
+
+# 1.3 Reset X11/GDM permission vaccine
+rm -rf /tmp/.X11-unix
+mkdir -p /tmp/.X11-unix
+chown root:root /tmp/.X11-unix
+chmod 1777 /tmp/.X11-unix
+echo "✅ Reset /tmp/.X11-unix permissions (GDM Login Loop Fix)."
+
+# ------------------------------------------------------------------------------
+# PHASE 2: USER RECONCILIATION
+# ------------------------------------------------------------------------------
+echo "--- [2/6] Reconciling User IDs (Heart Transplant) ---"
+
+# 1. Merge passwd and group (Prioritize Arch base, append local-only users/services)
+# This updates UIDs for base services (like GDM) while keeping unique local users.
+cp /usr/etc/passwd /etc/passwd.new
+awk -F: 'NR==FNR{seen[$1]=1; next} !seen[$1]' /usr/etc/passwd /etc/passwd >> /etc/passwd.new
+
+cp /usr/etc/group /etc/group.new
+awk -F: 'NR==FNR{seen[$1]=1; next} !seen[$1]' /usr/etc/group /etc/group >> /etc/group.new
+
+# 2. Merge shadow and gshadow (Prioritize local passwords, append new base users)
+cp /etc/shadow /etc/shadow.tmp
+if [ -f /usr/etc/shadow ]; then
+    awk -F: 'NR==FNR{seen[$1]=1; next} !seen[$1]' /etc/shadow /usr/etc/shadow >> /etc/shadow.tmp
+fi
+
+cp /etc/gshadow /etc/gshadow.tmp
+if [ -f /usr/etc/gshadow ]; then
+    awk -F: 'NR==FNR{seen[$1]=1; next} !seen[$1]' /etc/gshadow /usr/etc/gshadow >> /etc/gshadow.tmp
+fi
+
+# 3. Clean up shadow files (Remove dangling entries using strict username anchoring)
+grep -f <(cut -d: -f1 /etc/passwd.new | sed 's/^/^/; s/$/:/') /etc/shadow.tmp > /etc/shadow.new
+grep -f <(cut -d: -f1 /etc/group.new | sed 's/^/^/; s/$/:/') /etc/gshadow.tmp > /etc/gshadow.new
+rm -f /etc/shadow.tmp /etc/gshadow.tmp
+
+mv /etc/passwd.new /etc/passwd
+mv /etc/group.new /etc/group
+mv /etc/shadow.new /etc/shadow
+mv /etc/gshadow.new /etc/gshadow
+echo "✅ Merged Arch system users/groups with existing local users."
+
+# ------------------------------------------------------------------------------
+# PHASE 3: OVERLAYFS CLEANUP
+# ------------------------------------------------------------------------------
+echo "--- [3/6] Cleaning up stale OverlayFS metadata ---"
+
+if [[ -d "/var/opt_overlay/work" ]]; then
+    rm -rf /var/opt_overlay/work/*
+    echo "✅ Cleared /var/opt_overlay/work (OverlayFS Stale Handle Fix)."
+else
+    echo "ℹ️ No OverlayFS workdir found. Skipping."
+fi
+
+# ------------------------------------------------------------------------------
+# PHASE 4: HOME DIRECTORY & SHELL RESET
+# ------------------------------------------------------------------------------
+echo "--- [4/6] Cleaning Home Directory ($USER_HOME) ---"
+
+# Create the Vault
+sudo -u "$REAL_USER" mkdir -p "$VAULT_PATH"
+echo "📦 Vault created at: $VAULT_NAME"
+
+echo "Would you like to perform a 'Fresh Start' for your user configs?"
+echo "1) Surgical (Move known broken Fedora shell/tooling configs to vault)"
+echo "2) Total Reset (Move ALL hidden configs to vault, keep data/containers)"
+echo "3) Skip"
+read -p "Select [1-3]: " HOME_OPT
+
+case $HOME_OPT in
+    1) TARGETS=("$USER_HOME/.bashrc" "$USER_HOME/.zshrc" "$USER_HOME/.bash_profile" "$USER_HOME/.bash_logout" "$USER_HOME/.config/fish" "$USER_HOME/.local/share/flatpak") ;;
+    2) TARGETS=("$USER_HOME"/.[a-zA-Z0-9]*) ;;
+    *) TARGETS=() ;;
+esac
+
+for ITEM_PATH in "${TARGETS[@]}"; do
+    # Get the path relative to $USER_HOME for accurate exclusion matching
+    REL_PATH="${ITEM_PATH#$USER_HOME/}"
+    
+    # Prevent moving the vault itself
+    if [[ "$REL_PATH" == "$VAULT_NAME" ]]; then
+        continue
+    fi
+
+    # If the target is exactly an excluded item, skip it upfront
+    EXCLUDED=0
+    for EXCLUDE in "${EXCLUDE_LIST[@]}"; do
+        if [[ "$REL_PATH" == "$EXCLUDE" ]]; then
+            EXCLUDED=1
+            break
+        fi
+    done
+
+    if [[ $EXCLUDED -eq 1 ]]; then
+        echo "🛡️ Skipping protected data: $REL_PATH"
+        continue
+    fi
+
+    if [[ -e "$ITEM_PATH" ]]; then
+        echo "Moving $REL_PATH to Vault..."
+        # Ensure target directory exists in vault (important for nested paths like .config/fish)
+        mkdir -p "$VAULT_PATH/$(dirname "$REL_PATH")"
+        mv "$ITEM_PATH" "$VAULT_PATH/$REL_PATH"
+        
+        # Restore fresh Arch template from /etc/skel
+        SKEL_ITEM="/etc/skel/$REL_PATH"
+        if [[ -e "$SKEL_ITEM" ]]; then
+            # Ensure target directory exists in user home
+            mkdir -p "$USER_HOME/$(dirname "$REL_PATH")"
+            cp -r "$SKEL_ITEM" "$USER_HOME/$REL_PATH"
+            chown -R "$REAL_USER":"$REAL_USER" "$USER_HOME/$REL_PATH"
+            echo "  -> Restored fresh BoppOS template for $REL_PATH"
+        fi
+    fi
+done
+
+# Approach B: Restore protected data from the Vault back to the home directory
+echo "♻️ Restoring protected data from Vault..."
+for EXCLUDE in "${EXCLUDE_LIST[@]}"; do
+    if [[ -e "$VAULT_PATH/$EXCLUDE" ]]; then
+        # Ensure target directory exists in user home
+        mkdir -p "$USER_HOME/$(dirname "$EXCLUDE")"
+        mv "$VAULT_PATH/$EXCLUDE" "$USER_HOME/$EXCLUDE"
+        chown -R "$REAL_USER":"$REAL_USER" "$USER_HOME/$EXCLUDE"
+        echo "  -> Restored protected data: $EXCLUDE"
+    fi
+done
+
+# Ensure the Vault belongs to the user
+chown -R "$REAL_USER":"$REAL_USER" "$VAULT_PATH"
+
+# ------------------------------------------------------------------------------
+# PHASE 5: ENCRYPTION (TPM2)
+# ------------------------------------------------------------------------------
+echo "--- [5/6] Hardware & Encryption Check ---"
+
+if systemd-detect-virt --quiet --container; then
+    echo "ℹ️ Container detected. Skipping TPM checks."
+else
+    if lsblk -f | grep -q "crypto_LUKS"; then
+        read -p "LUKS encryption detected. Refresh TPM2 auto-unlock? [y/N]: " RUN_TPM
+        if [[ "$RUN_TPM" =~ ^[Yy]$ ]]; then
+            # Call the modular sub-script
+            if command -v bopp-tpm-refresh &> /dev/null; then
+                bopp-tpm-refresh
+            else
+                echo "⚠️ bopp-tpm-refresh script not found in PATH."
+            fi
+        fi
+    fi
+fi
+
+# ------------------------------------------------------------------------------
+# PHASE 6: FINAL SYSTEM ALIGNMENT
+# ------------------------------------------------------------------------------
+echo "--- [6/6] Finalizing System Alignment ---"
+
+# Re-run sysusers to fill in any gaps
+systemd-sysusers
+echo "✅ System users verified."
+
+# Repair Flatpak remotes
+read -p "Repair Flatpak runtimes for Arch compatibility? [y/N]: " FIX_FLATPAK
+if [[ "$FIX_FLATPAK" =~ ^[Yy]$ ]]; then
+    flatpak repair --system
+    echo "✅ Flatpaks repaired."
+fi
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "                      MIGRATION COMPLETE                       "
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Please REBOOT now to finalize the changes."
+echo "Your old configs are safely stored in: ~/$VAULT_NAME"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
