@@ -8,7 +8,7 @@ Before=local-fs.target
 What=overlay
 Where=/var/opt
 Type=overlay
-Options=lowerdir=/usr/lib/opt,upperdir=/var/opt_overlay/upper,workdir=/var/opt_overlay/work
+Options=lowerdir=/usr/lib/opt,upperdir=/var/opt_overlay/upper,workdir=/var/opt_overlay/work,index=off
 
 [Install]
 WantedBy=local-fs.target
