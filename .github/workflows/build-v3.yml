@@ -55,9 +55,6 @@ jobs:
             echo "should_skip=true" >> $GITHUB_OUTPUT # Set an output variable
           fi
 
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
         with:
@@ -66,6 +63,9 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
           remove-docker-images: 'true'
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Get current date
         id: date
