@@ -2,7 +2,7 @@
 # bopp-tpm-refresh: Refreshes LUKS TPM2 enrollment for BoppOS
 
 # 1. Identify the LUKS partition
-LUKS_PART=$(lsblk -f -o NAME,FSTYPE | grep "crypto_LUKS" | head -n1 | awk '{print "/dev/"$1}')
+LUKS_PART=$(lsblk -l -p -o NAME,FSTYPE | grep "crypto_LUKS" | head -n1 | awk '{print $1}')
 
 if [[ -z "$LUKS_PART" ]]; then
     echo "❌ No LUKS encrypted partition detected. Skipping TPM refresh."

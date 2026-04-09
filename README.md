@@ -10,23 +10,6 @@ This is all very experimental. So use at your own risk.
 
 ---
 
-## What's Changed (vs. Upstream)
-
-- **Desktop First:** Stripped away Steam Deck/handheld-specific UI elements and scaling tweaks in favor of standard desktop environments (with support for KDE Plasma, GNOME, and Niri).
-- **Developer Ready:** Pre-installed essentials like Distrobox, Homebrew (`brew`), Docker, VS Code, Node.js, Rust, and Python.
-- **Streamlined Management:** Integrated `just` for simplified building and introduced custom tools like `boppos-update` for seamless OS updates, `bopp-migrate` for transitioning from Fedora atomic systems, and `bopp-tpm-refresh` to easily handle LUKS/TPM2 decryption.
-```bash
-boppos-update
-```
-```bash
-bopp-tpm-refresh
-```
-- **Optional Flatpaks:** Includes an interactive script (`install-optional-flatpaks`) to easily fetch, customize, and install a curated list of essential Flatpak applications.
-To use it, simply open your terminal and run:
-```bash
-install-optional-flatpaks
-```
-
 ## Key Features
 
 - **High-Performance Base**: Built on [CachyOS](https://cachyos.org/), an Arch-based distribution with performance-tuned kernels and repositories.
@@ -45,6 +28,28 @@ install-optional-flatpaks
 - **Seamless Setup & Migration**: Features custom scripts to transition safely from other atomic distributions (`bopp-migrate`).
 - **Hardware Encryption Utility**: Includes `bopp-tpm-refresh` to automatically re-enroll LUKS TPM2 encryption keys after system updates or migrations.
 - **Enhanced Shell**: A pre-configured shell environment with `starship`, `zoxide`, and `eza` for a modern terminal experience.
+
+## Custom Enhancements
+
+- **Desktop First:** Stripped away Steam Deck/handheld-specific UI elements and scaling tweaks in favor of standard desktop environments (with support for KDE Plasma, GNOME, and Niri).
+- **Developer Ready:** Pre-installed essentials like Distrobox, Homebrew (`brew`), Docker, VS Code, Node.js, Rust, and Python.
+- **Streamlined Management:** Integrated `just` for simplified building and introduced custom tools for easy system administration:
+  - **OS Updates:** Seamlessly update your atomic system.
+    ```bash
+    boppos-update
+    ```
+  - **TPM Refresh:** Easily re-enroll LUKS/TPM2 decryption keys after system updates.
+    ```bash
+    bopp-tpm-refresh
+    ```
+  - **System Migration:** Transition your system from Fedora-based atomic distributions.
+    ```bash
+    sudo bopp-migrate
+    ```
+- **Optional Flatpaks:** Includes an interactive script to easily fetch, customize, and install a curated list of essential Flatpak applications. To use it, simply open your terminal and run:
+  ```bash
+  install-optional-flatpaks
+  ```
 
 ## Migration Tool (`bopp-migrate`)
 
