@@ -1,8 +1,10 @@
 [Unit]
 Description=OverlayFS for /opt
+DefaultDependencies=no
 # Ensure this runs early in the boot process
 After=systemd-tmpfiles-setup.service
-Before=local-fs.target
+Conflicts=umount.target
+Before=sysinit.target umount.target
 
 [Mount]
 What=overlay
@@ -11,4 +13,5 @@ Type=overlay
 Options=lowerdir=/usr/lib/opt,upperdir=/var/opt_overlay/upper,workdir=/var/opt_overlay/work,index=off
 
 [Install]
-WantedBy=local-fs.target
+WantedBy=sysinit.target
+
