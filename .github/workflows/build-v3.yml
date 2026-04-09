@@ -33,7 +33,7 @@ concurrency:
 jobs:
   build_push:
     name: Build and push image (v3)
-    runs-on: ubuntu-24.04
+    runs-on: x86-64-v3
 
     permissions:
       contents: read
@@ -55,8 +55,34 @@ jobs:
             echo "should_skip=true" >> $GITHUB_OUTPUT # Set an output variable
           fi
 
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
+      - name: Free Disk Space (Self-Hosted)
+        run: |
+          echo "🧹 Sweeping the runner for free space..."
+          
+          # 1. Clean up package cache (Apt for Debian/Ubuntu, Pacman for Arch/CachyOS)
+          if command -v apt-get &> /dev/null; then
+            echo "Detected apt. Cleaning cache..."
+            sudo apt-get clean
+          elif command -v pacman &> /dev/null; then
+            echo "Detected pacman. Cleaning cache..."
+            sudo pacman -Scc --noconfirm
+          fi
+          
+          # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman*
+          
+          # 3. Prune dangling Podman data AND aggressively wipe the build cache
+          sudo podman system prune --force
+          sudo podman builder prune -a -f
+          
+          # 4. Wipe the Podman package cache if the manual UI toggle was checked
+          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
+            echo "Nuking Podman builder cache mount..."
+            sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*
+          fi
+          
+          echo "📊 Disk space after cleanup:"
+          df -h /
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
