@@ -65,13 +65,6 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
     cd /tmp/autofs && \
     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
 
-# Build docker-desktop
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    git clone https://aur.archlinux.org/docker-desktop.git /tmp/docker-desktop && \
-    chown -R builduser:builduser /tmp/docker-desktop && \
-    cd /tmp/docker-desktop && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
-
 # ==========================================
 # STAGE 2: System Build
 # ==========================================
