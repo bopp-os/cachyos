@@ -64,6 +64,13 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
     cd /tmp/autofs && \
     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
 
+# Build sddm-theme-noctalia-git
+RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+    git clone https://aur.archlinux.org/sddm-theme-noctalia-git.git /tmp/sddm-theme-noctalia-git && \
+    chown -R builduser:builduser /tmp/sddm-theme-noctalia-git && \
+    cd /tmp/sddm-theme-noctalia-git && \
+    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
+
 # Clone bootcrew/mono to access their shared setup scripts
 RUN git clone https://github.com/bootcrew/mono.git /tmp/bootcrew-mono
 
@@ -107,6 +114,9 @@ RUN rm -rf /etc/pacman.d/gnupg && \
     pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
     pacman-key --lsign-key 3056513887B78AEB && \
     pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+
+# Tag pacman config and mirrorlists as a unique component to avoid ostree layer hash non-determinism
+RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings -exec setfattr -n user.component -v "pacman-config" {} +
 
 # Ensure the log file exists
 RUN touch /var/log/pacman.log
