@@ -19,7 +19,7 @@ RUN COMPONENT_TAG="gnome-core" pacman -Sy --noconfirm --needed \
 
 # --- Essential Desktop Utilities ---
 RUN COMPONENT_TAG="gnome-utilities" pacman -Sy --noconfirm --needed \
-    file-roller extension-manager dconf-editor && \
+    file-roller extension-manager dconf-editor papers loupe gnome-disk-utility simple-scan && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
@@ -39,7 +39,7 @@ RUN COMPONENT_TAG="gnome-extensions" pacman -Sy --noconfirm --needed \
 
 # --- GNOME Media ---
 RUN COMPONENT_TAG="gnome-media" pacman -Sy --noconfirm --needed \
-    sushi celluloid && \
+    sushi showtime celluloid && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 

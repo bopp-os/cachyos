@@ -21,7 +21,7 @@ RUN COMPONENT_TAG="kde-core" pacman -Sy --noconfirm --needed \
 RUN COMPONENT_TAG="kde-integration" pacman -Sy --noconfirm --needed \
     plasma plasma-pa plasma-nm kwallet-pam udisks2 python-gobject \
     kio-extras kio-fuse kio-admin flatpak-kcm xdg-utils libappimage \
-    baloo kwayland-integration plasma5-integration && \
+    baloo kwayland-integration plasma5-integration bluedevil plasma-firewall plasma-thunderbolt plasma-browser-integration kinfocenter xsettingsd plymouth-kcm && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
@@ -29,7 +29,7 @@ RUN COMPONENT_TAG="kde-integration" pacman -Sy --noconfirm --needed \
 RUN COMPONENT_TAG="kde-utilities" pacman -Sy --noconfirm --needed \
     dolphin dolphin-plugins konsole kate ark spectacle kdeconnect \
     gwenview okular kcalc partitionmanager plasma-disks plasma-systemmonitor \
-    kdialog filelight yakuake kfind kwalletmanager sweeper plasma-foreground-booster && \
+    kdialog filelight yakuake kfind kwalletmanager sweeper plasma-foreground-booster haruna phonon-qt6-vlc && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 

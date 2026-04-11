@@ -13,13 +13,13 @@ FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
 RUN COMPONENT_TAG="niri-core" pacman -Sy --noconfirm --needed \
     niri cachyos-niri-noctalia fuzzel alacritty \
     xwayland-satellite xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-    polkit-gnome sddm && \
+    polkit-gnome sddm mako waybar && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Essential Desktop Utilities & Applets ---
 RUN COMPONENT_TAG="niri-utilities" pacman -Sy --noconfirm --needed \
-    nautilus loupe evince file-roller gnome-text-editor && \
+    nautilus loupe papers file-roller gnome-text-editor && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
