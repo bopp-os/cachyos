@@ -18,6 +18,7 @@ echo "[*] Fetching curated Flatpak list from Bazzite-DX..."
 curl -sSL "$BAZZITE_URL" | sed 's/#.*//' | grep -v '^\s*$' > "$TMP_LIST"
 
 echo "[*] Merging BoppOS custom Flatpaks..."
+if [ -f "$BOPPOS_LIST" ]; then
     sed 's/#.*//' "$BOPPOS_LIST" | grep -v '^\s*$' >> "$TMP_LIST"
 else
     echo "[!] Warning: Custom list $BOPPOS_LIST not found. Skipping."
