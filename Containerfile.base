@@ -95,6 +95,7 @@ COPY --from=aur_builder /tmp/bootcrew-mono/shared /bootcrew-shared
 # Copy configured pacman environment from aur_builder
 COPY --from=aur_builder /etc/pacman.conf /etc/pacman.conf
 COPY --from=aur_builder /etc/pacman.d /etc/pacman.d
+COPY --from=aur_builder /usr/share/pacman/keyrings /usr/share/pacman/keyrings
 
 # Re-initialize and trust keys in the system stage to avoid GPGME environment issues
 RUN rm -rf /etc/pacman.d/gnupg && \
