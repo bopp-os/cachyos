@@ -177,6 +177,7 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
 RUN --mount=type=tmpfs,dst=/run \
     pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth mesa-git lib32-mesa-git || echo "Conflicting packages not found, skipping."
 
+# --- CATEGORY 1: System Core & Foundational ---
 # --- System Core ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="system-core" pacman -Sy --noconfirm --needed \
@@ -189,10 +190,35 @@ RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_
     bootc dracut ostree skopeo containers-common btrfs-progs e2fsprogs xfsprogs dosfstools && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
+# --- CATEGORY 2: Infrequent Updates (Stable) ---
+# --- Fonts ---
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="fonts" pacman -Sy --noconfirm --needed \
+    ttf-ms-fonts ttf-dejavu ttf-bitstream-vera ttf-ubuntu-font-family noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-nerd-fonts-symbols ttf-nerd-fonts-symbols-mono && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
 # --- Filesystems & Storage ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="filesystems" pacman -Sy --noconfirm --needed \
     fuse2 fuse3 fuse2fs ntfs-3g exfatprogs lvm2 mdadm cryptsetup gvfs gvfs-mtp gvfs-smb nfs-utils smartmontools && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Archiving & Compression ---
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="archiving" pacman -Sy --noconfirm --needed \
+    unp unarj unrar unzip zip bzip2 p7zip unace cpio sharutils cabextract rpmextract xz && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Printing & Scanning ---
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="printing-scanning" pacman -Sy --noconfirm --needed \
+    cups cups-pdf system-config-printer sane && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Audio Core ---
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="audio" pacman -Sy --noconfirm --needed \
+    pipewire-pulse pipewire-alsa pipewire-jack wireplumber pavucontrol alsa-utils alsa-plugins && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Firmware & Microcode ---
@@ -201,28 +227,17 @@ RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_
     amd-ucode intel-ucode linux-firmware sof-firmware alsa-firmware wireless-regdb linux-firmware-marvell && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# --- CachyOS Base Settings ---
+# --- Networking & VPNs ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="cachyos-settings" pacman -Sy --noconfirm --needed \
-    cachyos-settings cachyos-micro-settings cachyos-ananicy-rules cachyos-zsh-config cachyos-fish-config cachyos-samba-settings && \
+    COMPONENT_TAG="networking" pacman -Sy --noconfirm --needed \
+    networkmanager networkmanager-openvpn wpa_supplicant iwd ethtool dnsutils modemmanager usb_modeswitch nss-mdns bluez bluez-utils bluez-libs bluez-obex bluedevil openvpn wireguard-tools pptpclient mullvad-vpn mullvad-vpn-daemon cloudflare-warp-bin tailscale && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# --- Graphics & Drivers ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="graphics-drivers" pacman -Sy --noconfirm --needed \
-    mesa lib32-mesa mesa-utils vulkan-icd-loader vulkan-mesa-layers vulkan-intel vulkan-radeon intel-media-driver vulkan-nouveau lib32-vulkan-mesa-layers lib32-vulkan-intel lib32-vulkan-radeon lib32-vulkan-nouveau libdisplay-info lib32-libdisplay-info && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
+# --- CATEGORY 3: Moderate Updates ---
 # --- Power & Hardware Management ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="hardware-management" pacman -Sy --noconfirm --needed \
     power-profiles-daemon cpupower upower accountsservice rtkit xdg-user-dirs mousetweaks radeontool fwupd dmemcg-booster hwinfo dmidecode hdparm lsscsi sg3_utils mtools chwd && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- Audio Core ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="audio" pacman -Sy --noconfirm --needed \
-    pipewire-pulse pipewire-alsa pipewire-jack wireplumber pavucontrol alsa-utils alsa-plugins && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Shells & Prompts ---
@@ -249,18 +264,6 @@ RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_
     base-devel git git-lfs tig github-cli paru just cosign && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# --- Archiving & Compression ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="archiving" pacman -Sy --noconfirm --needed \
-    unp unarj unrar unzip zip bzip2 p7zip unace cpio sharutils cabextract rpmextract xz && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- Networking & VPNs ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="networking" pacman -Sy --noconfirm --needed \
-    networkmanager networkmanager-openvpn wpa_supplicant iwd ethtool dnsutils modemmanager usb_modeswitch nss-mdns bluez bluez-utils bluez-libs bluez-obex bluedevil openvpn wireguard-tools pptpclient mullvad-vpn mullvad-vpn-daemon cloudflare-warp-bin tailscale && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
 # --- Containers & Virtualization ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="containers" pacman -Sy --noconfirm --needed \
@@ -279,16 +282,10 @@ RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_
     xdg-utils libappimage gtk3 gtk4 nss libnotify libxss libappindicator-gtk3 libsecret && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# --- Printing & Scanning ---
+# --- CachyOS Base Settings ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="printing-scanning" pacman -Sy --noconfirm --needed \
-    cups cups-pdf system-config-printer sane && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- Fonts ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="fonts" pacman -Sy --noconfirm --needed \
-    ttf-ms-fonts ttf-dejavu ttf-bitstream-vera ttf-ubuntu-font-family noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-nerd-fonts-symbols ttf-nerd-fonts-symbols-mono && \
+    COMPONENT_TAG="cachyos-settings" pacman -Sy --noconfirm --needed \
+    cachyos-settings cachyos-micro-settings cachyos-ananicy-rules cachyos-zsh-config cachyos-fish-config cachyos-samba-settings && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Themes & Aesthetics ---
@@ -297,16 +294,23 @@ RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_
     cachyos-wallpapers cachyos-plymouth-theme cachyos-plymouth-bootanimation && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# --- Gaming Core & Hardware Utilities ---
+# --- CATEGORY 4: Frequent Updates (Volatile) ---
+# --- Graphics & Drivers ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="gaming-core" pacman -Sy --noconfirm --needed \
-    cachyos-gaming-meta cachyos-gaming-applications xorg-xwininfo xdotool yad winboat proton-cachyos wine gamescope-session-git sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid goverlay pascube vkbasalt vkbasalt-cli && \
+    COMPONENT_TAG="graphics-drivers" pacman -Sy --noconfirm --needed \
+    mesa lib32-mesa mesa-utils vulkan-icd-loader vulkan-mesa-layers vulkan-intel vulkan-radeon intel-media-driver vulkan-nouveau lib32-vulkan-mesa-layers lib32-vulkan-intel lib32-vulkan-radeon lib32-vulkan-nouveau libdisplay-info lib32-libdisplay-info && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Media & Video ---
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="media-video" pacman -Sy --noconfirm --needed \
     libdvdcss gst-libav mpv-git ffmpeg vlc gpu-screen-recorder-ui && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Gaming Core & Hardware Utilities ---
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="gaming-core" pacman -Sy --noconfirm --needed \
+    cachyos-gaming-meta cachyos-gaming-applications xorg-xwininfo xdotool yad winboat proton-cachyos wine gamescope-session-git sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid goverlay pascube vkbasalt vkbasalt-cli && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Web Browsers ---
