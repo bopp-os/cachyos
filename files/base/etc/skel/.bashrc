@@ -1,4 +1,4 @@
-# Default .bashrc provided by CachyOS BoppOS
+# Default .bashrc provided by GuaraOS
 
 # Source global definitions
 if [ -f /etc/bashrc ]; then

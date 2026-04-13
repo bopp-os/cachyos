@@ -1,9 +1,9 @@
-# BoppOS Containerfile.gnome
+# GuaraOS Containerfile.gnome
 #
 # Desktop overlay containing GNOME, gaming utilities, and developer tools.
 
 ARG BASE_IMAGE_TAG=latest
-FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
+FROM ghcr.io/guara92/guaraos-base:${BASE_IMAGE_TAG}
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION

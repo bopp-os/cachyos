@@ -1,4 +1,4 @@
-# Added by CachyOS BoppOS build process
+# Added by GuaraOS build process
 
 # Homebrew setup for fish syntax
 if test -x /home/linuxbrew/.linuxbrew/bin/brew
@@ -7,7 +7,7 @@ else if test -x /var/home/linuxbrew/.linuxbrew/bin/brew
     eval (/var/home/linuxbrew/.linuxbrew/bin/brew shellenv)
 end
 
-# Fish does not natively read /etc/profile.d/ on some setups, 
+# Fish does not natively read /etc/profile.d/ on some setups,
 # so we export the Wayland hint here just to be safe for terminal launches.
 set -gx ELECTRON_OZONE_PLATFORM_HINT "auto"
 

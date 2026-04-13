@@ -1,27 +1,27 @@
 #!/bin/bash
-# BoppOS Optional Flatpak Installer
+# GuaraOS Optional Flatpak Installer
 # Installs a curated list of Flatpaks sourced from Bazzite-DX
 
 set -euo pipefail
 
 echo "=========================================="
-echo " BoppOS Optional Flatpak Installer"
+echo " GuaraOS Optional Flatpak Installer"
 echo "=========================================="
 
 BAZZITE_URL="https://raw.githubusercontent.com/ublue-os/bazzite-dx/refs/heads/main/system_files/etc/ublue-os/system_flatpaks"
-BOPPOS_LIST="/usr/share/boppos/boppos-flatpaks.txt"
-TMP_LIST=$(mktemp /tmp/boppos_flatpaks.XXXXXX)
+GUARAOS_LIST="/usr/share/guaraos/guaraos-flatpaks.txt"
+TMP_LIST=$(mktemp /tmp/guaraos_flatpaks.XXXXXX)
 trap 'rm -f "$TMP_LIST"' EXIT
 
 echo "[*] Fetching curated Flatpak list from Bazzite-DX..."
 # Fetch the file, strip comments (#), remove empty lines, and save to temp file
 curl -sSL "$BAZZITE_URL" | sed 's/#.*//' | grep -v '^\s*$' > "$TMP_LIST"
 
-echo "[*] Merging BoppOS custom Flatpaks..."
-if [ -f "$BOPPOS_LIST" ]; then
-    sed 's/#.*//' "$BOPPOS_LIST" | grep -v '^\s*$' >> "$TMP_LIST"
+echo "[*] Merging GuaraOS custom Flatpaks..."
+if [ -f "$GUARAOS_LIST" ]; then
+    sed 's/#.*//' "$GUARAOS_LIST" | grep -v '^\s*$' >> "$TMP_LIST"
 else
-    echo "[!] Warning: Custom list $BOPPOS_LIST not found. Skipping."
+    echo "[!] Warning: Custom list $GUARAOS_LIST not found. Skipping."
 fi
 
 # Deduplicate and sort the merged list

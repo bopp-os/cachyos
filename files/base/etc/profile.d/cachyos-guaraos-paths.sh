@@ -1,4 +1,4 @@
-# CachyOS BoppOS - Global PATH setup
+# GuaraOS - Global PATH setup
 
 # Prepend user-local and Flatpak bin directories safely
 add_to_path() {

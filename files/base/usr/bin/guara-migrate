@@ -1,0 +1,331 @@
+#!/bin/bash
+
+# ==============================================================================
+# GuaraOS Migration Script (guara-migrate)
+# Purpose: Transition from a Fedora-based atomic OS (e.g. Bazzite) to GuaraOS
+#          using systemd-homed for user account management.
+#
+# What this script does:
+#   1. Backs up /etc and resets system configs (PAM, NSS, X11)
+#   2. Creates a systemd-homed user account (replaces UID surgery)
+#   3. Cleans up stale OverlayFS state
+#   4. Migrates preserved home data into the new homed home
+#   5. Final system alignment (sysusers, Flatpak repair)
+#
+# Prerequisites on GuaraOS:
+#   - systemd-homed.service enabled (done in Containerfile.base)
+#   - pam_systemd_home.so present (ships with systemd)
+#   - GuaraOS NSS/PAM configs in /usr/etc/ (restored in Phase 1)
+#
+# Run once, immediately after the first boot into GuaraOS.
+# ==============================================================================
+
+set -euo pipefail
+
+# --- Guard: must run as root ---------------------------------------------------
+if [[ $EUID -ne 0 ]]; then
+    echo "❌ This script must be run with sudo (e.g. sudo guara-migrate)"
+    exit 1
+fi
+
+# --- Configuration ------------------------------------------------------------
+REAL_USER="${SUDO_USER:-}"
+if [[ -z "$REAL_USER" ]]; then
+    echo "❌ Could not determine the invoking user. Run with sudo, not as root directly."
+    exit 1
+fi
+
+TIMESTAMP=$(date +%Y%m%d_%H%M)
+BACKUP_DIR="/var/roothome/migration_backups"
+
+# Bazzite stores homes in /var/home (symlinked from /home on Fedora atomic).
+# After a bootc switch, /var is preserved so the data is still there.
+OLD_HOME=""
+for candidate in "/var/home/${REAL_USER}" "/home/${REAL_USER}"; do
+    if [[ -d "$candidate" ]]; then
+        OLD_HOME="$candidate"
+        break
+    fi
+done
+
+# Data to carry over into the new homed home.
+# Everything else gets a fresh start from /etc/skel.
+PRESERVE_LIST=(
+    ".ssh"
+    ".gnupg"
+    ".password-store"
+    ".mozilla"
+    ".config/google-chrome"
+    ".config/BraveSoftware"
+    ".config/chromium"
+    ".config/vivaldi"
+    ".config/opera"
+    ".config/microsoft-edge"
+    ".config/Code"
+    ".vscode"
+    ".config/VSCodium"
+    ".vscode-oss"
+    ".thunderbird"
+    ".config/discord"
+    ".config/vesktop"
+    ".config/obs-studio"
+    ".config/sunshine"
+    ".config/Bitwarden"
+    ".config/1Password"
+    ".config/sops"
+    ".local/share/keyrings"
+    ".local/share/kwalletd"
+    ".steam"
+    ".local/share/Steam"
+    ".local/share/bottles"
+    ".local/share/lutris"
+    ".config/lutris"
+    ".config/heroic"
+    ".config/faugus-launcher"
+    ".local/share/faugus-launcher"
+    ".local/share/PrismLauncher"
+    ".local/share/waydroid"
+    ".var"                          # Flatpak user data
+    ".local/share/containers"       # Distrobox / Podman user storage
+)
+
+# Groups the homed user will belong to.
+# Extend if your setup needs more (e.g. libvirt, wireshark).
+USER_GROUPS="wheel,docker,video,audio,input,render,storage,network,optical,games"
+
+# systemd-homed storage backend.
+# 'directory' = plain dir in /home — appropriate when the whole disk is
+# No disk encryption is used — all machines are trusted desktops.
+HOMED_STORAGE="directory"
+
+# ------------------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------------------
+section() { echo; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo "  $*"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
+ok()      { echo "  ✅ $*"; }
+info()    { echo "  ℹ️  $*"; }
+warn()    { echo "  ⚠️  $*"; }
+die()     { echo "  ❌ $*" >&2; exit 1; }
+
+# ------------------------------------------------------------------------------
+# Banner & confirmation
+# ------------------------------------------------------------------------------
+clear
+cat <<EOF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+             GuaraOS MIGRATION TOOL — Bazzite → GuaraOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Migrating user : ${REAL_USER}
+  Old home found : ${OLD_HOME:-"(none — will skip data migration)"}
+  homed storage  : ${HOMED_STORAGE}
+  Groups         : ${USER_GROUPS}
+
+  This script will:
+    • Reset /etc to GuaraOS Arch-native configs
+    • Create a systemd-homed account for ${REAL_USER}
+    • Copy preserved data (SSH keys, browsers, game data…)
+
+  ⚠️  Do NOT run this more than once.
+  ⚠️  A full /etc backup is created before any changes.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF
+
+read -rp "Type 'MIGRATE' to confirm and proceed: " CONFIRM
+[[ "$CONFIRM" == "MIGRATE" ]] || { echo "Migration cancelled."; exit 0; }
+
+# ==============================================================================
+# PHASE 1 — System Backup & Config Reset
+# ==============================================================================
+section "[1/5] System backup & Arch config reset"
+
+# 1.1 Backup /etc
+mkdir -p "${BACKUP_DIR}"
+tar -czf "${BACKUP_DIR}/etc_pre_migration_${TIMESTAMP}.tar.gz" /etc 2>/dev/null || true
+ok "/etc backed up to ${BACKUP_DIR}/"
+
+# 1.2 Restore pristine Arch PAM & NSS from the image's /usr/etc.
+#     This replaces any Fedora-era PAM stacks and crucially installs the
+#     Arch systemd PAM configs which include pam_systemd_home.so hooks.
+if [[ -d /usr/etc/pam.d ]]; then
+    cp -af /usr/etc/pam.d/* /etc/pam.d/
+    ok "Restored Arch-native PAM stack (includes pam_systemd_home.so)"
+else
+    warn "/usr/etc/pam.d not found — skipping PAM restore. Verify manually."
+fi
+
+if [[ -f /usr/etc/nsswitch.conf ]]; then
+    cp -af /usr/etc/nsswitch.conf /etc/nsswitch.conf
+    ok "Restored Arch nsswitch.conf"
+else
+    warn "/usr/etc/nsswitch.conf not found — skipping."
+fi
+
+# 1.3 Ensure nsswitch.conf has 'systemd' for passwd/group lookups.
+#     Required for systemd-homed users to be resolvable by getent/login.
+if ! grep -q 'passwd:.*systemd' /etc/nsswitch.conf; then
+    sed -i 's/^passwd:\(.*\)$/passwd:\1 systemd/' /etc/nsswitch.conf
+    ok "Added 'systemd' to passwd lookup in nsswitch.conf"
+fi
+if ! grep -q 'group:.*systemd' /etc/nsswitch.conf; then
+    sed -i 's/^group:\(.*\)$/group:\1 systemd/' /etc/nsswitch.conf
+    ok "Added 'systemd' to group lookup in nsswitch.conf"
+fi
+
+# 1.4 Fix X11/GDM socket permissions (common login loop cause post-switch)
+rm -rf /tmp/.X11-unix
+mkdir -p /tmp/.X11-unix
+chown root:root /tmp/.X11-unix
+chmod 1777 /tmp/.X11-unix
+ok "Reset /tmp/.X11-unix permissions"
+
+# ==============================================================================
+# PHASE 2 — systemd-homed User Account
+# ==============================================================================
+section "[2/5] Creating systemd-homed account for '${REAL_USER}'"
+
+# 2.1 Ensure the homed service is running (it is enabled in Containerfile.base
+#     but may not have started on this first boot yet).
+if ! systemctl is-active --quiet systemd-homed.service; then
+    systemctl enable --now systemd-homed.service
+    # Give the D-Bus socket a moment to become ready
+    sleep 2
+fi
+ok "systemd-homed.service is running"
+
+# 2.2 If a homed record already exists for this user, skip creation.
+if homectl inspect "${REAL_USER}" &>/dev/null; then
+    warn "homed account '${REAL_USER}' already exists — skipping creation."
+else
+    # Prompt for the new account password
+    echo
+    echo "  Set a password for the new homed account '${REAL_USER}':"
+    homectl create "${REAL_USER}" \
+        --storage="${HOMED_STORAGE}" \
+        --member-of="${USER_GROUPS}" \
+        --shell=/bin/zsh
+    ok "homed account '${REAL_USER}' created (storage: ${HOMED_STORAGE})"
+fi
+
+# 2.3 Remove the stale traditional user entry left over from Bazzite.
+#     homed users must NOT have a conflicting /etc/passwd entry — the
+#     nss-systemd module is the authoritative source for their identity.
+if getent passwd "${REAL_USER}" | grep -qv 'systemd-homed'; then
+    # Only remove if the entry is a traditional shadow entry, not a homed one
+    if grep -q "^${REAL_USER}:" /etc/passwd 2>/dev/null; then
+        # Preserve the UID for reference but remove the entry
+        OLD_UID=$(id -u "${REAL_USER}" 2>/dev/null || echo "unknown")
+        sed -i "/^${REAL_USER}:/d" /etc/passwd
+        sed -i "/^${REAL_USER}:/d" /etc/shadow 2>/dev/null || true
+        ok "Removed stale /etc/passwd entry for '${REAL_USER}' (old UID was ${OLD_UID})"
+    fi
+fi
+
+# 2.4 Ensure standard system groups exist for membership resolution.
+systemd-sysusers
+ok "systemd-sysusers ran — system accounts verified"
+
+# ==============================================================================
+# PHASE 3 — OverlayFS Cleanup
+# ==============================================================================
+section "[3/5] Cleaning up stale OverlayFS state"
+
+if [[ -d "/var/opt_overlay/work" ]]; then
+    rm -rf /var/opt_overlay/work/*
+    ok "Cleared /var/opt_overlay/work"
+else
+    info "No /var/opt_overlay/work found — skipping."
+fi
+
+# ==============================================================================
+# PHASE 4 — Home Data Migration
+# ==============================================================================
+section "[4/5] Migrating home data into homed home"
+
+if [[ -z "$OLD_HOME" ]]; then
+    info "No old home directory found — skipping data migration."
+    info "The new homed home has been seeded from /etc/skel."
+else
+    # 4.1 Activate the new homed home so we can write into it.
+    #     homectl activate mounts the home at /home/${REAL_USER}.
+    if ! homectl inspect "${REAL_USER}" | grep -q 'State: active'; then
+        homectl activate "${REAL_USER}" || {
+            warn "Could not activate homed home. You may need to log in as ${REAL_USER} first."
+            warn "Re-run this script or manually copy from ${OLD_HOME} after first login."
+        }
+    fi
+
+    NEW_HOME="/home/${REAL_USER}"
+
+    if [[ -d "$NEW_HOME" ]]; then
+        echo
+        echo "  Source : ${OLD_HOME}"
+        echo "  Target : ${NEW_HOME}"
+        echo
+        echo "  The following will be copied (everything else gets a fresh start):"
+        for item in "${PRESERVE_LIST[@]}"; do
+            [[ -e "${OLD_HOME}/${item}" ]] && echo "    • ${item}"
+        done
+        echo
+
+        read -rp "  Proceed with data migration? [y/N]: " DO_MIGRATE
+        if [[ "$DO_MIGRATE" =~ ^[Yy]$ ]]; then
+            for item in "${PRESERVE_LIST[@]}"; do
+                SRC="${OLD_HOME}/${item}"
+                DST_DIR="${NEW_HOME}/$(dirname "${item}")"
+                if [[ -e "$SRC" ]]; then
+                    mkdir -p "$DST_DIR"
+                    rsync -a --delete "${SRC}" "${DST_DIR}/" 2>/dev/null \
+                        && echo "    ✅ ${item}" \
+                        || echo "    ⚠️  ${item} — rsync error (check manually)"
+                fi
+            done
+
+            # Fix ownership — homed assigns a dynamic UID; chown to the username
+            # works because nss-systemd resolves it correctly at this point.
+            chown -R "${REAL_USER}:${REAL_USER}" "${NEW_HOME}" 2>/dev/null || true
+            ok "Ownership corrected on ${NEW_HOME}"
+        else
+            info "Data migration skipped. Copy manually from ${OLD_HOME} after login."
+        fi
+    else
+        warn "New homed home at ${NEW_HOME} not accessible yet."
+        warn "Log in as ${REAL_USER} to activate it, then copy from ${OLD_HOME} manually."
+    fi
+fi
+
+# ==============================================================================
+# PHASE 5 — Final System Alignment
+# ==============================================================================
+section "[5/5] Final system alignment"
+
+# Repair Flatpak runtimes (Fedora→Arch ABI break means system Flatpaks need repair)
+read -rp "  Repair system Flatpak runtimes for Arch compatibility? [y/N]: " FIX_FLATPAK
+if [[ "$FIX_FLATPAK" =~ ^[Yy]$ ]]; then
+    flatpak repair --system && ok "System Flatpaks repaired"
+fi
+
+# Remind about user Flatpaks — can only be done once logged in as the user
+info "User Flatpaks (in ${REAL_USER}'s homed home): run 'flatpak repair --user'"
+info "after your first login to fix any Fedora-era user Flatpak state."
+
+# ==============================================================================
+# Done
+# ==============================================================================
+cat <<EOF
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                     MIGRATION COMPLETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Next steps:
+    1. Reboot:          sudo systemctl reboot
+    2. Log in as        ${REAL_USER}  (homed will prompt for your password)
+    3. If data wasn't migrated, copy from:
+                        ${OLD_HOME:-"(no old home found)"}
+    4. Run user Flatpak repair:
+                        flatpak repair --user
+    5. Re-enroll user Flatpaks if needed:
+                        flatpak update
+
+  /etc backup is at:   ${BACKUP_DIR}/etc_pre_migration_${TIMESTAMP}.tar.gz
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF

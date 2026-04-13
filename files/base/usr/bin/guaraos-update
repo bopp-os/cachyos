@@ -53,7 +53,7 @@ update_distrobox() {
 }
 
 show_help() {
-    echo "Usage: boppos-update [OPTIONS]"
+    echo "Usage: guaraos-update [OPTIONS]"
     echo "Options:"
     echo "  -o, --os         Update OS image (bootc)"
     echo "  -w, --fw         Update firmware (fwupdmgr)"
@@ -105,7 +105,7 @@ else
     done
 fi
 
-echo -e "${BLUE}Starting CachyOS BoppOS System Update...${NC}\n"
+echo -e "${BLUE}Starting GuaraOS System Update...${NC}\n"
 
 # Pre-authenticate sudo if OS or Firmware is being updated
 if [ "$RUN_OS" = true ] || [ "$RUN_FW" = true ]; then
@@ -118,7 +118,7 @@ fi
 [ "$RUN_BREW" = true ] && update_brew
 [ "$RUN_DISTROBOX" = true ] && update_distrobox
 
-echo -e "\n${BLUE}CachyOS BoppOS update complete!${NC}"
+echo -e "\n${BLUE}GuaraOS update complete!${NC}"
 if [ "$RUN_OS" = true ]; then
     echo -e "\nNote: If the OS was updated via bootc, please reboot to apply the changes."
 fi

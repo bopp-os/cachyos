@@ -1,0 +1,48 @@
+#!/bin/bash
+# guaraos-gamestation-setup
+#
+# First-boot service script for GuaraOS Gamestation.
+# Detects the first real user account and writes the plasmalogin autologin
+# drop-in config so that subsequent boots go straight to the gamescope session.
+#
+# This script is run by guaraos-gamestation-setup.service on every boot until
+# /etc/plasmalogin.conf.d/autologin.conf exists. Once written it never runs again.
+
+set -euo pipefail
+
+AUTOLOGIN_DIR="/etc/plasmalogin.conf.d"
+AUTOLOGIN_CONF="${AUTOLOGIN_DIR}/autologin.conf"
+SESSION="gamescope-session.desktop"
+
+# Find the first real user: UID >= 1000, not 'nobody' (65534)
+FIRST_USER=$(getent passwd \
+    | awk -F: '$3 >= 1000 && $3 < 65534 { print $1; exit }')
+
+if [[ -z "${FIRST_USER}" ]]; then
+    echo "guaraos-gamestation-setup: no real user found yet — will retry on next boot."
+    # Exit 0 so systemd does not mark the unit as failed.
+    # ConditionPathExists=! in the unit ensures we run again next boot.
+    exit 0
+fi
+
+# Verify the target gamescope session exists before pointing autologin at it
+SESSION_FILE="/usr/share/wayland-sessions/${SESSION}"
+if [[ ! -f "${SESSION_FILE}" ]]; then
+    echo "guaraos-gamestation-setup: WARNING — session file ${SESSION_FILE} not found." >&2
+    echo "guaraos-gamestation-setup: check that gamescope-session-git is installed." >&2
+    # Still write the config — the session might appear after a package update
+fi
+
+mkdir -p "${AUTOLOGIN_DIR}"
+
+cat > "${AUTOLOGIN_CONF}" << EOF
+# GuaraOS Gamestation — autologin configuration
+# Written by guaraos-gamestation-setup on first boot.
+# Edit this file or remove it to disable autologin.
+
+[Autologin]
+User=${FIRST_USER}
+Session=${SESSION}
+EOF
+
+echo "guaraos-gamestation-setup: autologin configured for '${FIRST_USER}' → ${SESSION}"
