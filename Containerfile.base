@@ -182,11 +182,11 @@ RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_
     COMPONENT_TAG="install-base" pacman -Sy --noconfirm --needed python python-yaml yq
 
 COPY scripts/install_packages.sh /tmp/install_packages.sh
-COPY files/base/base-analyzed.yml /tmp/base-analyzed.yml
+COPY files/base/base-analyzed.yml /tmp/base-analyzed.yaml
 
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     chmod +x /tmp/install_packages.sh && \
-    /tmp/install_packages.sh /tmp/base-analyzed.yml
+    /tmp/install_packages.sh /tmp/base-analyzed.yaml
 
 # ==========================================
 # POST-INSTALL CONFIGURATION
