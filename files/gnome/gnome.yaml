@@ -1,11 +1,9 @@
 gnome-core:
-  - gnome
-  - gnome-shell
+  - xorg-xwayland
   - mutter
+  - gdm
   - gnome-session
   - gnome-tweaks
-  - gdm
-  - xorg-xwayland
   - gnome-control-center
   - gnome-keyring
   - libnma
@@ -17,6 +15,8 @@ gnome-core:
   - gnome-console
   - gnome-text-editor
   - ptyxis
+  - tracker3
+  - tracker3-miners
 gnome-utilities:
   - file-roller
   - extension-manager
@@ -32,6 +32,10 @@ gnome-utilities:
   - malcontent
   - gvfs-afc
   - gvfs-gphoto2
+  - gnome-system-monitor
+  - gnome-calendar
+  - gnome-weather
+  - gnome-software
 gnome-themes:
   - adw-gtk-theme
   - cachyos-nord-gtk-theme-git
@@ -50,3 +54,6 @@ gnome-media:
   - sushi
   - showtime
   - celluloid
+gnome-meta:
+  - gnome-shell
+  - gnome

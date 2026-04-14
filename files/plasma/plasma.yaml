@@ -1,9 +1,11 @@
 kde-core:
-  - plasma-desktop
-  - plasma-workspace
   - xorg-xwayland
   - qt5-wayland
   - qt6-wayland
+  - kwin
+  - systemsettings
+  - kscreenlocker
+  - discover
   - plasma-login-manager
   - powerdevil
   - kscreen
@@ -13,7 +15,6 @@ kde-core:
   - xdg-desktop-portal-gtk
   - colord-kde
 kde-integration:
-  - plasma
   - plasma-pa
   - plasma-nm
   - kwallet-pam
@@ -77,3 +78,7 @@ kde-themes-aesthetics:
   - cachyos-nord-gtk-theme-git
   - cachyos-iridescent-kde
   - char-white
+kde-meta:
+  - plasma-desktop
+  - plasma-workspace
+  - plasma

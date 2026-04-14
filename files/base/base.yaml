@@ -23,6 +23,22 @@ bootc:
   - e2fsprogs
   - xfsprogs
   - dosfstools
+graphics-drivers:
+  - mesa
+  - lib32-mesa
+  - mesa-utils
+  - vulkan-icd-loader
+  - vulkan-mesa-layers
+  - vulkan-intel
+  - vulkan-radeon
+  - intel-media-driver
+  - vulkan-nouveau
+  - lib32-vulkan-mesa-layers
+  - lib32-vulkan-intel
+  - lib32-vulkan-radeon
+  - lib32-vulkan-nouveau
+  - libdisplay-info
+  - lib32-libdisplay-info
 fonts:
   - ttf-ms-fonts
   - ttf-dejavu
@@ -202,7 +218,11 @@ text-editors-ides:
   - meld
   - vim
 devel-base:
-  - base-devel
+  - gcc
+  - binutils
+  - make
+  - fakeroot
+  - patch
   - git
   - git-lfs
   - tig
@@ -225,6 +245,7 @@ schedulers:
   - scx-tools-git
   - scx-manager
 desktop-integration:
+  - xorg-xwayland
   - xdg-utils
   - libappimage
   - gtk3
@@ -239,33 +260,10 @@ desktop-integration:
   - poppler-glib
   - espeak-ng
   - orca
-cachyos-settings:
-  - cachyos-settings
-  - cachyos-micro-settings
-  - cachyos-ananicy-rules
-  - cachyos-zsh-config
-  - cachyos-fish-config
-  - cachyos-samba-settings
 themes-aesthetics:
   - cachyos-wallpapers
   - cachyos-plymouth-theme
   - cachyos-plymouth-bootanimation
-graphics-drivers:
-  - mesa
-  - lib32-mesa
-  - mesa-utils
-  - vulkan-icd-loader
-  - vulkan-mesa-layers
-  - vulkan-intel
-  - vulkan-radeon
-  - intel-media-driver
-  - vulkan-nouveau
-  - lib32-vulkan-mesa-layers
-  - lib32-vulkan-intel
-  - lib32-vulkan-radeon
-  - lib32-vulkan-nouveau
-  - libdisplay-info
-  - lib32-libdisplay-info
 media-video:
   - libdvdcss
   - gst-libav
@@ -279,11 +277,19 @@ media-video:
   - gst-plugins-ugly
   - vlc-plugins-all
 gaming-core:
-  - cachyos-gaming-meta
-  - cachyos-gaming-applications
   - xorg-xwininfo
   - xdotool
   - yad
+  - mangohud
+  - gamemode
+  - lutris
+  - heroic-games-launcher
+  - steam
+  - lib32-glibc
+  - lib32-gcc-libs
+  - lib32-systemd
+  - lib32-libx11
+  - lib32-alsa-plugins
   - winboat
   - proton-cachyos
   - wine
@@ -319,3 +325,14 @@ development-languages:
   - cargo-update
   - python-defusedxml
   - python-packaging
+cachyos-settings:
+  - cachyos-settings
+  - cachyos-micro-settings
+  - cachyos-ananicy-rules
+  - cachyos-zsh-config
+  - cachyos-fish-config
+  - cachyos-samba-settings
+base-meta:
+  - base-devel
+  - cachyos-gaming-applications
+  - cachyos-gaming-meta

@@ -1,12 +1,14 @@
 kde-core:
   biweekly:
   - colord-kde
+  - discover
   - kscreen
-  - plasma-desktop
-  - plasma-workspace
+  - kscreenlocker
+  - kwin
   - polkit-kde-agent
   - powerdevil
   - qt6-wayland
+  - systemsettings
   - xdg-desktop-portal-kde
   monthly:
   - plasma-login-manager
@@ -42,8 +44,6 @@ kde-integration:
   - udisks2
   - xdg-utils
   - xsettingsd
-  unknown:
-  - plasma
 kde-utilities:
   biweekly:
   - ark
@@ -95,3 +95,9 @@ kde-themes-aesthetics:
   - cachyos-nord-kde-theme-git
   - cachyos-themes-sddm
   - char-white
+kde-meta:
+  biweekly:
+  - plasma-desktop
+  - plasma-workspace
+  unknown:
+  - plasma

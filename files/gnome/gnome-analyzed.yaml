@@ -1,12 +1,13 @@
 gnome-core:
   biweekly:
-  - gnome-shell
   - mutter
   monthly:
   - gnome-control-center
   - gnome-text-editor
   - nautilus
   - ptyxis
+  - tracker3
+  - tracker3-miners
   - xdg-desktop-portal-gnome
   - xorg-xwayland
   quarterly:
@@ -20,12 +21,11 @@ gnome-core:
   - xdg-desktop-portal-gtk
   yearly:
   - gnome-keyring
-  unknown:
-  - gnome
 gnome-utilities:
   weekly:
   - extension-manager
   monthly:
+  - gnome-software
   - gvfs-afc
   - gvfs-gphoto2
   - loupe
@@ -33,7 +33,10 @@ gnome-utilities:
   quarterly:
   - file-roller
   - gnome-calculator
+  - gnome-calendar
   - gnome-disk-utility
+  - gnome-system-monitor
+  - gnome-weather
   - malcontent
   - simple-scan
   yearly:
@@ -67,3 +70,8 @@ gnome-media:
   yearly:
   - celluloid
   - sushi
+gnome-meta:
+  biweekly:
+  - gnome-shell
+  unknown:
+  - gnome

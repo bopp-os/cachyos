@@ -1,16 +1,14 @@
 niri-core:
-  - niri
-  - cachyos-niri-noctalia
-  - fuzzel
-  - alacritty
   - xwayland-satellite
   - xdg-desktop-portal
   - xdg-desktop-portal-gnome
   - xdg-desktop-portal-gtk
-  - polkit-gnome
   - sddm
-  - mako
   - waybar
+  - fuzzel
+  - alacritty
+  - polkit-gnome
+  - mako
   - librsvg
   - qt6-svg
 niri-utilities:
@@ -32,3 +30,6 @@ niri-themes-aesthetics:
   - librsvg
   - hicolor-icon-theme
   - nwg-look
+niri-meta:
+  - cachyos-niri-noctalia
+  - niri

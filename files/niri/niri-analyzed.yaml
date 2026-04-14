@@ -3,7 +3,6 @@ niri-core:
   - qt6-svg
   monthly:
   - librsvg
-  - niri
   - waybar
   - xdg-desktop-portal-gnome
   quarterly:
@@ -16,8 +15,6 @@ niri-core:
   yearly:
   - mako
   - polkit-gnome
-  unknown:
-  - cachyos-niri-noctalia
 niri-utilities:
   monthly:
   - gnome-text-editor
@@ -46,3 +43,8 @@ niri-themes-aesthetics:
   - hicolor-icon-theme
   unknown:
   - cachyos-nord-gtk-theme-git
+niri-meta:
+  monthly:
+  - niri
+  unknown:
+  - cachyos-niri-noctalia
