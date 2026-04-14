@@ -10,7 +10,7 @@ FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
 # ==========================================
 
 COPY scripts/install_packages.sh /tmp/install_packages.sh
-COPY files/gnome/gnome-analyzed.yml /tmp/gnome-analyzed.yaml
+COPY files/gnome/gnome-analyzed.yaml /tmp/gnome-analyzed.yaml
 
 RUN chmod +x /tmp/install_packages.sh && \
     /tmp/install_packages.sh /tmp/gnome-analyzed.yaml
