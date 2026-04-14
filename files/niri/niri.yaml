@@ -1,0 +1,34 @@
+niri-core:
+  - niri
+  - cachyos-niri-noctalia
+  - fuzzel
+  - alacritty
+  - xwayland-satellite
+  - xdg-desktop-portal
+  - xdg-desktop-portal-gnome
+  - xdg-desktop-portal-gtk
+  - polkit-gnome
+  - sddm
+  - mako
+  - waybar
+  - librsvg
+  - qt6-svg
+niri-utilities:
+  - nautilus
+  - loupe
+  - papers
+  - file-roller
+  - gnome-text-editor
+niri-applets-integration:
+  - network-manager-applet
+  - blueman
+  - swaylock
+  - swayidle
+  - kdeconnect
+niri-themes-aesthetics:
+  - cachyos-nord-gtk-theme-git
+  - adw-gtk-theme
+  - papirus-icon-theme
+  - librsvg
+  - hicolor-icon-theme
+  - nwg-look

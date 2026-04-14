@@ -1,0 +1,406 @@
+system-core:
+  biweekly:
+  - glib2
+  - systemd
+  - systemd-sysvcompat
+  quarterly:
+  - gnupg
+  - gpgme
+  - polkit
+  - shadow
+  yearly:
+  - dbus
+  - dbus-broker-units
+  - dbus-glib
+  - lua-luv
+  - ufw
+  unknown:
+  - linux-cachyos
+  - linux-cachyos-headers
+bootc:
+  biweekly:
+  - containers-common
+  monthly:
+  - btrfs-progs
+  - ostree
+  - skopeo
+  - xfsprogs
+  quarterly:
+  - dracut
+  - e2fsprogs
+  yearly:
+  - dosfstools
+  unknown:
+  - bootc
+fonts:
+  quarterly:
+  - noto-fonts
+  - ttf-meslo-nerd
+  - ttf-nerd-fonts-symbols
+  yearly:
+  - awesome-terminal-fonts
+  - cantarell-fonts
+  - noto-fonts-cjk
+  - noto-fonts-emoji
+  - ttf-bitstream-vera
+  - ttf-dejavu
+  - ttf-liberation
+  - ttf-nerd-fonts-symbols-mono
+  - ttf-opensans
+  - ttf-ubuntu-font-family
+  unknown:
+  - noto-color-emoji-fontconfig
+  - ttf-ms-fonts
+filesystems:
+  monthly:
+  - gvfs
+  - gvfs-mtp
+  - gvfs-smb
+  quarterly:
+  - cryptsetup
+  - fuse2fs
+  - fuse3
+  - lvm2
+  - nfs-utils
+  yearly:
+  - dmraid
+  - exfatprogs
+  - fuse2
+  - mdadm
+  - nilfs-utils
+  - ntfs-3g
+  - smartmontools
+archiving:
+  quarterly:
+  - unrar
+  - xz
+  yearly:
+  - bzip2
+  - cabextract
+  - cpio
+  - p7zip
+  - rpmextract
+  - sharutils
+  - unarj
+  - unp
+  - unzip
+  - zip
+  unknown:
+  - unace
+printing-scanning:
+  monthly:
+  - cups-filters
+  - hplip
+  quarterly:
+  - cups
+  - foomatic-db
+  - foomatic-db-nonfree
+  - foomatic-db-nonfree-ppds
+  - foomatic-db-ppds
+  - ghostscript
+  - python-pyqt5
+  - python-reportlab
+  - sane
+  yearly:
+  - cups-pdf
+  - foomatic-db-engine
+  - foomatic-db-gutenprint-ppds
+  - gsfonts
+  - gutenprint
+  - splix
+  - system-config-printer
+audio:
+  biweekly:
+  - pipewire-alsa
+  - pipewire-jack
+  - pipewire-pulse
+  monthly:
+  - wireplumber
+  quarterly:
+  - alsa-utils
+  yearly:
+  - alsa-plugins
+  - pavucontrol
+firmware:
+  monthly:
+  - amd-ucode
+  - linux-firmware
+  - linux-firmware-marvell
+  quarterly:
+  - intel-ucode
+  - sof-firmware
+  - wireless-regdb
+  yearly:
+  - alsa-firmware
+networking:
+  biweekly:
+  - bluedevil
+  - tailscale
+  monthly:
+  - bluez-obex
+  - iwd
+  - mullvad-vpn
+  - mullvad-vpn-daemon
+  - networkmanager
+  quarterly:
+  - bluez
+  - bluez-hid2hci
+  - bluez-libs
+  - bluez-utils
+  - ethtool
+  - modemmanager
+  - openvpn
+  - wireguard-tools
+  yearly:
+  - dnsmasq
+  - networkmanager-openvpn
+  - nss-mdns
+  - pptpclient
+  - usb_modeswitch
+  - wpa_supplicant
+  - xl2tpd
+  unknown:
+  - cloudflare-warp-bin
+  - dnsutils
+hardware-management:
+  monthly:
+  - cpupower
+  - fwupd
+  quarterly:
+  - hwdetect
+  - hwinfo
+  - mtools
+  - power-profiles-daemon
+  - upower
+  yearly:
+  - accountsservice
+  - dmidecode
+  - hdparm
+  - lsscsi
+  - mousetweaks
+  - radeontool
+  - rtkit
+  - sg3_utils
+  - xdg-user-dirs
+  unknown:
+  - chwd
+  - dmemcg-booster
+shells:
+  monthly:
+  - atuin
+  - starship
+  quarterly:
+  - bash
+  - fish
+  yearly:
+  - bash-completion
+  - bash-preexec
+  - zsh
+  - zsh-completions
+  unknown:
+  - oh-my-zsh-git
+cli-utilities:
+  weekly:
+  - eza
+  - fastfetch
+  monthly:
+  - btop
+  - curl
+  - fzf
+  - glances
+  - rclone
+  quarterly:
+  - bottom
+  - conky
+  - fd
+  - file
+  - htop
+  - iotop-c
+  - man-db
+  - man-pages
+  - openssh
+  - openssl
+  - pacman-contrib
+  - plocate
+  - procs
+  - pv
+  - rsync
+  - zoxide
+  yearly:
+  - duf
+  - fsarchiver
+  - jq
+  - pkgfile
+  - procps-ng
+  - ripgrep
+  - sysstat
+  - tealdeer
+  - wget
+  - wl-clipboard
+  unknown:
+  - konsave
+text-editors-ides:
+  biweekly:
+  - vim
+  quarterly:
+  - nano
+  yearly:
+  - meld
+  - micro
+  - nano-syntax-highlighting
+  - vi
+  unknown:
+  - visual-studio-code-bin
+devel-base:
+  biweekly:
+  - containers-common
+  - github-cli
+  monthly:
+  - cosign
+  - git
+  - just
+  - skopeo
+  quarterly:
+  - git-lfs
+  yearly:
+  - base-devel
+  - tig
+  unknown:
+  - paru
+containers:
+  biweekly:
+  - docker-compose
+  - podman
+  monthly:
+  - docker
+  - flatpak
+  - ptyxis
+  quarterly:
+  - distrobox
+  - podman-compose
+schedulers:
+  unknown:
+  - scx-manager
+  - scx-scheds-git
+  - scx-tools-git
+desktop-integration:
+  biweekly:
+  - gtk4
+  monthly:
+  - gtk3
+  - nss
+  - orca
+  - poppler-glib
+  quarterly:
+  - libappimage
+  - libsecret
+  yearly:
+  - espeak-ng
+  - libappindicator-gtk3
+  - libgsf
+  - libnotify
+  - libopenraw
+  - libxss
+  - xdg-utils
+cachyos-settings:
+  unknown:
+  - cachyos-ananicy-rules
+  - cachyos-fish-config
+  - cachyos-micro-settings
+  - cachyos-samba-settings
+  - cachyos-settings
+  - cachyos-zsh-config
+themes-aesthetics:
+  unknown:
+  - cachyos-plymouth-bootanimation
+  - cachyos-plymouth-theme
+  - cachyos-wallpapers
+graphics-drivers:
+  weekly:
+  - lib32-libdisplay-info
+  - lib32-vulkan-nouveau
+  - mesa
+  - vulkan-intel
+  - vulkan-nouveau
+  - vulkan-radeon
+  biweekly:
+  - lib32-mesa
+  - lib32-vulkan-intel
+  - lib32-vulkan-mesa-layers
+  - lib32-vulkan-radeon
+  - vulkan-mesa-layers
+  monthly:
+  - intel-media-driver
+  - vulkan-icd-loader
+  quarterly:
+  - mesa-utils
+  yearly:
+  - libdisplay-info
+media-video:
+  biweekly:
+  - gst-plugin-pipewire
+  - gst-plugins-bad
+  monthly:
+  - ffmpeg
+  - gpu-screen-recorder-ui
+  - gst-libav
+  - gst-plugins-ugly
+  - vlc
+  - vlc-plugins-all
+  yearly:
+  - ffmpegthumbnailer
+  - libdvdcss
+  unknown:
+  - mpv-git
+gaming-core:
+  biweekly:
+  - waydroid
+  - wine
+  monthly:
+  - goverlay
+  - lact
+  quarterly:
+  - openrgb
+  - yad
+  yearly:
+  - nvtop
+  - xdotool
+  - xorg-xwininfo
+  unknown:
+  - cachyos-gaming-applications
+  - cachyos-gaming-meta
+  - coolercontrol
+  - game-devices-udev
+  - gamescope-session-git
+  - lsfg-vk
+  - openrgb-plugin-effects-git
+  - pascube
+  - proton-cachyos
+  - sunshine
+  - udev-joystick-blacklist-git
+  - vkbasalt
+  - vkbasalt-cli
+  - winboat
+web-browsers:
+  weekly:
+  - firefox
+  unknown:
+  - cachyos-firefox-settings
+  - helium-browser-bin
+development-languages:
+  biweekly:
+  - cargo-binstall
+  - nodejs
+  - npm
+  - php
+  monthly:
+  - cargo-update
+  - go
+  - python-pip
+  - rust
+  quarterly:
+  - python-packaging
+  - python-pipx
+  - ruby
+  yearly:
+  - python-defusedxml

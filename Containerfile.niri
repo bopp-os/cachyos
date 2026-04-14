@@ -9,31 +9,11 @@ FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
 # MASTER PACKAGE INSTALLATION
 # ==========================================
 
-# --- Desktop Environment (Niri) Core ---
-RUN COMPONENT_TAG="niri-core" pacman -Sy --noconfirm --needed \
-    niri cachyos-niri-noctalia fuzzel alacritty \
-    xwayland-satellite xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-    polkit-gnome sddm mako waybar librsvg qt6-svg && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+COPY scripts/install_packages.sh /tmp/install_packages.sh
+COPY files/niri/niri-analyzed.yml /tmp/niri-analyzed.yml
 
-# --- Essential Desktop Utilities & Applets ---
-RUN COMPONENT_TAG="niri-utilities" pacman -Sy --noconfirm --needed \
-    nautilus loupe papers file-roller gnome-text-editor && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- Applets & Integration ---
-RUN COMPONENT_TAG="niri-applets-integration" pacman -Sy --noconfirm --needed \
-    network-manager-applet blueman swaylock swayidle kdeconnect && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- Themes & Aesthetics ---
-RUN COMPONENT_TAG="niri-themes-aesthetics" pacman -Sy --noconfirm --needed \
-    cachyos-nord-gtk-theme-git adw-gtk-theme papirus-icon-theme librsvg hicolor-icon-theme nwg-look && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+RUN chmod +x /tmp/install_packages.sh && \
+    /tmp/install_packages.sh /tmp/niri-analyzed.yml
 
 # Copy Niri-specific configuration files
 COPY files/niri/etc /etc/

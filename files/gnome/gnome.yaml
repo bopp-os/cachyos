@@ -1,0 +1,52 @@
+gnome-core:
+  - gnome
+  - gnome-shell
+  - mutter
+  - gnome-session
+  - gnome-tweaks
+  - gdm
+  - xorg-xwayland
+  - gnome-control-center
+  - gnome-keyring
+  - libnma
+  - gnome-backgrounds
+  - xdg-desktop-portal
+  - xdg-desktop-portal-gnome
+  - xdg-desktop-portal-gtk
+  - nautilus
+  - gnome-console
+  - gnome-text-editor
+  - ptyxis
+gnome-utilities:
+  - file-roller
+  - extension-manager
+  - dconf-editor
+  - papers
+  - loupe
+  - gnome-disk-utility
+  - simple-scan
+  - gnome-calculator
+  - gnome-power-manager
+  - gnome-nettool
+  - gnome-usage
+  - malcontent
+  - gvfs-afc
+  - gvfs-gphoto2
+gnome-themes:
+  - adw-gtk-theme
+  - cachyos-nord-gtk-theme-git
+gnome-extensions:
+  - gnome-shell-extension-appindicator
+  - gnome-shell-extension-gsconnect
+  - gnome-shell-extension-dash-to-dock
+  - gnome-shell-extension-no-overview
+  - gnome-browser-connector
+  - gnome-shell-extension-gnome-ui-tune-git
+  - gnome-shell-extension-arc-menu
+  - gnome-shell-extension-caffeine
+  - gnome-shell-extension-vitals
+  - gnome-shell-extension-bing-wallpaper
+gnome-media:
+  - sushi
+  - showtime
+  - celluloid
