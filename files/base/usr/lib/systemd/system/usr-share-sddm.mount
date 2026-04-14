@@ -1,6 +1,7 @@
 [Unit]
 Description=OverlayFS for SDDM
 DefaultDependencies=no
+RequiresMountsFor=/var
 After=systemd-tmpfiles-setup.service
 Conflicts=umount.target
 Before=umount.target sddm.service plasmalogin.service

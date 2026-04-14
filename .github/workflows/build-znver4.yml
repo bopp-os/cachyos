@@ -131,6 +131,17 @@ jobs:
           echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
 
+      - name: Restore Layer Cache
+        if: steps.check_compatibility.outputs.should_skip != 'true' && github.event.inputs.no_cache != 'true'
+        run: |
+          echo "📦 Pre-pulling previous images for layer caching..."
+          sudo podman pull "${IMAGE_REGISTRY}/guaraos-base:${DEFAULT_TAG}" \
+            || echo "ℹ️  No cached guaraos-base image found — first build or cache expired."
+          for FLAVOR in gnome gamestation cosmic; do
+            sudo podman pull "${IMAGE_REGISTRY}/guaraos-${FLAVOR}:${DEFAULT_TAG}" \
+              || echo "ℹ️  No cached guaraos-${FLAVOR} image found — first build or cache expired."
+          done
+
       - name: Build Base Image
         id: build_base
         if: steps.check_compatibility.outputs.should_skip != 'true'
@@ -165,6 +176,12 @@ jobs:
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Manual wipe package cache triggered. Appending build arg..."
             BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
+          fi
+
+          # Enable layer caching via the previously published GHCR image
+          # (gracefully skipped on the very first build when no cache image exists yet)
+          if [ "${{ github.event.inputs.no_cache }}" != "true" ]; then
+            BUILD_ARGS+=("--layers" "--cache-from" "${IMAGE_REGISTRY}/guaraos-base:${DEFAULT_TAG}")
           fi
 
           echo "::group::Building base"
@@ -215,8 +232,15 @@ jobs:
             DOCKERFILE="Containerfile.${FLAVOR}"
             FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
 
+            # Per-flavor layer cache: reuse the previously published GHCR image
+            if [ "${{ github.event.inputs.no_cache }}" != "true" ]; then
+              CACHE_FROM_ARG=("--layers" "--cache-from" "${IMAGE_REGISTRY}/guaraos-${FLAVOR}:${DEFAULT_TAG}")
+            else
+              CACHE_FROM_ARG=()
+            fi
+
             # For DE overlays, just build! They layer natively on the rechunked base.
-            sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
+            sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" "${CACHE_FROM_ARG[@]}" \
               --network=host \
               --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
 

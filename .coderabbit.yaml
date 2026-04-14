@@ -24,7 +24,6 @@ reviews:
     - "!guaraos.pub"
 
   path_instructions:
-
     # -------------------------------------------------------------------------
     # Containerfiles — immutable image build rules
     # -------------------------------------------------------------------------
@@ -39,7 +38,7 @@ reviews:
         FILESYSTEM RULES
         - /usr is read-only at runtime. Never suggest writing to it at runtime.
         - Writes at runtime go to /etc (mutable ostree overlay) or /var (persistent across upgrades).
-        - Never place files under /opt directly. Use /usr/lib/opt/ — the var-opt.mount OverlayFS exposes it at /opt at runtime.
+        - Never place files under /opt directly. Use /usr/lib/opt/ — the opt.mount OverlayFS exposes it at /opt at runtime.
 
         INITRAMFS
         - Never re-enable 90-mkinitcpio-install.hook or 90-dracut-install.hook. They are intentionally null-linked.
@@ -225,111 +224,110 @@ reviews:
   # Tools — enable only what applies to this project's file types
   # ---------------------------------------------------------------------------
   tools:
-
     # ENABLED — relevant to GuaraOS file types
     shellcheck:
-      enabled: true          # bash scripts in files/*/usr/libexec/ and scripts/
+      enabled: true # bash scripts in files/*/usr/libexec/ and scripts/
     hadolint:
-      enabled: true          # Containerfile.base, Containerfile.gnome, etc.
+      enabled: true # Containerfile.base, Containerfile.gnome, etc.
     actionlint:
-      enabled: true          # .github/workflows/*.yml
+      enabled: true # .github/workflows/*.yml
     yamllint:
-      enabled: true          # YAML workflows and any YAML config files
+      enabled: true # YAML workflows and any YAML config files
     markdownlint:
-      enabled: true          # README.md, AGENTS.md
+      enabled: true # README.md, AGENTS.md
     gitleaks:
-      enabled: true          # secret scanning (cosign key, registry tokens)
+      enabled: true # secret scanning (cosign key, registry tokens)
     trufflehog:
-      enabled: true          # additional secret detection with verification
+      enabled: true # additional secret detection with verification
     languagetool:
-      enabled: true          # grammar and style in README.md and AGENTS.md
+      enabled: true # grammar and style in README.md and AGENTS.md
     github-checks:
-      enabled: true          # surface CI build failures in reviews
+      enabled: true # surface CI build failures in reviews
       timeout_ms: 90000
 
     # DISABLED — no corresponding file types in this repository
     ast-grep:
       enabled: false
     ruff:
-      enabled: false         # no Python source code
+      enabled: false # no Python source code
     biome:
-      enabled: false         # no JavaScript/TypeScript
+      enabled: false # no JavaScript/TypeScript
     eslint:
-      enabled: false         # no JavaScript/TypeScript
+      enabled: false # no JavaScript/TypeScript
     oxc:
-      enabled: false         # no JavaScript/TypeScript
+      enabled: false # no JavaScript/TypeScript
     phpstan:
-      enabled: false         # no PHP
+      enabled: false # no PHP
     phpmd:
-      enabled: false         # no PHP
+      enabled: false # no PHP
     phpcs:
-      enabled: false         # no PHP
+      enabled: false # no PHP
     golangci-lint:
-      enabled: false         # no Go
+      enabled: false # no Go
     rubocop:
-      enabled: false         # no Ruby
+      enabled: false # no Ruby
     brakeman:
-      enabled: false         # no Ruby on Rails
+      enabled: false # no Ruby on Rails
     buf:
-      enabled: false         # no Protocol Buffers
+      enabled: false # no Protocol Buffers
     regal:
-      enabled: false         # no Rego/OPA
+      enabled: false # no Rego/OPA
     pmd:
-      enabled: false         # no Java
+      enabled: false # no Java
     clang:
-      enabled: false         # no C/C++
+      enabled: false # no C/C++
     cppcheck:
-      enabled: false         # no C/C++
+      enabled: false # no C/C++
     semgrep:
       enabled: false
     opengrep:
       enabled: false
     circleci:
-      enabled: false         # no CircleCI config
+      enabled: false # no CircleCI config
     clippy:
-      enabled: false         # no Rust source code
+      enabled: false # no Rust source code
     sqlfluff:
-      enabled: false         # no SQL
+      enabled: false # no SQL
     trivy:
-      enabled: false         # no Terraform/Kubernetes IaC
+      enabled: false # no Terraform/Kubernetes IaC
     tflint:
-      enabled: false         # no Terraform
+      enabled: false # no Terraform
     checkov:
-      enabled: false         # no Terraform/Kubernetes IaC
+      enabled: false # no Terraform/Kubernetes IaC
     detekt:
-      enabled: false         # no Kotlin
+      enabled: false # no Kotlin
     swiftlint:
-      enabled: false         # no Swift
+      enabled: false # no Swift
     flake8:
-      enabled: false         # no Python
+      enabled: false # no Python
     pylint:
-      enabled: false         # no Python
+      enabled: false # no Python
     fortitudeLint:
-      enabled: false         # no Fortran
+      enabled: false # no Fortran
     luacheck:
-      enabled: false         # no Lua
+      enabled: false # no Lua
     htmlhint:
-      enabled: false         # no HTML
+      enabled: false # no HTML
     stylelint:
-      enabled: false         # no CSS/SCSS
+      enabled: false # no CSS/SCSS
     prismaLint:
-      enabled: false         # no Prisma schema
+      enabled: false # no Prisma schema
     shopifyThemeCheck:
-      enabled: false         # no Shopify theme
+      enabled: false # no Shopify theme
     dotenvLint:
-      enabled: false         # no .env files
+      enabled: false # no .env files
     blinter:
-      enabled: false         # no Windows batch files
+      enabled: false # no Windows batch files
     smartyLint:
-      enabled: false         # no Smarty templates
+      enabled: false # no Smarty templates
     emberTemplateLint:
-      enabled: false         # no Handlebars templates
+      enabled: false # no Handlebars templates
     psscriptanalyzer:
-      enabled: false         # no PowerShell
+      enabled: false # no PowerShell
     checkmake:
-      enabled: false         # no Makefiles (project uses Justfile)
+      enabled: false # no Makefiles (project uses Justfile)
     osvScanner:
-      enabled: false         # no package manifests (packages are inline in Containerfiles)
+      enabled: false # no package manifests (packages are inline in Containerfiles)
 
 knowledge_base:
   code_guidelines:
@@ -339,7 +337,7 @@ knowledge_base:
     filePatterns:
       - "AGENTS.md"
   web_search:
-    enabled: true            # useful for bootc/ostree/btrfs best practice lookups
+    enabled: true # useful for bootc/ostree/btrfs best practice lookups
 
 chat:
   auto_reply: true

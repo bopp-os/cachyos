@@ -450,6 +450,11 @@ RUN --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysi
 # We capture the final settled state of /etc/pam.d and /etc/nsswitch.conf into
 # a stable read-only path under /usr so guara-migrate can restore them on a
 # post-bootc-switch system where /etc still carries old Fedora/Bazzite configs.
+#
+# No manual pam_systemd_home.so injection is needed: CachyOS pambase already
+# ships /etc/pam.d/system-auth with the correct -auth [success=2 default=ignore]
+# and -session optional pam_systemd_home.so entries out of the box (verified
+# against pambase 20250719-1 — pacman -Qkk pambase shows the file is unmodified).
 RUN mkdir -p /usr/share/guaraos/pristine/etc && \
     cp -af /etc/pam.d /usr/share/guaraos/pristine/etc/pam.d && \
     cp -af /etc/nsswitch.conf /usr/share/guaraos/pristine/etc/nsswitch.conf
@@ -489,7 +494,7 @@ RUN mkdir -p /etc/containers/containers.conf.d && \
     printf '[containers]\nlabel = false\n' > /etc/containers/containers.conf.d/01-no-selinux.conf
 
 # Enable required systemd services
-RUN systemctl enable var-opt.mount && \
+RUN systemctl enable opt.mount && \
     systemctl enable NetworkManager.service && \
     systemctl enable systemd-resolved.service && \
     systemctl enable dbus-broker.service && \

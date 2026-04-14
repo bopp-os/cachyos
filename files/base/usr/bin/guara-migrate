@@ -240,8 +240,8 @@ ok "systemd-sysusers ran — system accounts verified"
 section "[3/5] Cleaning up stale OverlayFS state"
 
 if [[ -d "/var/opt_overlay/work" ]]; then
-    if systemctl is-active --quiet var-opt.mount 2>/dev/null; then
-        info "var-opt.mount is active — skipping /var/opt_overlay/work cleanup to avoid corrupting live OverlayFS."
+    if systemctl is-active --quiet opt.mount 2>/dev/null; then
+        info "opt.mount is active — skipping /var/opt_overlay/work cleanup to avoid corrupting live OverlayFS."
     else
         rm -rf /var/opt_overlay/work/*
         ok "Cleared /var/opt_overlay/work"

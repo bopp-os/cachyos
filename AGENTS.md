@@ -64,7 +64,7 @@ files/base/                 overlay COPY'd into the base image
     lib/bootc/kargs.d/
       90-guaraos-optimizations.toml   kernel args (see Kernel Args section)
     lib/systemd/system/
-      var-opt.mount                    OverlayFS mount for /opt (writable on immutable system)
+      opt.mount                        OverlayFS mount for /opt (writable on immutable system)
       usr-share-sddm.mount             OverlayFS mount for SDDM theme dir
       guaraos-swap-setup.service       first-boot oneshot: creates /var/swap as btrfs subvolume + swapfile
       guaraos-snapper-setup.service    first-boot oneshot: creates snapper root config + .snapshots subvolume
@@ -134,7 +134,7 @@ FROM ghcr.io/guara92/guaraos-base:{arch}
 - `/usr` is **read-only at runtime**. The only way to change it is to rebuild and push a new image, then `bootc upgrade`.
 - `/etc` is a writable mutable overlay (ostree). Ship seeds in `files/*/etc/`; first-boot services write runtime config here.
 - `/var` is writable and persistent across upgrades. User data lives here.
-- `/opt` is provided via OverlayFS (`var-opt.mount`): lower=`/usr/lib/opt`, upper=`/var/opt_overlay/upper`.
+- `/opt` is provided via OverlayFS (`opt.mount`): lower=`/usr/lib/opt`, upper=`/var/opt_overlay/upper`.
 
 ### 2. Unbreakable by Architecture
 
@@ -318,7 +318,7 @@ Triggers: `schedule` (every 2 days) + `workflow_dispatch`. `build-v3.yml` also t
 - **Never remove `bootc container lint`** from `Containerfile.base`. It is the final validation gate.
 - **Never push to the git remote.** All remote operations are handled by CI.
 - **Never remove the `cosign.pub → guaraos.pub` COPY** from `Containerfile.base`. It is what makes `bootc upgrade` trust signed updates.
-- **Never place files under `/opt` directly** in a Containerfile. Place them in `/usr/lib/opt/`; the `var-opt.mount` OverlayFS exposes them at `/opt` at runtime.
+- **Never place files under `/opt` directly** in a Containerfile. Place them in `/usr/lib/opt/`; the `opt.mount` OverlayFS exposes them at `/opt` at runtime.
 - **Never skip the `if [ -e /usr/etc ]` cleanup block** after pacman installs. CachyOS packages occasionally write stale `/usr/etc` files that break `bootc`.
 - **Never disable `systemd-homed.service`** in the base image. User accounts depend on it.
 - **Never add LUKS or TPM2 kernel arguments** (`rd.luks.options=tpm2-device=auto`). GuaraOS machines are trusted desktops with no disk encryption.
