@@ -1,0 +1,36 @@
+# Default Helix configuration seeded by GuaraOS.
+# Mirrors the project's installed LSP/linter stack.
+# Override per-project with .helix/config.toml, or globally by editing this file.
+
+[editor]
+bufferline = "always"
+cursorline = true
+idle-timeout = 50
+color-modes = true
+rulers = [100]
+
+[editor.soft-wrap]
+enable = true
+
+[editor.cursor-shape]
+insert = "bar"
+normal = "block"
+select = "underline"
+
+[editor.lsp]
+display-inlay-hints = true
+display-messages = true
+
+[editor.statusline]
+right = [
+  "diagnostics",
+  "selections",
+  "position",
+  "file-encoding",
+  "file-line-ending",
+  "file-type",
+  "version-control",
+]
+
+[editor.indent-guides]
+render = true

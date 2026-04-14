@@ -1,0 +1,55 @@
+# GuaraOS — Optional Flatpaks
+# Install with: guara-install-flatpaks
+#
+# Curated selection for the GNOME flavor.
+# All apps are sourced from Flathub.
+# Lines starting with # are ignored by the install script.
+
+# --- Communication ---
+com.discordapp.Discord
+org.signal.Signal
+org.telegram.desktop
+org.gnome.Fractal
+
+# --- News & Reading ---
+io.gitlab.news_flash.NewsFlash
+com.calibre_ebook.calibre
+com.github.johnfactotum.Foliate
+
+# --- Creativity ---
+org.inkscape.Inkscape
+com.obsproject.Studio
+
+# --- GNOME Tools ---
+com.mattjakeman.ExtensionManager
+io.github.flattool.Warehouse
+com.github.tchx84.Flatseal
+page.tesk.Refine
+
+# --- System ---
+io.missioncenter.MissionCenter
+net.nokyan.Resources
+org.fedoraproject.MediaWriter
+com.transmissionbt.Transmission
+app.drey.Warp
+
+# --- Security ---
+com.bitwarden.desktop
+org.gnome.seahorse.Application
+
+# --- Development ---
+io.podman_desktop.PodmanDesktop
+io.github.shiftey.Desktop
+com.getpostman.Postman
+rest.insomnia.Insomnia
+org.freedesktop.Bustle
+io.github.cleomenezesjr.Escambo
+
+# --- Gaming ---
+com.vysp3r.ProtonPlus
+
+# --- Media ---
+com.github.iwalton3.jellyfin-media-player
+
+# --- Utilities ---
+it.mijorus.gearlever

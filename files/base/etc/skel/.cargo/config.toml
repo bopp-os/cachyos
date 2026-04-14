@@ -1,0 +1,24 @@
+# Default Cargo config seeded by GuaraOS.
+#
+# Applied to every new user's ~/.cargo/config.toml via /etc/skel.
+# Settings here are overridden by any project-level .cargo/config.toml.
+#
+# mold    — fastest available linker; cuts link times by 5-10x on large Rust
+#           projects compared to the default BFD linker.
+# sccache — compiler cache shared across all workspaces; dramatically speeds
+#           up incremental and cross-project rebuilds.
+# native  — compile for the exact microarchitecture of the user's machine at
+#           runtime (not the build machine). Safe in skel because cargo reads
+#           this file when *the user* runs `cargo build`, not at image build time.
+# lto     — thin LTO for release profiles: best ratio of compile-time overhead
+#           to binary size / runtime performance improvement.
+
+[build]
+rustc-wrapper = "sccache"
+
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/mold", "-C", "target-cpu=native"]
+
+[profile.release]
+lto = "thin"

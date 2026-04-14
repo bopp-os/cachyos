@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "arch-mcp": {
+            "command": "/usr/local/bin/arch-ops-server",
+            "args": []
+        },
+        "linux-mcp": {
+            "command": "/usr/local/bin/linux-mcp-server",
+            "args": []
+        }
+    }
+}

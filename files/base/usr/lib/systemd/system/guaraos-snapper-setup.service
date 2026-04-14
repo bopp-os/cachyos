@@ -1,0 +1,17 @@
+[Unit]
+Description=GuaraOS — First-boot snapper configuration
+Documentation=https://github.com/Guara92/GuaraOS
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target
+
+# Only run if the snapper root config does not already exist
+ConditionPathExists=!/etc/snapper/configs/root
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/guaraos-snapper-setup
+
+[Install]
+WantedBy=sysinit.target

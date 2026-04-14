@@ -1,0 +1,120 @@
+#!/bin/bash
+# guaraos-swap-setup
+#
+# First-boot swapfile creator for GuaraOS.
+# Creates a 32 GiB swap file at /var/swap/swapfile, btrfs-aware.
+#
+# On btrfs, /var/swap is created as a dedicated nested subvolume BEFORE the
+# swapfile is created inside it. This is REQUIRED: the kernel refuses to
+# activate a btrfs swapfile if its containing subvolume has any writable
+# snapshots. Snapper targets the root subvolume (@); btrfs nested subvolumes
+# are excluded from parent snapshots. By isolating /var/swap in its own
+# subvolume, snapper can freely snapshot @ without the swapfile's subvolume
+# ever acquiring snapshots of its own — and swapon succeeds on every boot.
+#
+# Run by guaraos-swap-setup.service (oneshot, ConditionPathExists).
+# Safe to re-run: exits 0 immediately if swapfile already exists.
+
+set -euo pipefail
+
+SWAP_DIR="/var/swap"
+SWAP_FILE="${SWAP_DIR}/swapfile"
+SWAP_SIZE="32g"
+
+# Idempotent fast-path: file already exists — ensure swap is active and persisted.
+if [ -f "${SWAP_FILE}" ]; then
+    echo "guaraos-swap-setup: ${SWAP_FILE} already exists — ensuring activation and persistence..."
+
+    # On btrfs, verify SWAP_DIR is a dedicated subvolume before activating.
+    # A swapfile inside a plain btrfs directory can be snapshotted by snapper,
+    # which permanently blocks swapon. Fail loudly so the operator can remediate.
+    FS_TYPE=$(findmnt -n -o FSTYPE --target /var 2>/dev/null || echo "unknown")
+    if [ "${FS_TYPE}" = "btrfs" ]; then
+        if ! btrfs subvolume show "${SWAP_DIR}" &>/dev/null; then
+            echo "guaraos-swap-setup: ERROR: ${SWAP_DIR} is NOT a btrfs subvolume." >&2
+            echo "guaraos-swap-setup: Activating a swapfile in a plain btrfs directory is unsafe:" >&2
+            echo "guaraos-swap-setup: snapper may snapshot it, permanently blocking future swapon." >&2
+            echo "guaraos-swap-setup: Manual remediation required:" >&2
+            echo "guaraos-swap-setup:   1. swapoff ${SWAP_FILE}  (if currently active)" >&2
+            echo "guaraos-swap-setup:   2. cp ${SWAP_FILE} /tmp/swapfile.bak" >&2
+            echo "guaraos-swap-setup:   3. rm -rf ${SWAP_DIR}" >&2
+            echo "guaraos-swap-setup:   4. btrfs subvolume create ${SWAP_DIR}" >&2
+            echo "guaraos-swap-setup:   5. btrfs filesystem mkswapfile --size 32g --uuid clear ${SWAP_FILE}" >&2
+            echo "guaraos-swap-setup:   6. swapon --priority 10 ${SWAP_FILE}" >&2
+            exit 1
+        fi
+        echo "guaraos-swap-setup: ${SWAP_DIR} is a btrfs subvolume — OK."
+    fi
+
+    # Re-activate if not currently swapped in (e.g. crash between mkswapfile and swapon).
+    if ! swapon --show | grep -qF "${SWAP_FILE}"; then
+        echo "guaraos-swap-setup: Swap not active — activating..."
+        swapon --priority 10 "${SWAP_FILE}"
+    fi
+
+    # Ensure fstab entry is present (e.g. crash before fstab write).
+    FSTAB="/etc/fstab"
+    if ! grep -qF "${SWAP_FILE}" "${FSTAB}" 2>/dev/null; then
+        echo "guaraos-swap-setup: Adding ${SWAP_FILE} to ${FSTAB}..."
+        printf '\n# GuaraOS swapfile — created by guaraos-swap-setup\n%s none swap defaults,pri=10 0 0\n' \
+            "${SWAP_FILE}" >> "${FSTAB}"
+    fi
+
+    echo "guaraos-swap-setup: Done. Swap active:"
+    swapon --show
+    exit 0
+fi
+
+echo "guaraos-swap-setup: Creating ${SWAP_SIZE} swapfile at ${SWAP_FILE}..."
+
+# Detect filesystem type for /var (where the swap dir will live).
+FS_TYPE=$(findmnt -n -o FSTYPE --target /var 2>/dev/null || echo "unknown")
+echo "guaraos-swap-setup: Detected filesystem for /var: ${FS_TYPE}"
+
+if [ "${FS_TYPE}" = "btrfs" ]; then
+    # btrfs: /var/swap MUST be a dedicated nested subvolume.
+    #
+    # The kernel refuses to activate a btrfs swapfile if its containing
+    # subvolume has any writable snapshots. Snapper snapshots the root
+    # subvolume (@); btrfs nested subvolumes are excluded from their parent's
+    # snapshots. By creating /var/swap as its own subvolume, the swapfile
+    # lives in a snapshot-free subvolume regardless of how often snapper
+    # runs on @.
+    if ! btrfs subvolume show "${SWAP_DIR}" &>/dev/null; then
+        echo "guaraos-swap-setup: Creating btrfs subvolume at ${SWAP_DIR}..."
+        btrfs subvolume create "${SWAP_DIR}"
+    else
+        echo "guaraos-swap-setup: ${SWAP_DIR} is already a btrfs subvolume."
+    fi
+
+    # btrfs filesystem mkswapfile handles in one step:
+    #   - NOCOW attribute (prevents CoW fragmentation on swap writes)
+    #   - contiguous pre-allocation without holes
+    #   - correct permissions (0600)
+    #   - mkswap header
+    # Requires btrfs-progs >= 6.1 (ships in the base image).
+    echo "guaraos-swap-setup: Using btrfs filesystem mkswapfile..."
+    btrfs filesystem mkswapfile --size "${SWAP_SIZE}" --uuid clear "${SWAP_FILE}"
+else
+    # ext4 / xfs / f2fs — fallocate is safe and fast.
+    mkdir -p "${SWAP_DIR}"
+    echo "guaraos-swap-setup: Using fallocate..."
+    fallocate -l "${SWAP_SIZE}" "${SWAP_FILE}"
+    chmod 0600 "${SWAP_FILE}"
+    mkswap "${SWAP_FILE}"
+fi
+
+# Activate immediately for this boot.
+swapon --priority 10 "${SWAP_FILE}"
+
+# Persist across reboots via /etc/fstab.
+# We write to /etc (mutable ostree overlay) — never to /usr.
+FSTAB="/etc/fstab"
+if ! grep -qF "${SWAP_FILE}" "${FSTAB}" 2>/dev/null; then
+    echo "guaraos-swap-setup: Adding ${SWAP_FILE} to ${FSTAB}..."
+    printf '\n# GuaraOS swapfile — created by guaraos-swap-setup\n%s none swap defaults,pri=10 0 0\n' \
+        "${SWAP_FILE}" >> "${FSTAB}"
+fi
+
+echo "guaraos-swap-setup: Done. Swap active:"
+swapon --show

@@ -1,0 +1,78 @@
+# GuaraOS Containerfile.gamestation
+#
+# Desktop overlay: KDE Plasma + gamescope/Steam session (gamestation flavour).
+# Primary session: gamescope-session (autologin via first-boot service).
+# Secondary session: KDE Plasma (selectable from the plasmalogin greeter).
+
+ARG BASE_IMAGE_TAG=latest
+FROM ghcr.io/guara92/guaraos-base:${BASE_IMAGE_TAG}
+
+# ==========================================
+# MASTER PACKAGE INSTALLATION
+# ==========================================
+
+# --- Desktop Environment (KDE Plasma) Core ---
+RUN COMPONENT_TAG="kde-core" pacman -Sy --noconfirm --needed \
+    plasma-desktop plasma-workspace xorg-xwayland qt5-wayland qt6-wayland \
+    plasma-login-manager powerdevil kscreen polkit-kde-agent \
+    xdg-desktop-portal xdg-desktop-portal-kde xdg-desktop-portal-gtk colord-kde && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Desktop Integration & Services ---
+RUN COMPONENT_TAG="kde-integration" pacman -Sy --noconfirm --needed \
+    plasma plasma-pa plasma-nm kwallet-pam udisks2 python-gobject kdeplasma-addons \
+    kio-extras kio-fuse kio-admin flatpak-kcm xdg-utils libappimage \
+    baloo kwayland-integration plasma5-integration bluedevil plasma-firewall plasma-thunderbolt plasma-browser-integration kinfocenter xsettingsd plymouth-kcm && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- KDE Utilities & Addons ---
+RUN COMPONENT_TAG="kde-utilities" pacman -Sy --noconfirm --needed \
+    dolphin dolphin-plugins konsole kate ark spectacle kdeconnect \
+    gwenview okular kcalc partitionmanager plasma-disks plasma-systemmonitor \
+    kdialog filelight yakuake kfind kwalletmanager sweeper plasma-foreground-booster haruna phonon-qt6-vlc && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- KDE Media ---
+RUN COMPONENT_TAG="kde-media" pacman -Sy --noconfirm --needed \
+    ffmpegthumbnailer ffmpegthumbs kdegraphics-thumbnailers kimageformats qt6-imageformats && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- KDE Themes & Aesthetics ---
+RUN COMPONENT_TAG="kde-themes-aesthetics" pacman -Sy --noconfirm --needed \
+    breeze-gtk kde-gtk-config appmenu-gtk-module cachyos-kde-settings cachyos-themes-sddm cachyos-emerald-kde-theme-git cachyos-nord-kde-theme-git cachyos-lavender-kde-theme-git cachyos-nord-gtk-theme-git cachyos-iridescent-kde char-white && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# ==========================================
+# GAMESTATION CONFIGURATION
+# ==========================================
+
+# Copy gamestation-specific configuration files:
+#   - usr/lib/plasmalogin/defaults.conf        managed default session (gamescope)
+#   - usr/lib/systemd/system/guaraos-gamestation-setup.service
+#   - usr/libexec/guaraos-gamestation-setup     first-boot autologin script
+COPY files/gamestation/usr /usr/
+COPY files/gamestation/etc /etc/
+
+# Make the first-boot setup script executable
+RUN chmod 0755 /usr/libexec/guaraos-gamestation-setup
+
+# ==========================================
+# ENABLE SERVICES
+# ==========================================
+
+RUN systemctl disable sddm.service || true && \
+    systemctl disable gdm.service || true && \
+    systemctl enable plasmalogin.service && \
+    systemctl enable usr-share-sddm.mount && \
+    systemctl enable guaraos-gamestation-setup.service
+
+# Preserve /opt contents for OverlayFS
+RUN mkdir -p /usr/lib/opt && \
+    if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
+        find /opt -mindepth 1 -maxdepth 1 -exec mv -t /usr/lib/opt/ {} + || true; \
+    fi

@@ -1,0 +1,77 @@
+#!/bin/bash
+# GuaraOS Optional Flatpak Installer
+# Installs a curated list of Flatpaks sourced from Bazzite-DX
+
+set -euo pipefail
+
+echo "=========================================="
+echo " GuaraOS Optional Flatpak Installer"
+echo " Run as: guara-install-flatpaks"
+echo "=========================================="
+
+BAZZITE_URL="https://raw.githubusercontent.com/ublue-os/bazzite-dx/refs/heads/main/system_files/etc/ublue-os/system_flatpaks"
+GUARAOS_LIST="/usr/share/guaraos/guaraos-flatpaks.txt"
+TMP_LIST=$(mktemp /tmp/guaraos_flatpaks.XXXXXX)
+TMP_FETCH=$(mktemp /tmp/guaraos_fetch.XXXXXX)
+trap 'rm -f "$TMP_LIST" "$TMP_FETCH"' EXIT
+
+echo "[*] Loading curated GuaraOS Flatpak list..."
+if [ -f "$GUARAOS_LIST" ]; then
+    awk '{ sub(/#.*/, ""); if ($0 ~ /[^[:space:]]/) print }' "$GUARAOS_LIST" > "$TMP_LIST"
+    echo "[*] Loaded $(wc -l < "$TMP_LIST") entries from local list."
+else
+    echo "[!] Warning: Local list $GUARAOS_LIST not found. Proceeding with upstream list only."
+    touch "$TMP_LIST"
+fi
+
+echo "[*] Fetching additional Flatpaks from Bazzite-DX (non-fatal)..."
+if curl --fail --show-error --silent \
+    --connect-timeout 30 --max-time 120 \
+    --retry 3 --retry-connrefused \
+    "$BAZZITE_URL" | awk '{ sub(/#.*/, ""); if ($0 ~ /[^[:space:]]/) print }' > "$TMP_FETCH" \
+    && [ -s "$TMP_FETCH" ]; then
+    cat "$TMP_FETCH" >> "$TMP_LIST"
+    echo "[*] Merged upstream Bazzite-DX list."
+else
+    echo "[!] Warning: Could not fetch Bazzite-DX list (network error or URL changed). Proceeding with local list only."
+fi
+
+# Deduplicate and sort the merged list
+sort -u -o "$TMP_LIST" "$TMP_LIST"
+
+if [ ! -s "$TMP_LIST" ]; then
+    echo "[!] Error: Failed to fetch or parse the Flatpak list."
+    exit 1
+fi
+
+echo "[*] The curated list has been downloaded."
+read -p "Would you like to review or edit the list before installing? [y/N]: " EDIT_CHOICE
+
+if [[ "$EDIT_CHOICE" =~ ^[Yy]$ ]]; then
+    ${EDITOR:-nano} "$TMP_LIST"
+fi
+
+# Read the (potentially edited) list into an array, stripping comments/blanks again just in case
+mapfile -t FLATPAKS < <(awk '{ sub(/#.*/, ""); if ($0 ~ /[^[:space:]]/) print }' "$TMP_LIST")
+
+if [ ${#FLATPAKS[@]} -eq 0 ]; then
+    echo "[*] No Flatpaks selected for installation. Exiting."
+    exit 0
+fi
+
+echo "[*] Ensuring Flathub remote is configured..."
+# Use system-wide flatpak if run as root, otherwise user-level
+if [ "$(id -u)" -eq 0 ]; then
+    FLATPAK_CMD="flatpak install --system -y flathub"
+    flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+else
+    FLATPAK_CMD="flatpak install --user -y flathub"
+    flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+fi
+
+echo "[*] Found ${#FLATPAKS[@]} Flatpaks to install."
+echo "[*] Starting installation (this may take a while)..."
+
+$FLATPAK_CMD "${FLATPAKS[@]}"
+
+echo "[*] All optional Flatpaks have been installed successfully!"

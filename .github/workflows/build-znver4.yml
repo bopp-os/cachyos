@@ -6,20 +6,20 @@ on:
   workflow_dispatch:
     inputs:
       no_cache:
-        description: 'Force a clean build (--no-cache)'
+        description: "Force a clean build (--no-cache)"
         required: false
         type: boolean
         default: false
       wipe_pkg_cache:
-        description: 'Wipe package cache before build'
+        description: "Wipe package cache before build"
         required: false
         type: boolean
         default: false
 
 env:
-  IMAGE_DESC: "CachyOS BoppOS Bootc image (znver4)"
-  IMAGE_KEYWORDS: "bootc,arch,cachyos"
-  IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
+  IMAGE_DESC: "GuaraOS Bootc image (znver4)"
+  IMAGE_KEYWORDS: "bootc,arch,cachyos,guaraos"
+  IMAGE_LOGO_URL: "https://github.com/Guara92.png"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "znver4"
 
@@ -55,7 +55,7 @@ jobs:
       - name: Free Disk Space (Self-Hosted)
         run: |
           echo "🧹 Sweeping the runner for free space..."
-          
+
           # 1. Clean up package cache (Apt for Debian/Ubuntu, Pacman for Arch/CachyOS)
           if command -v apt-get &> /dev/null; then
             echo "Detected apt. Cleaning cache..."
@@ -64,19 +64,19 @@ jobs:
             echo "Detected pacman. Cleaning cache..."
             sudo pacman -Scc --noconfirm
           fi
-          
+
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman*
-          
+
           # 3. Prune dangling Podman data AND aggressively wipe the build cache
           sudo podman system prune --all --force --build
-          
+
           # 4. Wipe the Podman package cache if the manual UI toggle was checked
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Nuking Podman builder cache mount..."
-            sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*
+            sudo rm -rf /var/lib/containers/storage/volumes/guaraos-builder-cache-*
           fi
-          
+
           echo "📊 Disk space after cleanup:"
           df -h /
 
@@ -109,7 +109,7 @@ jobs:
             org.opencontainers.image.description=${{ env.IMAGE_DESC }}
             org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}
-            org.opencontainers.image.title=cachyos
+            org.opencontainers.image.title=guaraos
             org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/tree/${{ github.sha }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
             org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
@@ -139,7 +139,7 @@ jobs:
         run: |
           set -x
 
-          # Calculate the base image tag. 
+          # Calculate the base image tag.
           # If DEFAULT_TAG is znver4, BASE_TAG becomes v4. Otherwise, they match.
           MARCH="${{ env.DEFAULT_TAG }}"
           if [ "$MARCH" == "znver4" ]; then
@@ -168,7 +168,7 @@ jobs:
           fi
 
           echo "::group::Building base"
-          CURRENT_IMAGE_NAME="cachyos-base"
+          CURRENT_IMAGE_NAME="guaraos-base"
           DOCKERFILE="Containerfile.base"
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$BASE_TAG" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
@@ -207,11 +207,11 @@ jobs:
             BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
           fi
 
-          FLAVORS=("plasma" "gnome" "niri")
-          
+          FLAVORS=("gnome" "gamestation" "cosmic")
+
           for FLAVOR in "${FLAVORS[@]}"; do
             echo "::group::Building $FLAVOR"
-            CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
+            CURRENT_IMAGE_NAME="guaraos-${FLAVOR}"
             DOCKERFILE="Containerfile.${FLAVOR}"
             FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
 
@@ -219,7 +219,7 @@ jobs:
             sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
               --network=host \
               --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
-            
+
             echo "Rechunking $FLAVOR image..."
             IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
             ARCHIVE_PATH="${{ github.workspace }}/rechunked_${FLAVOR}.tar"
@@ -252,17 +252,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -ex
-          
-          FLAVORS=("plasma" "gnome" "niri")
-          
+
+          FLAVORS=("gnome" "gamestation" "cosmic")
+
           for FLAVOR in "${FLAVORS[@]}"; do
             echo "::group::Pushing $FLAVOR"
-            CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
-            
+            CURRENT_IMAGE_NAME="guaraos-${FLAVOR}"
+
             for tag in $IMAGE_TAGS; do
               SUCCESS=false
               for i in $(seq "${MAX_RETRIES}"); do
-                if sudo podman push "localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"; then
+                if sudo podman push --compression-format=zstd:chunked --compression-level=3 "localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"; then
                   SUCCESS=true
                   break
                 fi
@@ -274,7 +274,7 @@ jobs:
                 exit 1
               fi
             done
-            
+
             # Fetch remote digest with retries and explicit auth to account for GHCR private package visibility
             SUCCESS_DIGEST=false
             for i in $(seq "${MAX_RETRIES}"); do
@@ -289,7 +289,7 @@ jobs:
               echo "::error::Failed to fetch remote digest for ${CURRENT_IMAGE_NAME} after ${MAX_RETRIES} retries."
               exit 1
             fi
-            
+
             echo "Captured remote digest: $REMOTE_DIGEST"
             echo "${CURRENT_IMAGE_NAME}=${REMOTE_DIGEST}" >> digests.env
             echo "::endgroup::"
@@ -314,16 +314,16 @@ jobs:
         if: always()
         run: |
           echo "🧹 Sweeping up the heavy Podman assets..."
-          
+
           # 1. Obliterate orphaned Podman extraction directories (The 128GB Silent Killer)
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman*
-          
+
           # 2. Delete the massive chunkah tarballs
           sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
-          
+
           # 3. Prune dangling (<none>) images AND the intermediate build cache
           sudo podman system prune --all --force --build
-          
+
           # 4. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
             echo "✨ Build succeeded. Wiping workspace source files..."
@@ -332,6 +332,6 @@ jobs:
           else
             echo "⚠️ Build failed. Leaving workspace source files intact for debugging."
           fi
-          
+
           echo "📊 Final Disk Space:"
           df -h /

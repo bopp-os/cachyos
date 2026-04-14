@@ -1,0 +1,14 @@
+[Unit]
+Description=GuaraOS Gamestation — configure plasmalogin autologin
+Documentation=https://github.com/Guara92/GuaraOS
+# Run on every boot until the drop-in config has been written
+ConditionPathExists=!/etc/plasmalogin.conf.d/autologin.conf
+After=local-fs.target systemd-sysusers.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/guaraos-gamestation-setup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

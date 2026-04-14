@@ -1,4 +1,4 @@
-# BoppOS Containerfile.base
+# GuaraOS Containerfile.base
 #
 # A high-performance, atomic image based on CachyOS.
 # Foundation layer including bootc and hardware enablement.
@@ -17,7 +17,7 @@ USER root
 
 # Conditionally wipe the AUR builder package cache
 ARG WIPE_PKG_CACHE
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+RUN --mount=type=cache,id=guaraos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     if [ "$WIPE_PKG_CACHE" = "true" ]; then \
         echo "Wiping AUR builder package cache..." && \
         rm -rf /var/cache/pacman/pkg/* ; \
@@ -25,7 +25,7 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
 
 # Minimal setup: just enough to build packages
 # Dynamic cache ID ensures builder isolation for different architectures
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+RUN --mount=type=cache,id=guaraos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     pacman-key --init && \
     echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
     pacman-key --populate archlinux cachyos && \
@@ -51,24 +51,33 @@ RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/c
     chown -R builduser:builduser /home/builduser
 
 # Build Scopebuddy
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+RUN --mount=type=cache,id=guaraos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     git clone https://aur.archlinux.org/scopebuddy-git.git /tmp/scopebuddy && \
     chown -R builduser:builduser /tmp/scopebuddy && \
     cd /tmp/scopebuddy && \
     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
 
 # Build autofs
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+RUN --mount=type=cache,id=guaraos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
     git clone https://aur.archlinux.org/autofs.git /tmp/autofs && \
     chown -R builduser:builduser /tmp/autofs && \
     cd /tmp/autofs && \
     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
 
-# Build sddm-theme-noctalia-git
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    git clone https://aur.archlinux.org/sddm-theme-noctalia-git.git /tmp/sddm-theme-noctalia-git && \
-    chown -R builduser:builduser /tmp/sddm-theme-noctalia-git && \
-    cd /tmp/sddm-theme-noctalia-git && \
+# Build heroic-games-launcher-bin
+RUN --mount=type=cache,id=guaraos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+    git clone https://aur.archlinux.org/heroic-games-launcher-bin.git /tmp/heroic && \
+    chown -R builduser:builduser /tmp/heroic && \
+    cd /tmp/heroic && \
+    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
+
+# Build git-credential-manager-bin
+# Pre-compiled .NET binary — no .NET SDK needed at build time.
+# Provides cross-host credential storage backed by libsecret / GNOME keyring.
+RUN --mount=type=cache,id=guaraos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
+    git clone https://aur.archlinux.org/git-credential-manager-bin.git /tmp/gcm && \
+    chown -R builduser:builduser /tmp/gcm && \
+    cd /tmp/gcm && \
     sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
 
 # Clone bootcrew/mono to access their shared setup scripts
@@ -86,7 +95,7 @@ ENV LANG=en_US.UTF-8
 
 # Conditionally wipe the system package cache
 ARG WIPE_PKG_CACHE
-RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     if [ "$WIPE_PKG_CACHE" = "true" ]; then \
         echo "Wiping system package cache..." && \
         rm -rf /usr/lib/sysimage/cache/pacman/pkg/* ; \
@@ -113,7 +122,8 @@ RUN rm -rf /etc/pacman.d/gnupg && \
     pacman-key --lsign-key F3B607488DB35A47 && \
     pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
     pacman-key --lsign-key 3056513887B78AEB && \
-    pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+    pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # Tag pacman config and mirrorlists as a unique component to avoid ostree layer hash non-determinism
 RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings -exec setfattr -n user.component -v "pacman-config" {} +
@@ -148,7 +158,7 @@ RUN sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
 
 # Dracut i18n fix
 RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
-    echo 'i18n_vars="/usr/share/kbd/consolefonts  /usr/share/kbd/keymaps"' >> /usr/lib/dracut/dracut.conf.d/boppos-cachyos.conf
+    echo 'i18n_vars="/usr/share/kbd/consolefonts  /usr/share/kbd/keymaps"' >> /usr/lib/dracut/dracut.conf.d/guaraos.conf
 
 # Backfill user.component attributes for the original CachyOS base image packages.
 # Subsequent package installs will be handled automatically by the ALPM hook.
@@ -157,7 +167,7 @@ RUN COMPONENT_TAG="default-base" pacman -Qq | /usr/libexec/assign-usercomponent.
 # ==========================================
 # CPU ARCHITECTURE REPOSITORY SETUP
 # ==========================================
-RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     export COMPONENT_TAG="arch-optimizations" && \
     rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
     rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
@@ -169,160 +179,251 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
     else \
         echo "Architecture $TARGET_CPU_MARCH detected. Using standard image repositories." ; \
     fi && \
-    pacman -Syu --noconfirm
+    pacman -Syu --noconfirm && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
 # ==========================================
 RUN --mount=type=tmpfs,dst=/run \
-    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth mesa-git lib32-mesa-git || echo "Conflicting packages not found, skipping."
+    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth mesa lib32-mesa || echo "Conflicting packages not found, skipping."
 
 # --- CATEGORY 1: System Core & Foundational ---
 # --- System Core ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="system-core" pacman -Sy --noconfirm --needed \
     linux-cachyos linux-cachyos-headers systemd systemd-sysvcompat dbus dbus-broker-units dbus-glib glib2 polkit shadow lua-luv gpgme gnupg ufw && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Bootc Dependencies ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="bootc" pacman -Sy --noconfirm --needed \
     bootc dracut ostree skopeo containers-common btrfs-progs e2fsprogs xfsprogs dosfstools && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- CATEGORY 2: Infrequent Updates (Stable) ---
 # --- Fonts ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="fonts" pacman -Sy --noconfirm --needed \
-    ttf-ms-fonts ttf-dejavu ttf-bitstream-vera ttf-ubuntu-font-family noto-fonts noto-fonts-cjk noto-fonts-emoji noto-color-emoji-fontconfig ttf-nerd-fonts-symbols ttf-nerd-fonts-symbols-mono awesome-terminal-fonts cantarell-fonts ttf-liberation ttf-opensans ttf-meslo-nerd && \
+    ttf-ms-fonts ttf-dejavu ttf-bitstream-vera ttf-ubuntu-font-family noto-fonts noto-fonts-cjk noto-fonts-emoji noto-color-emoji-fontconfig ttf-nerd-fonts-symbols ttf-nerd-fonts-symbols-mono awesome-terminal-fonts cantarell-fonts ttf-liberation ttf-opensans ttf-meslo-nerd \
+    inter-font ttf-jetbrains-mono-nerd ttf-firacode-nerd && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Filesystems & Storage ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="filesystems" pacman -Sy --noconfirm --needed \
     fuse2 fuse3 fuse2fs ntfs-3g exfatprogs lvm2 mdadm cryptsetup gvfs gvfs-mtp gvfs-smb nfs-utils smartmontools nilfs-utils dmraid && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
+# --- Btrfs Snapshots ---
+# snapper + btrfs-assistant: daily timeline snapshots of the mutable state
+# (/etc config changes, /var app state). /usr is read-only (bootc-managed)
+# so snapshot diffs are small. Configuration and .snapshots subvolume creation
+# are deferred to guaraos-snapper-setup.service on first boot.
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="btrfs-snapshots" pacman -Sy --noconfirm --needed \
+    snapper btrfs-assistant cachyos-snapper-support btrfsmaintenance && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
 # --- Archiving & Compression ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="archiving" pacman -Sy --noconfirm --needed \
-    unp unarj unrar unzip zip bzip2 p7zip unace cpio sharutils cabextract rpmextract xz && \
+    unp unarj unrar unzip zip bzip2 p7zip unace cpio sharutils cabextract rpmextract xz \
+    innoextract unshield && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Printing & Scanning ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="printing-scanning" pacman -Sy --noconfirm --needed \
     cups cups-pdf system-config-printer sane cups-filters foomatic-db foomatic-db-engine foomatic-db-gutenprint-ppds foomatic-db-nonfree foomatic-db-nonfree-ppds foomatic-db-ppds ghostscript gsfonts gutenprint splix hplip python-pyqt5 python-reportlab && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Audio Core ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="audio" pacman -Sy --noconfirm --needed \
-    pipewire-pulse pipewire-alsa pipewire-jack wireplumber pavucontrol alsa-utils alsa-plugins && \
+    pipewire-pulse pipewire-alsa pipewire-jack wireplumber pavucontrol alsa-utils alsa-plugins \
+    realtime-privileges && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Camera Support ---
+# libcamera: modern camera stack for webcams on Linux.
+# pipewire-libcamera: integrates libcamera devices into the PipeWire graph.
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="camera" pacman -Sy --noconfirm --needed \
+    libcamera pipewire-libcamera && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Firmware & Microcode ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="firmware" pacman -Sy --noconfirm --needed \
     amd-ucode intel-ucode linux-firmware sof-firmware alsa-firmware wireless-regdb linux-firmware-marvell && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Networking & VPNs ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="networking" pacman -Sy --noconfirm --needed \
     networkmanager networkmanager-openvpn wpa_supplicant iwd ethtool dnsutils modemmanager usb_modeswitch nss-mdns bluez bluez-utils bluez-libs bluez-obex bluedevil openvpn wireguard-tools pptpclient mullvad-vpn mullvad-vpn-daemon cloudflare-warp-bin tailscale dnsmasq xl2tpd bluez-hid2hci && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- CATEGORY 3: Moderate Updates ---
 # --- Power & Hardware Management ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="hardware-management" pacman -Sy --noconfirm --needed \
-    power-profiles-daemon cpupower upower accountsservice rtkit xdg-user-dirs mousetweaks radeontool fwupd dmemcg-booster hwinfo dmidecode hdparm lsscsi sg3_utils mtools chwd hwdetect && \
+    power-profiles-daemon cpupower upower accountsservice rtkit xdg-user-dirs mousetweaks radeontool fwupd dmemcg-booster hwinfo dmidecode hdparm lsscsi sg3_utils mtools chwd hwdetect \
+    radeontop android-udev libva-utils && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Shells & Prompts ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="shells" pacman -Sy --noconfirm --needed \
     bash zsh fish bash-preexec bash-completion zsh-completions oh-my-zsh-git atuin starship && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- CLI Utilities ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="cli-utilities" pacman -Sy --noconfirm --needed \
-    zoxide eza ripgrep tealdeer fd fzf jq btop iotop-c konsave conky sysstat htop fastfetch glances procs bottom rsync rclone wl-clipboard procps-ng curl wget file man-db man-pages openssh openssl pacman-contrib pkgfile plocate duf fsarchiver pv && \
+    zoxide eza ripgrep tealdeer fd fzf jq btop iotop-c konsave conky sysstat htop fastfetch glances procs bottom rsync rclone wl-clipboard procps-ng curl wget file man-db man-pages openssh openssl pacman-contrib pkgfile plocate duf fsarchiver pv bpftune-git \
+    bat git-delta lazygit lazydocker dust dog xh sd tokei hyperfine glow speedtest++ logrotate bpftop && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Text Editors & IDEs ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="text-editors-ides" pacman -Sy --noconfirm --needed \
-    nano nano-syntax-highlighting micro vi visual-studio-code-bin meld vim && \
+    nano nano-syntax-highlighting micro vi meld vim helix neovim && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Development Base ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="devel-base" pacman -Sy --noconfirm --needed \
-    base-devel git git-lfs tig github-cli paru just cosign && \
+    base-devel git git-lfs tig github-cli paru just cosign mold chezmoi && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Containers & Virtualization ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="containers" pacman -Sy --noconfirm --needed \
-    docker docker-compose podman podman-compose distrobox flatpak ptyxis && \
+    docker docker-compose podman podman-compose distrobox flatpak ptyxis \
+    docker-buildx docker-credential-secretservice crun && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Full Virtualization Stack ---
+# QEMU/KVM + libvirt for running VMs. edk2-ovmf provides UEFI firmware.
+# swtpm adds virtual TPM support for Windows 11 VMs.
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="virtualization" pacman -Sy --noconfirm --needed \
+    qemu-full libvirt virt-install virt-viewer edk2-ovmf swtpm && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- CPU Schedulers ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="schedulers" pacman -Sy --noconfirm --needed \
     scx-scheds-git scx-tools-git scx-manager && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Desktop Integration & GUI Libraries ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="desktop-integration" pacman -Sy --noconfirm --needed \
     xdg-utils libappimage gtk3 gtk4 nss libnotify libxss libappindicator-gtk3 libsecret libgsf libopenraw poppler-glib espeak-ng orca && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- CachyOS Base Settings ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="cachyos-settings" pacman -Sy --noconfirm --needed \
     cachyos-settings cachyos-micro-settings cachyos-ananicy-rules cachyos-zsh-config cachyos-fish-config cachyos-samba-settings && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Themes & Aesthetics ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="themes-aesthetics" pacman -Sy --noconfirm --needed \
     cachyos-wallpapers cachyos-plymouth-theme cachyos-plymouth-bootanimation && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- CATEGORY 4: Frequent Updates (Volatile) ---
 # --- Graphics & Drivers ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="graphics-drivers" pacman -Sy --noconfirm --needed \
-    mesa lib32-mesa mesa-utils vulkan-icd-loader vulkan-mesa-layers vulkan-intel vulkan-radeon intel-media-driver vulkan-nouveau lib32-vulkan-mesa-layers lib32-vulkan-intel lib32-vulkan-radeon lib32-vulkan-nouveau libdisplay-info lib32-libdisplay-info && \
+    mesa-git lib32-mesa-git mesa-utils vulkan-icd-loader vulkan-mesa-layers vulkan-intel vulkan-radeon intel-media-driver vulkan-nouveau lib32-vulkan-mesa-layers lib32-vulkan-intel lib32-vulkan-radeon lib32-vulkan-nouveau libdisplay-info lib32-libdisplay-info && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Media & Video ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="media-video" pacman -Sy --noconfirm --needed \
     libdvdcss gst-libav mpv-git ffmpeg vlc gpu-screen-recorder-ui ffmpegthumbnailer gst-plugin-pipewire gst-plugins-bad gst-plugins-ugly vlc-plugins-all && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Gaming Core & Hardware Utilities ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="gaming-core" pacman -Sy --noconfirm --needed \
-    cachyos-gaming-meta cachyos-gaming-applications xorg-xwininfo xdotool yad winboat proton-cachyos wine gamescope-session-git sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid goverlay pascube vkbasalt vkbasalt-cli && \
+    cachyos-gaming-meta cachyos-gaming-applications xorg-xwininfo xdotool yad winboat proton-cachyos wine gamescope-session-git sunshine lact coolercontrol openrgb openrgb-plugin-effects-git nvtop lsfg-vk game-devices-udev udev-joystick-blacklist-git waydroid goverlay pascube vkbasalt vkbasalt-cli protonup-qt steam lutris && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Web Browsers ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="web-browsers" pacman -Sy --noconfirm --needed \
-    helium-browser-bin cachyos-firefox-settings firefox && \
+    hellfire-browser-bin cachyos-firefox-settings firefox && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- Development Languages ---
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="development-languages" pacman -Sy --noconfirm --needed \
-    nodejs npm rust go python-pip python-pipx ruby php cargo-binstall cargo-update python-defusedxml python-packaging && \
+    nodejs npm rust go python-pip python-pipx ruby php cargo-binstall cargo-update python-defusedxml python-packaging uv topgrade sccache && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Language Servers ---
+# One LSP per language already present in development-languages.
+# taplo-cli: TOML LSP + formatter — covers kargs.d and other TOML configs.
+# marksman: Markdown LSP — covers README, docs, AGENTS.md.
+# clangd is shipped by the clang package already pulled via base-devel deps.
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="language-servers" pacman -Sy --noconfirm --needed \
+    bash-language-server lua-language-server rust-analyzer gopls pyright \
+    typescript-language-server yaml-language-server taplo-cli marksman && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Linters & Formatters ---
+# shellcheck: static analysis for shell scripts (GuaraOS ships many bash scripts).
+# shfmt:   shell script formatter — pairs with shellcheck.
+# stylua:  opinionated Lua formatter — pairs with lua-language-server.
+# ruff:    ultra-fast Python linter + formatter (replaces flake8 + black + isort).
+# biome:   all-in-one JS/TS/JSON/CSS formatter + linter.
+# oxlint:  Rust-native JS/TS linter from the Oxc toolchain — extremely fast.
+# typos:   source-code spell checker for code and documentation.
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="linters-formatters" pacman -Sy --noconfirm --needed \
+    shellcheck shfmt stylua ruff biome oxlint typos && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Tree-sitter Grammars ---
+# System-installed parsers used natively by Helix and optionally by Neovim.
+# tree-sitter-query: the meta-grammar for writing tree-sitter highlight/indent queries.
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="tree-sitter-grammars" pacman -Sy --noconfirm --needed \
+    tree-sitter tree-sitter-bash tree-sitter-c tree-sitter-javascript \
+    tree-sitter-lua tree-sitter-markdown tree-sitter-python \
+    tree-sitter-rust tree-sitter-query && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- MCP Servers (AI assistant integrations) ---
+# arch-ops-server  — bridges AI assistants with the Arch Linux ecosystem:
+#                    pacman, AUR, Arch Wiki, package search. Stdio transport.
+#                    Entry point: arch-ops-server (symlinked as arch-mcp).
+# linux-mcp-server — read-only Linux system diagnostics via MCP: systemd,
+#                    journald, filesystems, process info. Stdio transport.
+#                    Entry point: linux-mcp-server.
+#
+# Both are installed system-wide via uv tool into /usr/lib/guaraos-mcp.
+# Wrapper scripts land in /usr/local/bin/ so all users can invoke them.
+# The uv cache is cleaned after install to keep image layers small.
+#
+# Claude Desktop config seeded in /etc/skel/.config/Claude/ references
+# both entry points; users of other clients (Cursor, Zed, Continue) should
+# adapt their own config using the same absolute paths.
+RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+    UV_TOOL_DIR=/usr/lib/guaraos-mcp UV_TOOL_BIN_DIR=/usr/local/bin \
+        uv tool install "git+https://github.com/nihalxkumar/arch-mcp.git" && \
+    UV_TOOL_DIR=/usr/lib/guaraos-mcp UV_TOOL_BIN_DIR=/usr/local/bin \
+        uv tool install linux-mcp-server && \
+    ln -sf /usr/local/bin/arch-ops-server /usr/local/bin/arch-mcp && \
+    rm -rf /root/.cache/uv && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # ==========================================
@@ -335,7 +436,7 @@ RUN chmod -R 0755 /usr/bin /usr/share/libalpm/scripts
 
 # Install AUR packages from Stage 1
 COPY --from=aur_builder /home/builduser/packages/ /tmp/aur-pkgs/
-RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=cache,id=guaraos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="aur-packages" pacman -U --noconfirm /tmp/aur-pkgs/*.pkg.tar.zst && \
     rm -rf /tmp/aur-pkgs && \
     if [ -e /usr/etc ]; then \
@@ -343,6 +444,15 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
         if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && \
         rm -rf /usr/etc; \
     fi
+
+# Preserve pristine GuaraOS PAM + NSS configs for guara-migrate.
+# /usr/etc is cleaned up after every pacman RUN to satisfy bootc container lint.
+# We capture the final settled state of /etc/pam.d and /etc/nsswitch.conf into
+# a stable read-only path under /usr so guara-migrate can restore them on a
+# post-bootc-switch system where /etc still carries old Fedora/Bazzite configs.
+RUN mkdir -p /usr/share/guaraos/pristine/etc && \
+    cp -af /etc/pam.d /usr/share/guaraos/pristine/etc/pam.d && \
+    cp -af /etc/nsswitch.conf /usr/share/guaraos/pristine/etc/nsswitch.conf
 
 # Configure Flatpak
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -387,7 +497,23 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable ModemManager.service && \
     systemctl enable ananicy-cpp.service && \
     systemctl enable scx_loader.service && \
-    systemctl enable brew-setup.service
+    systemctl enable brew-setup.service && \
+    systemctl enable systemd-homed.service && \
+    systemctl enable ufw.service && \
+    systemctl enable dmemcg-booster-system.service && \
+    systemctl enable coolercontrold.service && \
+    systemctl enable fstrim.timer && \
+    systemctl enable snapper-cleanup.timer && \
+    systemctl enable snapper-timeline.timer && \
+    systemctl enable btrfs-scrub.timer && \
+    systemctl enable btrfs-balance.timer && \
+    systemctl enable libvirtd.socket && \
+    systemctl enable docker.socket && \
+    systemctl enable guaraos-swap-setup.service && \
+    systemctl enable guaraos-snapper-setup.service
+
+RUN chmod 0755 /usr/libexec/guaraos-swap-setup && \
+    chmod 0755 /usr/libexec/guaraos-snapper-setup
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
@@ -399,7 +525,7 @@ RUN --mount=type=tmpfs,dst=/run \
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
     if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
-        mv /opt/* /usr/lib/opt/ || true; \
+        find /opt -mindepth 1 -maxdepth 1 -exec mv -t /usr/lib/opt/ {} + || true; \
     fi
 
 # Final system setup and cleanup
@@ -414,7 +540,7 @@ RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
 
 # Add repository security keys
 RUN mkdir -p /etc/pki/containers
-COPY cosign.pub /etc/pki/containers/bopp-os.pub
+COPY guaraos.pub /etc/pki/containers/guaraos.pub
 
 RUN rm -f /README.md
 LABEL containers.bootc=1

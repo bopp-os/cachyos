@@ -1,0 +1,45 @@
+# GuaraOS Containerfile.cosmic
+#
+# Desktop overlay containing COSMIC Desktop (compositor, greeter, shell, and first-party apps).
+
+ARG BASE_IMAGE_TAG=latest
+FROM ghcr.io/guara92/guaraos-base:${BASE_IMAGE_TAG}
+ARG BASE_IMAGE_TAG
+
+# ==========================================
+# MASTER PACKAGE INSTALLATION
+# ==========================================
+
+# --- Desktop Environment (COSMIC) Core ---
+RUN --mount=type=cache,id=guaraos-cache-${BASE_IMAGE_TAG},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="cosmic-core" pacman -Sy --noconfirm --needed \
+    cosmic-session cosmic-comp cosmic-bg cosmic-greeter cosmic-panel cosmic-launcher \
+    cosmic-applets cosmic-app-library cosmic-notifications cosmic-osd \
+    cosmic-settings cosmic-settings-daemon cosmic-workspaces \
+    xdg-desktop-portal-cosmic && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- COSMIC First-Party Applications + Extras ---
+RUN --mount=type=cache,id=guaraos-cache-${BASE_IMAGE_TAG},target=/usr/lib/sysimage/cache/pacman/pkg \
+    COMPONENT_TAG="cosmic-apps" pacman -Sy --noconfirm --needed \
+    cosmic-files cosmic-terminal cosmic-text-editor cosmic-screenshot cosmic-player \
+    cosmic-randr cosmic-store cosmic-initial-setup cosmic-wallpapers cosmic-icon-theme && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# No COSMIC-specific overlay files yet — uncomment when files/cosmic/ is populated:
+# COPY files/cosmic/etc /etc/
+# COPY files/cosmic/usr /usr/
+
+# Enable DE services
+# We disable SDDM, GDM, and plasmalogin if they were enabled, and enable cosmic-greeter
+RUN systemctl disable sddm.service || true && \
+    systemctl disable gdm.service || true && \
+    systemctl disable plasmalogin.service || true && \
+    systemctl enable cosmic-greeter.service
+
+# Preserve /opt contents for OverlayFS
+# (visual-studio-code-bin and others install here)
+RUN mkdir -p /usr/lib/opt && \
+    if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
+        find /opt -mindepth 1 -maxdepth 1 -exec mv -t /usr/lib/opt/ {} + || true; \
+    fi

@@ -1,0 +1,17 @@
+[Unit]
+Description=GuaraOS — First-boot swap file setup
+Documentation=https://github.com/Guara92/GuaraOS
+DefaultDependencies=no
+After=local-fs.target
+Before=swap.target sysinit.target
+
+# Only run if the swapfile does not already exist
+ConditionPathExists=!/var/swap/swapfile
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/guaraos-swap-setup
+
+[Install]
+WantedBy=sysinit.target

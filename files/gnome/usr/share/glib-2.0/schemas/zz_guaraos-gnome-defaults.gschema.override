@@ -1,0 +1,139 @@
+# GuaraOS GNOME Defaults
+# /usr/share/glib-2.0/schemas/zz_guaraos-gnome-defaults.gschema.override
+#
+# Sets system-level GSettings defaults for the GNOME flavor.
+# These are DEFAULT values — users can override anything via GNOME Settings,
+# Tweaks, dconf-editor, or Extension Manager. The "zz_" prefix ensures this
+# file is processed last and wins over any other package-provided overrides.
+#
+# Recompiled at image build time by Containerfile.gnome after COPY.
+
+# ---------------------------------------------------------------------------
+# Desktop Interface
+# ---------------------------------------------------------------------------
+[org.gnome.desktop.interface]
+# Dark mode for all libadwaita (GTK4) and GTK3 apps.
+color-scheme='prefer-dark'
+
+# Show the day of the week next to the clock in the top bar.
+clock-show-weekday=true
+
+# Adwaita blue accent (matches Flat-Remix-GTK-Blue variant below).
+accent-color='blue'
+
+# Subpixel (RGBA) antialiasing — sharper text on LCD/OLED panels.
+font-antialiasing='rgba'
+
+# Full hinting — best results with Inter's hinting tables.
+font-hinting='full'
+
+# UI font: Inter (inter-font package, installed in base image).
+font-name='Inter 12'
+
+# Document font (Papers, Evince, GNOME Text Editor, …).
+document-font-name='Inter 14'
+
+# Monospace font: FiraCode Nerd Font Mono (ttf-firacode-nerd, base image).
+# The Nerd Font variant provides all powerline / icon glyphs for terminals.
+monospace-font-name='FiraCode Nerd Font Mono 14'
+
+# GTK3 theme (flat-remix-gtk installed in gnome image).
+# Blue variant aligns with accent-color=blue; Darkest-Solid is opaque.
+gtk-theme='Flat-Remix-GTK-Blue-Darkest-Solid'
+
+# ---------------------------------------------------------------------------
+# Date & Time
+# ---------------------------------------------------------------------------
+[org.gnome.desktop.datetime]
+# Let the system resolve the timezone from network/IP — no manual setup needed.
+automatic-timezone=true
+
+# ---------------------------------------------------------------------------
+# Mutter (Wayland compositor)
+# ---------------------------------------------------------------------------
+[org.gnome.mutter]
+# Experimental Wayland features enabled by default:
+#   scale-monitor-framebuffer  — fractional scaling without blurriness (HiDPI).
+#   xwayland-native-scaling    — XWayland apps scale at native resolution
+#                                instead of being upscaled from 1× (removes blur).
+#   autoclose-xwayland         — terminate XWayland when no X11 app is running
+#                                (saves ~40 MB RAM and avoids stale X sockets).
+#   variable-refresh-rate      — VRR / FreeSync / G-Sync on supported displays
+#                                (critical for gaming on AMD GPUs).
+experimental-features=['scale-monitor-framebuffer', 'xwayland-native-scaling', 'autoclose-xwayland', 'variable-refresh-rate']
+
+# Workspaces span all monitors — moving to workspace N moves all displays.
+workspaces-only-on-primary=false
+
+# Disable mutter's built-in edge tiling; pop-shell@system76.com owns tiling.
+edge-tiling=false
+
+# ---------------------------------------------------------------------------
+# Window Manager Keybindings
+# ---------------------------------------------------------------------------
+[org.gnome.desktop.wm.keybindings]
+# Close focused window with Super+Q (faster than hunting for Alt+F4).
+close=['<Super>q', '<Alt>F4']
+
+# Toggle maximise with Super+M.
+toggle-maximized=['<Super>m']
+
+# Workspace navigation: Ctrl+Super+↑/↓ and vim-style Ctrl+Super+k/j.
+switch-to-workspace-up=['<Primary><Super>Up', '<Primary><Super>k']
+switch-to-workspace-down=['<Primary><Super>Down', '<Primary><Super>j']
+
+# Disable mutter minimize shortcut — pop-shell handles window hiding.
+minimize=['<Super>comma']
+
+# ---------------------------------------------------------------------------
+# Media Keys (settings-daemon)
+# ---------------------------------------------------------------------------
+[org.gnome.settings-daemon.plugins.media-keys]
+# Super+T opens the system default terminal (ptyxis on GuaraOS).
+terminal=['<Super>t']
+
+# Super+Escape locks the screen (more ergonomic than Super+L on some layouts).
+screensaver=['<Super>Escape']
+
+# Super+F opens the Files app (Nautilus).
+home=['<Super>f']
+
+# Super+B opens the default web browser.
+www=['<Super>b']
+
+# Volume up/down step: 5% per keypress (default is 6%).
+volume-step=5
+
+# ---------------------------------------------------------------------------
+# Dash to Dock extension defaults
+# ---------------------------------------------------------------------------
+[org.gnome.shell.extensions.dash-to-dock]
+# Dock sits at the bottom of the screen.
+dock-position='BOTTOM'
+
+# Autohide: dock slides away when a window overlaps it.
+dock-fixed=false
+
+# Keep the dock hidden even in fullscreen (games, video).
+autohide-in-fullscreen=true
+
+# Disable intellihide — straightforward autohide is more predictable.
+intellihide=false
+
+# Icon size: 54 px — comfortable on 1080p–4K without being oversized.
+dash-max-icon-size=54
+
+# Shrink the dock background to fit icons rather than full-width bar.
+custom-theme-shrink=true
+
+# Semi-transparent dock background.
+background-opacity=0.80000000000000004
+
+# Show the App Grid button at the top of the dock (easier discovery).
+show-apps-at-top=true
+
+# Scrolling on the dock switches workspaces.
+scroll-action='switch-workspace'
+
+# Disable numeric hot-keys (1-9) to avoid conflicts with app shortcuts.
+hot-keys=false

@@ -1,0 +1,47 @@
+#!/bin/bash
+# guaraos-snapper-setup
+#
+# First-boot snapper configuration for GuaraOS.
+# Creates the snapper 'root' config targeting '/' using the 'guaraos' template.
+#
+# The 'guaraos' template is tuned for an immutable bootc system:
+#   - No snap-pac pre/post pairs (no live pacman on an immutable image)
+#   - Daily timeline snapshots as the primary protection mechanism (7-day window)
+#   - Conservative space and retention limits
+#   - /usr is read-only (bootc-managed), so snapshot diffs are small
+#
+# Run by guaraos-snapper-setup.service (oneshot, ConditionPathExists).
+# Skipped silently if / is not on btrfs or if the config already exists.
+
+set -euo pipefail
+
+SNAPPER_CONFIG="/etc/snapper/configs/root"
+TEMPLATE="guaraos"
+
+# Already configured on a previous boot — nothing to do.
+if [ -f "${SNAPPER_CONFIG}" ]; then
+    echo "guaraos-snapper-setup: snapper already configured, skipping."
+    exit 0
+fi
+
+# Snapper is only meaningful on btrfs.
+FS_TYPE=$(findmnt -n -o FSTYPE --target / 2>/dev/null || echo "unknown")
+echo "guaraos-snapper-setup: Detected filesystem for /: ${FS_TYPE}"
+
+if [ "${FS_TYPE}" != "btrfs" ]; then
+    echo "guaraos-snapper-setup: / is not btrfs (${FS_TYPE}), skipping snapper setup."
+    exit 0
+fi
+
+echo "guaraos-snapper-setup: Creating snapper root config (template: ${TEMPLATE})..."
+
+# snapper create-config does three things:
+#   1. Reads /etc/snapper/config-templates/${TEMPLATE}
+#   2. Writes /etc/snapper/configs/root
+#   3. Creates /.snapshots as a nested btrfs subvolume
+# All three are required for snapper to function correctly.
+snapper create-config --template "${TEMPLATE}" /
+
+echo "guaraos-snapper-setup: Snapper root config created successfully."
+echo "guaraos-snapper-setup: Snapper config:"
+cat "${SNAPPER_CONFIG}"

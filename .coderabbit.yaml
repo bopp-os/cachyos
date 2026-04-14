@@ -1,0 +1,345 @@
+# .coderabbit.yaml — GuaraOS code review configuration
+# https://docs.coderabbit.ai/reference/configuration
+#
+# GuaraOS is a personal immutable atomic Linux image (CachyOS + bootc).
+# Primary file types: Containerfiles, bash scripts, systemd units, TOML,
+# YAML workflows, sysctl conf, Markdown. No Python/Go/JS/Rust source code.
+
+language: "en-US"
+
+reviews:
+  profile: "assertive"
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  collapse_walkthrough: false
+  poem: false
+  in_progress_fortune: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+  # Exclude binary and generated files from review
+  path_filters:
+    - "!guaraos.pub"
+
+  path_instructions:
+
+    # -------------------------------------------------------------------------
+    # Containerfiles — immutable image build rules
+    # -------------------------------------------------------------------------
+    - path: "Containerfile*"
+      instructions: |
+        This is an immutable atomic Linux image built with bootc/ostree. Enforce strictly:
+
+        PACKAGE MANAGEMENT
+        - Never suggest installing packages at runtime. All packages must be in a Containerfile pacman RUN layer.
+        - After every pacman install block, verify the 'if [ -e /usr/etc ]' cleanup stanza is present — CachyOS packages occasionally write stale /usr/etc files that break bootc.
+
+        FILESYSTEM RULES
+        - /usr is read-only at runtime. Never suggest writing to it at runtime.
+        - Writes at runtime go to /etc (mutable ostree overlay) or /var (persistent across upgrades).
+        - Never place files under /opt directly. Use /usr/lib/opt/ — the var-opt.mount OverlayFS exposes it at /opt at runtime.
+
+        INITRAMFS
+        - Never re-enable 90-mkinitcpio-install.hook or 90-dracut-install.hook. They are intentionally null-linked.
+        - Dracut is called once explicitly at the end of Containerfile.base. Do not suggest moving or removing it.
+
+        BOOTC
+        - 'bootc container lint' must remain as the final validation step in Containerfile.base.
+        - The 'COPY cosign.pub' (guaraos.pub) step must not be removed — it is what makes bootc upgrade trust signed updates.
+
+        DISPLAY MANAGERS
+        - gamestation: plasmalogin only. Never add SDDM or GDM.
+        - gnome: GDM only. Never add plasmalogin or SDDM.
+        - cosmic: cosmic-greeter only. Never add GDM or plasmalogin.
+
+        SWAP / MEMORY
+        - Never enable zram. GuaraOS uses zswap + disk swapfile exclusively. They are mutually exclusive.
+        - Never add LUKS or TPM2 kernel arguments.
+
+        SIGNING
+        - Never remove the COPY that brings cosign.pub / guaraos.pub into the image.
+
+    # -------------------------------------------------------------------------
+    # First-boot scripts (run as root under systemd oneshot services)
+    # -------------------------------------------------------------------------
+    - path: "files/**/usr/libexec/**"
+      instructions: |
+        These scripts execute as root on first boot via systemd oneshot services.
+
+        SAFETY
+        - Verify 'set -euo pipefail' is present at the top of every script.
+        - Verify idempotency: the script must safely exit 0 if already completed.
+          Check for file/directory existence guards before any destructive operations.
+
+        BTRFS
+        - /var/swap MUST be created as a dedicated btrfs nested subvolume (btrfs subvolume create)
+          before the swapfile is created inside it. A btrfs swapfile activation fails if its
+          containing subvolume has any writable snapshots. A nested subvolume is excluded from
+          parent (@ root) snapshots, keeping the swapfile's subvolume snapshot-free.
+        - Use 'btrfs filesystem mkswapfile --size <N> <path>' for btrfs swapfile creation.
+          This handles NOCOW + pre-allocation + mkswap in one step. Never use fallocate on btrfs for swap.
+        - For non-btrfs paths (ext4/xfs), fallocate + chmod 0600 + mkswap is correct.
+
+        FSTAB
+        - Always guard fstab writes with 'grep -qF' to prevent duplicate entries on re-runs.
+
+        SNAPPER
+        - guaraos-snapper-setup must call 'snapper create-config --template guaraos /'
+          which creates both the config file AND the .snapshots nested btrfs subvolume.
+
+        USERS
+        - Never hardcode usernames. Use 'getent passwd' with UID range 1000-65533.
+
+        SECRETS
+        - No secrets, tokens, or credentials may be hardcoded.
+
+    # -------------------------------------------------------------------------
+    # systemd unit files
+    # -------------------------------------------------------------------------
+    - path: "files/**/usr/lib/systemd/system/*.service"
+      instructions: |
+        Systemd unit files shipped in the read-only image.
+
+        FIRST-BOOT SERVICES
+        - Oneshot first-boot services must have ConditionPathExists=!<target> guards.
+        - Type=oneshot and RemainAfterExit=yes are required for setup services.
+        - DefaultDependencies=no is correct for early-boot services that must run before sysinit.target.
+
+        ORDERING
+        - Services that touch /var must be After=local-fs.target.
+        - Services that must complete before swap is available must be Before=swap.target.
+        - WantedBy=sysinit.target is appropriate for pre-boot setup services.
+        - guaraos-snapper-setup.service must not depend on guaraos-swap-setup.service
+          (they are independent and can run in parallel).
+
+    # -------------------------------------------------------------------------
+    # Kernel arguments (bootc kargs.d)
+    # -------------------------------------------------------------------------
+    - path: "files/**/usr/lib/bootc/kargs.d/*.toml"
+      instructions: |
+        TOML files declaring kernel arguments applied atomically by bootc.
+
+        REQUIRED KARGS
+        - zswap.enabled=1, zswap.compressor=zstd, zswap.zpool=zsmalloc, zswap.shrinker_enabled=1
+          must all be present for the zswap configuration to be correct.
+        - amd_pstate=active is required for Ryzen frequency scaling.
+        - mitigations=off is intentional — GuaraOS machines are trusted desktops.
+
+        FORBIDDEN KARGS
+        - Never add rd.luks.options, rd.luks.uuid, or any LUKS/encryption parameters.
+        - Never add zram kargs — GuaraOS uses zswap exclusively.
+        - Never enable systemd-cryptenroll or TPM2 auto-unlock arguments.
+
+    # -------------------------------------------------------------------------
+    # sysctl configuration
+    # -------------------------------------------------------------------------
+    - path: "files/**/etc/sysctl.d/*.conf"
+      instructions: |
+        Sysctl seeds shipped in the mutable /etc overlay.
+
+        - vm.swappiness must be 40 — tuned for zswap with 32 GB RAM on a gaming workstation.
+          Lower than zram-tuned 100, higher than pure-disk-swap 10. The kernel should prefer
+          evicting file cache (cheap, NVMe re-read) over compressing app/game memory.
+        - Never set vm.swappiness=100 — that value is only appropriate for zram (no backing store).
+        - vm.zone_reclaim_mode=0 is required for multi-CCD Ryzen (Zen 4+) desktop workloads
+          to prevent cross-CCD thrashing.
+        - net.ipv4.tcp_congestion_control=bbr should be present in the base config.
+
+    # -------------------------------------------------------------------------
+    # snapper config template
+    # -------------------------------------------------------------------------
+    - path: "files/**/etc/snapper/config-templates/**"
+      instructions: |
+        GuaraOS snapper template tuned for an immutable bootc system.
+
+        - SPACE_LIMIT="0.2" — /usr is read-only (bootc-managed) so snapshot diffs are small.
+          20% is a conservative, safe limit.
+        - FREE_LIMIT="0.2" — always keep at least 20% of the filesystem free.
+        - TIMELINE_CREATE="yes" with TIMELINE_LIMIT_DAILY="7" is the primary recovery mechanism.
+          snap-pac pre/post pairs are irrelevant because pacman is never invoked on the live system.
+        - NUMBER_LIMIT="10", NUMBER_LIMIT_IMPORTANT="5" for manual/one-shot snapshots.
+        - TIMELINE_LIMIT_HOURLY="0" — no hourly snapshots retained; daily aggregation only.
+        - /var/swap is a dedicated nested btrfs subvolume, automatically excluded from parent
+          snapshots. No snapper config should target a subvolume containing the swapfile.
+
+    # -------------------------------------------------------------------------
+    # GitHub Actions workflows
+    # -------------------------------------------------------------------------
+    - path: ".github/workflows/*.yml"
+      instructions: |
+        CI workflows that build, rechunk, push, and cosign-sign OCI images.
+
+        BUILD PIPELINE
+        - Build order must be: base → rechunk base → flavor(s) → rechunk flavor(s).
+          The rechunking step (chunkah) must run between base and flavor builds.
+        - Images must be pushed with '--compression-format=zstd:chunked --compression-level=3'.
+        - All flavors in FLAVORS arrays must be built, rechunked, and pushed.
+
+        SIGNING
+        - cosign signing uses SIGNING_SECRET (GitHub Actions secret for the cosign private key).
+          Verify it is referenced correctly and never hardcoded.
+        - Each image digest must be signed after push.
+
+        ARCH VARIANTS
+        - build-znver4.yml covers: guaraos-base:znver4, guaraos-gnome:znver4,
+          guaraos-gamestation:znver4, guaraos-cosmic:znver4.
+        - build-v3.yml covers: guaraos-base:v3, guaraos-gamestation:v3.
+        - Never merge the two workflows — they run on different self-hosted runners
+          (AVX-512/znver4 vs AVX2).
+
+        REMOTE
+        - Never push to the git remote from within a workflow.
+
+    # -------------------------------------------------------------------------
+    # Justfile
+    # -------------------------------------------------------------------------
+    - path: "Justfile"
+      instructions: |
+        Task runner for GuaraOS local builds, push, sign, verify, and switch.
+
+        - All arch-dependent recipes must support both 'znver4' and 'v3' arguments.
+        - The 'verify' recipe must include all implemented flavors: gnome, gamestation, cosmic.
+        - Never add recipes that push to the git remote.
+        - Build order in recipes must mirror the CI pipeline: base → rechunk → flavor → rechunk.
+
+    # -------------------------------------------------------------------------
+    # AGENTS.md — ground truth for AI coding agents
+    # -------------------------------------------------------------------------
+    - path: "AGENTS.md"
+      instructions: |
+        AGENTS.md is the canonical context document for all AI coding agents on this project.
+
+        - Any modification to the 'What Agents Must Never Do' section requires strong justification.
+          These rules are inviolable safety constraints, not preferences.
+        - The three Core Principles (Immutable by Design, Unbreakable by Architecture,
+          Maximum Runtime Performance) must not be weakened or removed.
+        - The Target Matrix, Stack table, and Key Packages table must stay accurate and in sync
+          with the actual Containerfiles.
+        - The Kernel Arguments table must exactly match the contents of
+          files/base/usr/lib/bootc/kargs.d/90-guaraos-optimizations.toml.
+        - Repository Layout must reflect actual paths in the files/ directory tree.
+
+  # ---------------------------------------------------------------------------
+  # Tools — enable only what applies to this project's file types
+  # ---------------------------------------------------------------------------
+  tools:
+
+    # ENABLED — relevant to GuaraOS file types
+    shellcheck:
+      enabled: true          # bash scripts in files/*/usr/libexec/ and scripts/
+    hadolint:
+      enabled: true          # Containerfile.base, Containerfile.gnome, etc.
+    actionlint:
+      enabled: true          # .github/workflows/*.yml
+    yamllint:
+      enabled: true          # YAML workflows and any YAML config files
+    markdownlint:
+      enabled: true          # README.md, AGENTS.md
+    gitleaks:
+      enabled: true          # secret scanning (cosign key, registry tokens)
+    trufflehog:
+      enabled: true          # additional secret detection with verification
+    languagetool:
+      enabled: true          # grammar and style in README.md and AGENTS.md
+    github-checks:
+      enabled: true          # surface CI build failures in reviews
+      timeout_ms: 90000
+
+    # DISABLED — no corresponding file types in this repository
+    ast-grep:
+      enabled: false
+    ruff:
+      enabled: false         # no Python source code
+    biome:
+      enabled: false         # no JavaScript/TypeScript
+    eslint:
+      enabled: false         # no JavaScript/TypeScript
+    oxc:
+      enabled: false         # no JavaScript/TypeScript
+    phpstan:
+      enabled: false         # no PHP
+    phpmd:
+      enabled: false         # no PHP
+    phpcs:
+      enabled: false         # no PHP
+    golangci-lint:
+      enabled: false         # no Go
+    rubocop:
+      enabled: false         # no Ruby
+    brakeman:
+      enabled: false         # no Ruby on Rails
+    buf:
+      enabled: false         # no Protocol Buffers
+    regal:
+      enabled: false         # no Rego/OPA
+    pmd:
+      enabled: false         # no Java
+    clang:
+      enabled: false         # no C/C++
+    cppcheck:
+      enabled: false         # no C/C++
+    semgrep:
+      enabled: false
+    opengrep:
+      enabled: false
+    circleci:
+      enabled: false         # no CircleCI config
+    clippy:
+      enabled: false         # no Rust source code
+    sqlfluff:
+      enabled: false         # no SQL
+    trivy:
+      enabled: false         # no Terraform/Kubernetes IaC
+    tflint:
+      enabled: false         # no Terraform
+    checkov:
+      enabled: false         # no Terraform/Kubernetes IaC
+    detekt:
+      enabled: false         # no Kotlin
+    swiftlint:
+      enabled: false         # no Swift
+    flake8:
+      enabled: false         # no Python
+    pylint:
+      enabled: false         # no Python
+    fortitudeLint:
+      enabled: false         # no Fortran
+    luacheck:
+      enabled: false         # no Lua
+    htmlhint:
+      enabled: false         # no HTML
+    stylelint:
+      enabled: false         # no CSS/SCSS
+    prismaLint:
+      enabled: false         # no Prisma schema
+    shopifyThemeCheck:
+      enabled: false         # no Shopify theme
+    dotenvLint:
+      enabled: false         # no .env files
+    blinter:
+      enabled: false         # no Windows batch files
+    smartyLint:
+      enabled: false         # no Smarty templates
+    emberTemplateLint:
+      enabled: false         # no Handlebars templates
+    psscriptanalyzer:
+      enabled: false         # no PowerShell
+    checkmake:
+      enabled: false         # no Makefiles (project uses Justfile)
+    osvScanner:
+      enabled: false         # no package manifests (packages are inline in Containerfiles)
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    # AGENTS.md is the canonical coding context for this project.
+    # CodeRabbit will use it as review criteria alongside the path instructions above.
+    filePatterns:
+      - "AGENTS.md"
+  web_search:
+    enabled: true            # useful for bootc/ostree/btrfs best practice lookups
+
+chat:
+  auto_reply: true

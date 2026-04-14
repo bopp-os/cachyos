@@ -1,9 +1,9 @@
-# BoppOS Containerfile.gnome
+# GuaraOS Containerfile.gnome
 #
 # Desktop overlay containing GNOME, gaming utilities, and developer tools.
 
 ARG BASE_IMAGE_TAG=latest
-FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
+FROM ghcr.io/guara92/guaraos-base:${BASE_IMAGE_TAG}
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
@@ -19,13 +19,46 @@ RUN COMPONENT_TAG="gnome-core" pacman -Sy --noconfirm --needed \
 
 # --- Essential Desktop Utilities ---
 RUN COMPONENT_TAG="gnome-utilities" pacman -Sy --noconfirm --needed \
-    file-roller extension-manager dconf-editor papers loupe gnome-disk-utility simple-scan gnome-calculator gnome-power-manager gnome-nettool gnome-usage malcontent gvfs-afc gvfs-gphoto2 && \
+    file-roller extension-manager dconf-editor papers loupe gnome-disk-utility simple-scan gnome-calculator gnome-power-manager gnome-nettool gnome-usage malcontent gvfs-afc gvfs-gphoto2 gdm-settings && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- GNOME Qt Integration ---
+# adwaita-qt5/qt6: bends Qt5/Qt6 apps (VLC, OBS, qBittorrent…) to match GNOME Adwaita visually.
+# colord-gtk: GTK3 color management widget — needed for display calibration and GIMP.
+# polkit-gnome: legacy polkit authentication agent required by gparted, virt-manager and others.
+# xdg-user-dirs-gtk: creates XDG user directories on first login and handles relocalisation.
+RUN COMPONENT_TAG="gnome-qt-integration" pacman -Sy --noconfirm --needed \
+    adwaita-qt5 adwaita-qt6 colord-gtk polkit-gnome xdg-user-dirs-gtk && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- GNOME GVFS Backends ---
+# Extra gvfs backends for Nautilus integration:
+#   gvfs-onedrive: Microsoft OneDrive mounts.
+#   gvfs-goa:      GNOME Online Accounts (Nextcloud, OwnCloud, Google Drive).
+#   gvfs-dnssd:    macOS/Bonjour file sharing and WebDAV.
+#   gvfs-wsdd:     Windows Web Services Dynamic Discovery (SMB network browser).
+#   gvfs-nfs:      NFS mount support.
+RUN COMPONENT_TAG="gnome-gvfs-backends" pacman -Sy --noconfirm --needed \
+    gvfs-onedrive gvfs-goa gvfs-dnssd gvfs-wsdd gvfs-nfs && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- GNOME Extra Apps ---
+# grilo-plugins: media source plugins for GNOME apps (GNOME Music, Totem).
+# journalview:   GUI log viewer for journald — more accessible than raw journalctl.
+# snapshot:      GNOME camera app (GNOME Circle).
+# baobab:        graphical disk usage analyser — especially useful for /var.
+# mangojuice:    modern GUI configurator for MangoHud (already present as a dep).
+RUN COMPONENT_TAG="gnome-apps-extra" pacman -Sy --noconfirm --needed \
+    grilo-plugins journalview snapshot baobab mangojuice && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
 # --- GNOME Themes ---
 RUN COMPONENT_TAG="gnome-themes" pacman -Sy --noconfirm --needed \
-    adw-gtk-theme cachyos-nord-gtk-theme-git && \
+    adw-gtk-theme cachyos-nord-gtk-theme-git flat-remix-gnome flat-remix-gtk && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
@@ -37,15 +70,73 @@ RUN COMPONENT_TAG="gnome-extensions" pacman -Sy --noconfirm --needed \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
+# --- Pop Shell (System76 tiling extension) ---
+# Cloned from HEAD of the default branch at image build time; no Pacman
+# package exists for this extension in the CachyOS/Arch repos.
+#
+# jq patches metadata.json to declare compatibility with GNOME 40-50 so
+# the extension loads regardless of the exact shell version in this image.
+#
+# glib-compile-schemas runs twice:
+#   1. To register pop-shell's own GSettings schema (keybindings, gaps, …).
+#   2. After writing the gschema override that default-enables the extension,
+#      so the compiled gschemas.compiled reflects the new default immediately.
+#
+# typescript provides `tsc`, required by the TypeScript→GJS transpile step.
+# It is a dependency of typescript-language-server anyway so it is kept.
+RUN pacman -Sy --noconfirm --needed typescript && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    git clone --depth=1 https://github.com/pop-os/shell.git /tmp/pop-shell && \
+    cd /tmp/pop-shell && \
+    jq '.["shell-version"] = ["40","41","42","43","44","45","46","47","48","49","50"]' \
+        metadata.json > metadata.json.tmp && mv metadata.json.tmp metadata.json && \
+    make all && \
+    make install DESTDIR=/ && \
+    glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
+    printf "[org.gnome.shell]\nenabled-extensions=['pop-shell@system76.com', 'dash-to-dock@micxgx.gmail.com', 'blur-my-shell@aunetx']\n" \
+        > /usr/share/glib-2.0/schemas/zz_guaraos-pop-shell.gschema.override && \
+    glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
+    rm -rf /tmp/pop-shell && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# --- Blur My Shell (GNOME Shell extension) ---
+# Downloaded from extensions.gnome.org (the official distribution channel).
+# The EGO extension-info API is queried at build time with the exact GNOME Shell
+# major version installed in this image, so the downloaded zip is always the
+# release validated for that version — no metadata patching required.
+# bsdtar (libarchive, always present as a pacman dependency) extracts the zip.
+RUN GNOME_VER=$(pacman -Q gnome-shell | awk '{print $2}' | cut -d. -f1) && \
+    DL_URL=$(curl -sf \
+        "https://extensions.gnome.org/extension-info/?uuid=blur-my-shell%40aunetx&shell_version=${GNOME_VER}" | \
+        python3 -c "import json,sys; d=json.load(sys.stdin); print('https://extensions.gnome.org' + d['download_url'])") && \
+    mkdir -p /usr/share/gnome-shell/extensions/blur-my-shell@aunetx && \
+    curl -sfL "$DL_URL" | \
+        bsdtar -xf - -C /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/ && \
+    glib-compile-schemas /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/schemas/ && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
 # --- GNOME Media ---
 RUN COMPONENT_TAG="gnome-media" pacman -Sy --noconfirm --needed \
     sushi showtime celluloid && \
     rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
     if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
 
-# Copy GNOME-specific configuration files
+# --- GNOME Audio Processing ---
+# easyeffects: per-app EQ, compressor, limiter, reverb via PipeWire.
+# lsp-plugins: high-quality DSP plugin suite used as easyeffects presets.
+RUN COMPONENT_TAG="gnome-audio" pacman -Sy --noconfirm --needed \
+    easyeffects lsp-plugins && \
+    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
+    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+
+# Copy GNOME-specific overlay files (themes, gschema overrides, …)
 # COPY files/gnome/etc /etc/
-# COPY files/gnome/usr /usr/
+COPY files/gnome/usr /usr/
+
+# Recompile GSettings schemas to include GuaraOS GNOME defaults.
+# This must run after the COPY so that zz_guaraos-gnome-defaults.gschema.override
+# (and the pop-shell override written earlier) are both baked into gschemas.compiled.
+RUN glib-compile-schemas /usr/share/glib-2.0/schemas/
 
 # Enable DE services
 # We disable SDDM if it was enabled, and enable GDM
@@ -55,6 +146,7 @@ RUN systemctl disable sddm.service || true && \
 
 # Preserve /opt contents for OverlayFS
 # (visual-studio-code-bin and others install here)
-RUN if [ -d /var/opt ] && [ "$(ls -A /var/opt)" ]; then \
-        mkdir -p /usr/lib/opt && cp -r /var/opt/* /usr/lib/opt/ && rm -rf /var/opt/* ; \
+RUN mkdir -p /usr/lib/opt && \
+    if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
+        find /opt -mindepth 1 -maxdepth 1 -exec mv -t /usr/lib/opt/ {} + || true; \
     fi

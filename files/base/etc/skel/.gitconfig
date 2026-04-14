@@ -1,0 +1,65 @@
+# Default git configuration seeded by GuaraOS.
+#
+# Set your identity before first use:
+#   git config --global user.name  "Your Name"
+#   git config --global user.email "you@example.com"
+#
+# All settings here are overridden by any project-level .git/config.
+
+[core]
+	editor         = hx
+	pager          = delta
+	autocrlf       = input
+	eol            = lf
+
+[init]
+	defaultBranch  = main
+
+[pull]
+	rebase         = true
+
+[push]
+	autoSetupRemote = true
+
+[interactive]
+	diffFilter     = delta --color-only
+
+[delta]
+	features       = side-by-side line-numbers decorations
+	syntax-theme   = Dracula
+
+[delta "decorations"]
+	commit-decoration-style   = bold yellow box ul
+	file-style                = bold yellow ul
+	file-decoration-style     = none
+	hunk-header-decoration-style = cyan box ul
+
+[delta "line-numbers"]
+	line-numbers-left-style   = cyan
+	line-numbers-right-style  = cyan
+	line-numbers-minus-style  = 124
+	line-numbers-plus-style   = 28
+
+[filter "lfs"]
+	smudge   = git-lfs smudge -- %f
+	process  = git-lfs filter-process
+	required = true
+	clean    = git-lfs clean -- %f
+
+# git-credential-manager handles credential storage for all Git hosts.
+# It uses the GNOME keyring (libsecret / seahorse) as the backing store.
+# Requires first-time setup: gcm configure (or git credential-manager configure)
+[credential]
+	credentialStore = secretservice
+	helper          = manager
+
+# Override GCM with the GitHub CLI for github.com and gist.github.com —
+# gh auth login is faster and integrates with PATs, OAuth, and SSH keys.
+# The empty helper = line clears the global helper before setting the override.
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential

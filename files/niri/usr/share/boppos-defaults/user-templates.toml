@@ -1,3 +1,0 @@
-[templates.sddm]
-input_path = "/usr/share/sddm/themes/noctalia/theme.template.conf"
-output_path = "/usr/share/sddm/themes/noctalia/theme.conf"
