@@ -179,7 +179,7 @@ RUN --mount=type=tmpfs,dst=/run \
     pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth mesa-git lib32-mesa-git || echo "Conflicting packages not found, skipping."
 
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="install-base" pacman -Sy --noconfirm --needed python python-yaml yq python-yq
+    COMPONENT_TAG="install-base" pacman -Sy --noconfirm --needed python python-yaml yq
 
 COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/base/base-analyzed.yml /tmp/base-analyzed.yml
