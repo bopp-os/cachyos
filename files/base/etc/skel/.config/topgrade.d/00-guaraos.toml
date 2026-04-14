@@ -1,0 +1,99 @@
+# GuaraOS topgrade drop-in configuration
+# Auto-loaded from ~/.config/topgrade.d/ — no user action required.
+#
+# GuaraOS is an immutable atomic OS managed by bootc. The system package
+# manager (pacman / paru) must NEVER run on the live image — /usr is
+# read-only at runtime. OS updates are delivered as complete atomic images
+# via `bootc upgrade`.
+#
+# This drop-in configures topgrade for the GuaraOS environment:
+#   - Runs the bootc OS upgrade first, before all other steps
+#   - Disables the system package manager step (pacman / paru)
+#   - Ensures fwupd actually applies firmware (not just checks for it)
+#   - Updates the system-wide Flatpak installation (requires sudo)
+#   - Cleans stale Flatpak FUSE caches before the run to prevent crashes
+#   - Pre-caches sudo credentials upfront to avoid mid-run prompts
+#
+# IMPORTANT — why there is no [linux] bootc = true here:
+#   The [linux] bootc option is only honoured by topgrade for RPM-based
+#   immutable distributions (Fedora Silverblue, Kinoite, etc.). GuaraOS is
+#   CachyOS-based, which topgrade detects as Distribution::Arch and routes
+#   through archlinux::upgrade_arch_linux() — the bootc flag is never read.
+#   The [commands] entry below is the correct mechanism for Arch-based bootc
+#   systems: it injects bootc upgrade as a named custom step that runs as
+#   part of the standard topgrade pipeline.
+#
+# To override any value, set it in ~/.config/topgrade.toml — user config
+# is loaded after this file and takes precedence.
+
+[misc]
+# Cache sudo credentials at the start of the run.
+# Avoids a blocking password prompt in the middle of an unattended update.
+pre_sudo = true
+
+# Disable the system package manager step.
+# On GuaraOS, /usr is read-only — pacman/paru must never run on the live
+# system. To add a package, add it to the appropriate Containerfile and
+# let CI build and push a new image, then reboot into it via bootc.
+disable = ["system"]
+
+# Run custom commands (which includes the bootc OS upgrade below) before
+# all other steps, so the new image is staged before firmware/Flatpak/Brew
+# are updated. bootc upgrade only stages the image; the reboot that applies
+# it can happen after all other updates complete.
+first = ["custom_commands"]
+
+# Uncomment to run fully non-interactive (skips all confirmation prompts).
+# assume_yes = true
+
+# ---------------------------------------------------------------------------
+# Pre-run commands
+# ---------------------------------------------------------------------------
+
+[pre_commands]
+# Wipe stale Flatpak FUSE temporary caches before the update run.
+# These accumulate across sessions and can cause revokefs-fuse / glib
+# crashes during `flatpak update`. Safe to remove — they are regenerated
+# on demand.
+"Clean stale Flatpak FUSE caches" = "sudo rm -rf /var/tmp/flatpak-cache-* 2>/dev/null || true"
+
+# ---------------------------------------------------------------------------
+# Custom commands — steps that have no native topgrade support on Arch
+# ---------------------------------------------------------------------------
+
+[commands]
+# Atomic OS image upgrade via bootc.
+# bootc pulls and stages the new image in the background; the change is
+# applied on the next reboot. A rollback is always available via bootc.
+# pacman/paru is intentionally disabled — this is the only supported path
+# for OS-level updates on GuaraOS.
+"GuaraOS OS Upgrade" = "sudo bootc upgrade"
+
+# ---------------------------------------------------------------------------
+# Firmware
+# ---------------------------------------------------------------------------
+
+[firmware]
+# Apply available firmware updates via fwupd rather than only reporting them.
+upgrade = true
+
+# ---------------------------------------------------------------------------
+# Flatpak
+# ---------------------------------------------------------------------------
+
+[flatpak]
+# Use sudo to update the system-wide Flatpak installation (/var/lib/flatpak).
+# Per-user installations (~/.local/share/flatpak) are updated without sudo.
+use_sudo = true
+
+# ---------------------------------------------------------------------------
+# Distrobox
+# Note: distrobox upgrades iterate over every container and can be slow.
+# Skip this step on a given run with: topgrade --skip distrobox
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Homebrew (brew)
+# No extra configuration required — topgrade runs `brew update && brew upgrade`
+# automatically when `brew` is found on PATH.
+# ---------------------------------------------------------------------------

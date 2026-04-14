@@ -1,0 +1,17 @@
+[Unit]
+Description=OverlayFS for /opt
+DefaultDependencies=no
+# /var must be fully mounted before the upper and work dirs inside it are accessible
+RequiresMountsFor=/var
+After=systemd-tmpfiles-setup.service
+Conflicts=umount.target
+Before=sysinit.target umount.target
+
+[Mount]
+What=overlay
+Where=/opt
+Type=overlay
+Options=lowerdir=/usr/lib/opt,upperdir=/var/opt_overlay/upper,workdir=/var/opt_overlay/work,index=off
+
+[Install]
+WantedBy=sysinit.target
