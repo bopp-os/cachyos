@@ -1,0 +1,77 @@
+gnome-core:
+  biweekly:
+  - mutter
+  monthly:
+  - gnome-control-center
+  - gnome-text-editor
+  - nautilus
+  - ptyxis
+  - tracker3
+  - tracker3-miners
+  - xdg-desktop-portal-gnome
+  - xorg-xwayland
+  quarterly:
+  - gdm
+  - gnome-backgrounds
+  - gnome-console
+  - gnome-session
+  - gnome-tweaks
+  - libnma
+  - xdg-desktop-portal
+  - xdg-desktop-portal-gtk
+  yearly:
+  - gnome-keyring
+gnome-utilities:
+  weekly:
+  - extension-manager
+  monthly:
+  - gnome-software
+  - gvfs-afc
+  - gvfs-gphoto2
+  - loupe
+  - papers
+  quarterly:
+  - file-roller
+  - gnome-calculator
+  - gnome-calendar
+  - gnome-disk-utility
+  - gnome-system-monitor
+  - gnome-weather
+  - malcontent
+  - simple-scan
+  yearly:
+  - dconf-editor
+  - gnome-nettool
+  - gnome-power-manager
+  - gnome-usage
+gnome-themes:
+  quarterly:
+  - adw-gtk-theme
+  unknown:
+  - cachyos-nord-gtk-theme-git
+gnome-extensions:
+  monthly:
+  - gnome-shell-extension-arc-menu
+  quarterly:
+  - gnome-shell-extension-appindicator
+  - gnome-shell-extension-caffeine
+  - gnome-shell-extension-vitals
+  yearly:
+  - gnome-browser-connector
+  unknown:
+  - gnome-shell-extension-bing-wallpaper
+  - gnome-shell-extension-dash-to-dock
+  - gnome-shell-extension-gnome-ui-tune-git
+  - gnome-shell-extension-gsconnect
+  - gnome-shell-extension-no-overview
+gnome-media:
+  monthly:
+  - showtime
+  yearly:
+  - celluloid
+  - sushi
+gnome-meta:
+  biweekly:
+  - gnome-shell
+  unknown:
+  - gnome

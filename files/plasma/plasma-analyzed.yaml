@@ -1,0 +1,103 @@
+kde-core:
+  biweekly:
+  - colord-kde
+  - discover
+  - kscreen
+  - kscreenlocker
+  - kwin
+  - polkit-kde-agent
+  - powerdevil
+  - qt6-wayland
+  - systemsettings
+  - xdg-desktop-portal-kde
+  monthly:
+  - plasma-login-manager
+  - qt5-wayland
+  - xorg-xwayland
+  quarterly:
+  - xdg-desktop-portal
+  - xdg-desktop-portal-gtk
+kde-integration:
+  biweekly:
+  - bluedevil
+  - flatpak-kcm
+  - kdeplasma-addons
+  - kinfocenter
+  - kio-admin
+  - kio-extras
+  - kwallet-pam
+  - kwayland-integration
+  - plasma-browser-integration
+  - plasma-firewall
+  - plasma-nm
+  - plasma-pa
+  - plasma-thunderbolt
+  - plasma5-integration
+  - plymouth-kcm
+  monthly:
+  - baloo
+  quarterly:
+  - libappimage
+  - python-gobject
+  yearly:
+  - kio-fuse
+  - udisks2
+  - xdg-utils
+  - xsettingsd
+kde-utilities:
+  biweekly:
+  - ark
+  - dolphin
+  - dolphin-plugins
+  - filelight
+  - gwenview
+  - kate
+  - kcalc
+  - kdeconnect
+  - kdialog
+  - kfind
+  - konsole
+  - kwalletmanager
+  - okular
+  - plasma-disks
+  - plasma-systemmonitor
+  - spectacle
+  - sweeper
+  - yakuake
+  monthly:
+  - haruna
+  - partitionmanager
+  yearly:
+  - phonon-qt6-vlc
+  unknown:
+  - plasma-foreground-booster
+kde-media:
+  biweekly:
+  - ffmpegthumbs
+  - kdegraphics-thumbnailers
+  - qt6-imageformats
+  monthly:
+  - kimageformats
+  yearly:
+  - ffmpegthumbnailer
+kde-themes-aesthetics:
+  biweekly:
+  - breeze-gtk
+  - kde-gtk-config
+  yearly:
+  - appmenu-gtk-module
+  unknown:
+  - cachyos-emerald-kde-theme-git
+  - cachyos-iridescent-kde
+  - cachyos-kde-settings
+  - cachyos-lavender-kde-theme-git
+  - cachyos-nord-gtk-theme-git
+  - cachyos-nord-kde-theme-git
+  - cachyos-themes-sddm
+  - char-white
+kde-meta:
+  biweekly:
+  - plasma-desktop
+  - plasma-workspace
+  unknown:
+  - plasma

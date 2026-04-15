@@ -229,7 +229,7 @@ jobs:
               --mount=type=image,source=$IMAGE_REF,target=/chunkah \
               -e SOURCE_DATE_EPOCH=0 \
               -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-              quay.io/coreos/chunkah build --compressed --compression-level 6 --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
+              quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
 
             sudo podman rmi -f "$IMAGE_REF"
             sudo podman system prune -f
@@ -262,7 +262,7 @@ jobs:
             for tag in $IMAGE_TAGS; do
               SUCCESS=false
               for i in $(seq "${MAX_RETRIES}"); do
-                if sudo podman push "localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"; then
+                if sudo podman push --compression-format=zstd:chunked "localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"; then
                   SUCCESS=true
                   break
                 fi

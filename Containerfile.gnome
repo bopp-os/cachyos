@@ -9,39 +9,11 @@ FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
 # MASTER PACKAGE INSTALLATION
 # ==========================================
 
-# --- Desktop Environment (GNOME) Core ---
-RUN COMPONENT_TAG="gnome-core" pacman -Sy --noconfirm --needed \
-    gnome gnome-shell mutter gnome-session gnome-tweaks gdm xorg-xwayland gnome-control-center gnome-keyring libnma gnome-backgrounds \
-    xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-    nautilus gnome-console gnome-text-editor ptyxis && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+COPY scripts/install_packages.sh /tmp/install_packages.sh
+COPY files/gnome/gnome-analyzed.yaml /tmp/gnome-analyzed.yaml
 
-# --- Essential Desktop Utilities ---
-RUN COMPONENT_TAG="gnome-utilities" pacman -Sy --noconfirm --needed \
-    file-roller extension-manager dconf-editor papers loupe gnome-disk-utility simple-scan gnome-calculator gnome-power-manager gnome-nettool gnome-usage malcontent gvfs-afc gvfs-gphoto2 && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- GNOME Themes ---
-RUN COMPONENT_TAG="gnome-themes" pacman -Sy --noconfirm --needed \
-    adw-gtk-theme cachyos-nord-gtk-theme-git && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- GNOME Extensions ---
-RUN COMPONENT_TAG="gnome-extensions" pacman -Sy --noconfirm --needed \
-    gnome-shell-extension-appindicator gnome-shell-extension-gsconnect gnome-shell-extension-dash-to-dock \
-    gnome-shell-extension-no-overview gnome-browser-connector gnome-shell-extension-gnome-ui-tune-git \
-    gnome-shell-extension-arc-menu gnome-shell-extension-caffeine gnome-shell-extension-vitals gnome-shell-extension-bing-wallpaper && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
-
-# --- GNOME Media ---
-RUN COMPONENT_TAG="gnome-media" pacman -Sy --noconfirm --needed \
-    sushi showtime celluloid && \
-    rm -rf /usr/lib/sysimage/cache/pacman/pkg/* && \
-    if [ -e /usr/etc ]; then if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && rm -rf /usr/etc; fi
+RUN chmod +x /tmp/install_packages.sh && \
+    /tmp/install_packages.sh /tmp/gnome-analyzed.yaml
 
 # Copy GNOME-specific configuration files
 # COPY files/gnome/etc /etc/

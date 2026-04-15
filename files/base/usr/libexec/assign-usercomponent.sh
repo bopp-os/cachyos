@@ -13,6 +13,9 @@ while read -r pkgname; do
         if [[ -f "$filepath" && ! -L "$filepath" ]]; then
             # Group by COMPONENT_TAG if set, otherwise fallback to individual package names
             setfattr -n user.component -v "${COMPONENT_TAG:-$pkgname}" "$filepath"
+            if [[ -n "$UPDATE_INTERVAL_TAG" ]]; then
+                setfattr -n user.update-interval -v "$UPDATE_INTERVAL_TAG" "$filepath"
+            fi
         fi
     done <<< "$file_list"
 done
