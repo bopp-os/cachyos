@@ -176,7 +176,9 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
 # ==========================================
 
 RUN --mount=type=tmpfs,dst=/run \
-    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth mesa-git lib32-mesa-git || echo "Conflicting packages not found, skipping."
+    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth || true && \
+    pacman -Rdd --noconfirm mesa-git || true && \
+    pacman -Rdd --noconfirm lib32-mesa-git || true
 
 RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
     COMPONENT_TAG="install-base" pacman -Sy --noconfirm --needed python python-yaml yq

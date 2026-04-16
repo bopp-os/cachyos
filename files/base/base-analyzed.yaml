@@ -1,4 +1,7 @@
 system-core:
+  weekly:
+  - mesa 
+  - lib32-mesa
   biweekly:
   - glib2
   - systemd
@@ -36,12 +39,10 @@ graphics-drivers:
   weekly:
   - lib32-libdisplay-info
   - lib32-vulkan-nouveau
-  - mesa
   - vulkan-intel
   - vulkan-nouveau
   - vulkan-radeon
   biweekly:
-  - lib32-mesa
   - lib32-vulkan-intel
   - lib32-vulkan-mesa-layers
   - lib32-vulkan-radeon
