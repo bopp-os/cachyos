@@ -3,6 +3,10 @@
 # A high-performance, atomic image based on CachyOS.
 # Foundation layer including bootc and hardware enablement.
 
+# Global build arguments must be declared before FROM to be used in image tags
+ARG TARGET_CPU_MARCH=v3
+ARG BASE_IMAGE_TAG=v3
+
 # ==========================================
 # System Build
 # ==========================================
