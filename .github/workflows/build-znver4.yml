@@ -136,6 +136,7 @@ jobs:
         with:
           path: .pkg-cache
           key: pacman-cache-${{ env.DEFAULT_TAG }}-${{ github.run_id }}
+          save-always: true
           restore-keys: |
             pacman-cache-${{ env.DEFAULT_TAG }}-
 
