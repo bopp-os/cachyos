@@ -133,6 +133,23 @@ jobs:
           echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
 
+      - name: Restore/Save Pacman Cache
+        uses: actions/cache@v4
+        with:
+          path: .pkg-cache
+          key: pacman-cache-${{ env.DEFAULT_TAG }}-${{ github.run_id }}
+          restore-keys: |
+            pacman-cache-${{ env.DEFAULT_TAG }}-
+
+      - name: Prepare Cache Directory
+        run: |
+          mkdir -p .pkg-cache
+          # If the manual wipe toggle was checked, clear the restored cache
+          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
+            echo "Manual wipe triggered. Clearing restored pacman cache..."
+            sudo rm -rf .pkg-cache/*
+          fi
+
       - name: Build Base Image
         id: build_base
         if: steps.check_compatibility.outputs.should_skip != 'true'
@@ -140,6 +157,23 @@ jobs:
           META_LABELS: ${{ steps.metadata.outputs.labels }}
         run: |
           set -x
+
+          # Build AUR builder first
+          MARCH_AUR="${{ env.DEFAULT_TAG }}"
+          if [ "$MARCH_AUR" == "znver4" ]; then
+            BASE_TAG_AUR="v4"
+          else
+            BASE_TAG_AUR="$MARCH_AUR"
+          fi
+
+          echo "::group::Building AUR builder"
+          sudo podman build -v "${{ github.workspace }}/.pkg-cache:/var/cache/pacman/pkg:z" \
+            --build-arg BASE_IMAGE_TAG=$BASE_TAG_AUR \
+            --build-arg TARGET_CPU_MARCH=$MARCH_AUR \
+            --network=host \
+            --tag "localhost/aur-builder:$MARCH_AUR" -f "Containerfile.aur" .
+          echo "::endgroup::"
+
 
           # Calculate the base image tag. 
           # If DEFAULT_TAG is znver4, BASE_TAG becomes v4. Otherwise, they match.
@@ -156,6 +190,8 @@ jobs:
               BUILD_ARGS+=("--label" "$label")
             fi
           done <<< "$META_LABELS"
+
+          BUILD_ARGS+=("-v" "${{ github.workspace }}/.pkg-cache:/usr/lib/sysimage/cache/pacman/pkg:z")
 
           # Check if the manual 'no_cache' toggle was checked in the GitHub UI
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
@@ -196,6 +232,8 @@ jobs:
               BUILD_ARGS+=("--label" "$label")
             fi
           done <<< "$META_LABELS"
+
+          BUILD_ARGS+=("-v" "${{ github.workspace }}/.pkg-cache:/usr/lib/sysimage/cache/pacman/pkg:z")
 
           # Check if the manual 'no_cache' toggle was checked in the GitHub UI
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
@@ -312,6 +350,25 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
           COSIGN_PASSWORD: ""
 
+      - name: Prune Pacman Cache
+        if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
+        run: |
+          if [ ! -d ".pkg-cache" ] || [ -z "$(ls -A .pkg-cache)" ]; then
+            echo "Cache directory is empty or does not exist, skipping prune."
+            exit 0
+          fi
+          echo "🧹 Pruning pacman cache to manage size..."
+          echo "Cache size before pruning:"
+          du -sh .pkg-cache
+
+          # Use a container to ensure paccache is available. Keep only the single most recent version of each package.
+          sudo podman run --rm --network=host -v ${{ github.workspace }}/.pkg-cache:/var/cache/pacman/pkg:z \
+            archlinux/archlinux:latest \
+            bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -rk1"
+
+          echo "Cache size after pruning:"
+          du -sh .pkg-cache
+
       - name: Clean Workspace & Podman Storage
         if: always()
         run: |
@@ -328,9 +385,10 @@ jobs:
           
           # 4. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
-            echo "✨ Build succeeded. Wiping workspace source files..."
-            sudo rm -rf ${{ github.workspace }}/*
-            sudo rm -rf ${{ github.workspace }}/.[!.]* || true
+            echo "✨ Build succeeded. Wiping workspace source files (preserving .pkg-cache)..."
+            sudo find ${{ github.workspace }} -mindepth 1 -maxdepth 1 ! -name '.pkg-cache' -exec rm -rf {} +
+            # Ensure GitHub's runner user owns the cache so the post-job save action doesn't fail on root permissions
+            sudo chown -R $USER:$USER ${{ github.workspace }}/.pkg-cache || true
           else
             echo "⚠️ Build failed. Leaving workspace source files intact for debugging."
           fi
