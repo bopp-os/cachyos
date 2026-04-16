@@ -231,7 +231,7 @@ jobs:
               --mount=type=image,source=$IMAGE_REF,target=/chunkah \
               -e SOURCE_DATE_EPOCH=0 \
               -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-              quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
+              quay.io/coreos/chunkah build --compressed --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
 
             sudo podman rmi -f "$IMAGE_REF"
             sudo podman system prune -f
