@@ -77,6 +77,10 @@ jobs:
             sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*
           fi
           
+          # 5. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
+          echo "Nuking leftover workspace files..."
+          sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+          
           echo "📊 Disk space after cleanup:"
           df -h /
 
@@ -364,9 +368,17 @@ jobs:
           echo "Cache size before pruning:"
           du -sh .pkg-cache
 
+          # Determine the correct CachyOS base image to reuse for pruning
+          MARCH="${{ env.DEFAULT_TAG }}"
+          if [ "$MARCH" == "znver4" ]; then
+            PRUNE_IMAGE="docker.io/cachyos/cachyos-v4"
+          else
+            PRUNE_IMAGE="docker.io/cachyos/cachyos-$MARCH"
+          fi
+
           # Use a container to ensure paccache is available. Keep only the single most recent version of each package.
           sudo podman run --rm --network=host -v ${{ github.workspace }}/.pkg-cache:/var/cache/pacman/pkg:z \
-            archlinux/archlinux:latest \
+            $PRUNE_IMAGE \
             bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -rk1"
 
           echo "Cache size after pruning:"
@@ -390,11 +402,12 @@ jobs:
           if [ "${{ job.status }}" == "success" ]; then
             echo "✨ Build succeeded. Wiping workspace source files (preserving .pkg-cache)..."
             sudo find ${{ github.workspace }} -mindepth 1 -maxdepth 1 ! -name '.pkg-cache' -exec rm -rf {} +
-            # Ensure GitHub's runner user owns the cache so the post-job save action doesn't fail on root permissions
-            sudo chown -R $USER:$USER ${{ github.workspace }}/.pkg-cache || true
           else
             echo "⚠️ Build failed. Leaving workspace source files intact for debugging."
           fi
           
+          # Ensure GitHub's runner user owns the cache so the post-job save action doesn't fail on root permissions (runs on both success and failure!)
+          sudo chown -R $USER:$USER ${{ github.workspace }}/.pkg-cache || true
+
           echo "📊 Final Disk Space:"
           df -h /
