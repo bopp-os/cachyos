@@ -135,12 +135,12 @@ jobs:
           echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
 
-      - name: Restore/Save Pacman Cache
-        uses: actions/cache@v4
+      - name: Restore Pacman Cache
+        id: cache-restore
+        uses: actions/cache/restore@v5
         with:
           path: .pkg-cache
           key: pacman-cache-${{ env.DEFAULT_TAG }}-${{ github.run_id }}
-          save-always: true
           restore-keys: |
             pacman-cache-${{ env.DEFAULT_TAG }}-
 
@@ -384,6 +384,20 @@ jobs:
           echo "Cache size after pruning:"
           du -sh .pkg-cache
 
+      - name: Fix Cache Permissions
+        if: always()
+        run: |
+          echo "Changing ownership of .pkg-cache back to runner user so it can be saved..."
+          sudo chown -R $USER:$USER ${{ github.workspace }}/.pkg-cache || true
+
+      - name: Explicitly Save Pacman Cache
+        id: cache-save
+        if: always() && steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .pkg-cache
+          key: pacman-cache-${{ env.DEFAULT_TAG }}-${{ github.run_id }}
+
       - name: Clean Workspace & Podman Storage
         if: always()
         run: |
@@ -400,14 +414,11 @@ jobs:
           
           # 4. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
-            echo "✨ Build succeeded. Wiping workspace source files (preserving .pkg-cache)..."
-            sudo find ${{ github.workspace }} -mindepth 1 -maxdepth 1 ! -name '.pkg-cache' -exec rm -rf {} +
+            echo "✨ Build succeeded. Wiping workspace source files..."
+            sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           else
             echo "⚠️ Build failed. Leaving workspace source files intact for debugging."
           fi
           
-          # Ensure GitHub's runner user owns the cache so the post-job save action doesn't fail on root permissions (runs on both success and failure!)
-          sudo chown -R $USER:$USER ${{ github.workspace }}/.pkg-cache || true
-
           echo "📊 Final Disk Space:"
           df -h /
