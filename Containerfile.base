@@ -48,7 +48,7 @@ RUN touch /var/log/pacman.log
 
 # Move pacman directories for bootc/usroverlay compatibility
 # Also add NoExtract rules to strip documentation and non-English locales to save space
-RUN grep "= */var" /etc/pacman.conf | sed "/= *\/var/s/.*=// ; s/ //" | xargs -n1 sh -c 'mkdir -p "/usr/lib/sysimage/$(dirname $(echo $1 | sed "s@/var/@@"))" && mv -v "$1" "/usr/lib/sysimage/$(echo "$1" | sed "s@/var/@@")"' '' && \
+RUN grep "= */var" /etc/pacman.conf | grep -v "CacheDir" | sed "/= *\/var/s/.*=// ; s/ //" | xargs -n1 sh -c 'mkdir -p "/usr/lib/sysimage/$(dirname $(echo $1 | sed "s@/var/@@"))" && mv -v "$1" "/usr/lib/sysimage/$(echo "$1" | sed "s@/var/@@")"' '' && \
     sed -i -e "/= *\/var/ s/^#//" -e "s@= */var@= /usr/lib/sysimage@g" -e "/DownloadUser/d" /etc/pacman.conf && \
     sed -i '/^\[options\]/a NoExtract = usr/share/help/* usr/share/gtk-doc/html/* usr/share/doc/*\nNoExtract = usr/share/locale/* usr/share/man/??/* usr/share/man/??_*/*\nNoExtract = !usr/share/locale/en_US/* !usr/share/locale/locale.alias' /etc/pacman.conf
 
