@@ -22,6 +22,7 @@ env:
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "znver4"
+  FLAVORS: "plasma gnome niri"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -30,6 +31,8 @@ concurrency:
 jobs:
   build_push:
     name: Build and push image (znver4)
+    env:
+      BASE_TAG: v4
     runs-on: znver4
 
     permissions:
@@ -135,40 +138,33 @@ jobs:
           echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
 
-      - name: Restore Pacman Cache
-        id: cache-restore
-        uses: actions/cache/restore@v5
-        with:
-          path: .pkg-cache
-          key: pacman-cache-${{ env.DEFAULT_TAG }}-${{ github.run_id }}
-          restore-keys: |
-            pacman-cache-${{ env.DEFAULT_TAG }}-
-
-      - name: Prepare Cache Directory
+      - name: Prepare Local Cache Directory
         run: |
-          mkdir -p .pkg-cache
-          # If the manual wipe toggle was checked, clear the restored cache
+          CACHE_DIR="/opt/boppos-pkg-cache/${{ env.DEFAULT_TAG }}"
+          sudo mkdir -p "$CACHE_DIR"
+          sudo chown -R $USER:$USER "$CACHE_DIR"
+          
+          # Delete problematic lua packages and incomplete downloads before build
+          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
+          
+          # If the manual wipe toggle was checked, clear the cache
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Manual wipe triggered. Clearing restored pacman cache..."
-            sudo rm -rf .pkg-cache/*
+            echo "Manual wipe triggered. Clearing local pacman cache..."
+            sudo rm -rf "$CACHE_DIR"/*
           fi
+          
+          echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
       - name: Build AUR Image
         id: build_aur
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
           set -x
-
           MARCH="${{ env.DEFAULT_TAG }}"
-          if [ "$MARCH" == "znver4" ]; then
-            BASE_TAG="v4"
-          else
-            BASE_TAG="$MARCH"
-          fi
 
           echo "::group::Building AUR builder"
-          sudo podman build -v "${{ github.workspace }}/.pkg-cache:/var/cache/pacman/pkg:z" \
-            --build-arg BASE_IMAGE_TAG=$BASE_TAG \
+          sudo podman build -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
+            --build-arg BASE_IMAGE_TAG=${{ env.BASE_TAG }} \
             --build-arg TARGET_CPU_MARCH=$MARCH \
             --network=host \
             --tag "localhost/aur-builder:$MARCH" -f "Containerfile.aur" .
@@ -182,14 +178,7 @@ jobs:
         run: |
           set -x
 
-          # Calculate the base image tag. 
-          # If DEFAULT_TAG is znver4, BASE_TAG becomes v4. Otherwise, they match.
           MARCH="${{ env.DEFAULT_TAG }}"
-          if [ "$MARCH" == "znver4" ]; then
-            BASE_TAG="v4"
-          else
-            BASE_TAG="$MARCH"
-          fi
 
           # get labels from metadata action
           while IFS= read -r label; do
@@ -198,7 +187,7 @@ jobs:
             fi
           done <<< "$META_LABELS"
 
-          BUILD_ARGS+=("-v" "${{ github.workspace }}/.pkg-cache:/usr/lib/sysimage/cache/pacman/pkg:z")
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
           
           # Check if the manual 'no_cache' toggle was checked in the GitHub UI
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
@@ -215,7 +204,7 @@ jobs:
           echo "::group::Building base"
           CURRENT_IMAGE_NAME="cachyos-base"
           DOCKERFILE="Containerfile.base"
-          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$BASE_TAG" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
+          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
             --network=host \
@@ -252,11 +241,9 @@ jobs:
             BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
           fi
           
-          BUILD_ARGS+=("-v" "${{ github.workspace }}/.pkg-cache:/usr/lib/sysimage/cache/pacman/pkg:z")
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
 
-          FLAVORS=("plasma" "gnome" "niri")
-          
-          for FLAVOR in "${FLAVORS[@]}"; do
+          for FLAVOR in ${{ env.FLAVORS }}; do
             echo "::group::Building $FLAVOR"
             CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
             DOCKERFILE="Containerfile.${FLAVOR}"
@@ -300,9 +287,7 @@ jobs:
         run: |
           set -ex
           
-          FLAVORS=("plasma" "gnome" "niri")
-          
-          for FLAVOR in "${FLAVORS[@]}"; do
+          for FLAVOR in ${{ env.FLAVORS }}; do
             echo "::group::Pushing $FLAVOR"
             CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
             
@@ -360,13 +345,13 @@ jobs:
       - name: Prune Pacman Cache
         if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
         run: |
-          if [ ! -d ".pkg-cache" ] || [ -z "$(ls -A .pkg-cache)" ]; then
+          if [ ! -d "${{ env.LOCAL_CACHE_DIR }}" ] || [ -z "$(ls -A ${{ env.LOCAL_CACHE_DIR }})" ]; then
             echo "Cache directory is empty or does not exist, skipping prune."
             exit 0
           fi
           echo "🧹 Pruning pacman cache to manage size..."
           echo "Cache size before pruning:"
-          du -sh .pkg-cache
+          du -sh ${{ env.LOCAL_CACHE_DIR }}
 
           # Determine the correct CachyOS base image to reuse for pruning
           MARCH="${{ env.DEFAULT_TAG }}"
@@ -377,26 +362,15 @@ jobs:
           fi
 
           # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
-          sudo podman run --rm --network=host -v ${{ github.workspace }}/.pkg-cache:/host-cache:z \
+          sudo podman run --rm --network=host -v ${{ env.LOCAL_CACHE_DIR }}:/host-cache:z \
             $PRUNE_IMAGE \
             bash -c "pacman -Sy --noconfirm archlinux-keyring cachyos-keyring && pacman -S --noconfirm pacman-contrib && paccache -c /host-cache -rk1"
+            
+          # Ensure problematic packages are purged after pruning too
+          sudo rm -f ${{ env.LOCAL_CACHE_DIR }}/lua* ${{ env.LOCAL_CACHE_DIR }}/*.part
 
           echo "Cache size after pruning:"
-          du -sh .pkg-cache
-
-      - name: Fix Cache Permissions
-        if: always()
-        run: |
-          echo "Changing ownership of .pkg-cache back to runner user so it can be saved..."
-          sudo chown -R $USER:$USER ${{ github.workspace }}/.pkg-cache || true
-
-      - name: Explicitly Save Pacman Cache
-        id: cache-save
-        if: always() && steps.cache-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: .pkg-cache
-          key: pacman-cache-${{ env.DEFAULT_TAG }}-${{ github.run_id }}
+          du -sh ${{ env.LOCAL_CACHE_DIR }}
 
       - name: Clean Workspace & Podman Storage
         if: always()
