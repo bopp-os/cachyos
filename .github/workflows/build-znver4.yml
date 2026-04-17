@@ -376,10 +376,10 @@ jobs:
             PRUNE_IMAGE="docker.io/cachyos/cachyos-$MARCH"
           fi
 
-          # Use a container to ensure paccache is available. Keep only the single most recent version of each package.
-          sudo podman run --rm --network=host -v ${{ github.workspace }}/.pkg-cache:/var/cache/pacman/pkg:z \
+          # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
+          sudo podman run --rm --network=host -v ${{ github.workspace }}/.pkg-cache:/host-cache:z \
             $PRUNE_IMAGE \
-            bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -rk1"
+            bash -c "pacman -Sy --noconfirm archlinux-keyring cachyos-keyring && pacman -S --noconfirm pacman-contrib && paccache -c /host-cache -rk1"
 
           echo "Cache size after pruning:"
           du -sh .pkg-cache
