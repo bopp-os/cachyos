@@ -22,6 +22,7 @@ env:
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "v4"
+  FLAVORS: "plasma gnome niri"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -30,6 +31,8 @@ concurrency:
 jobs:
   build_push:
     name: Build and push image (v4)
+    env:
+      BASE_TAG: v4
     runs-on: x86-64-v4
 
     permissions:
@@ -76,6 +79,10 @@ jobs:
             echo "Nuking Podman builder cache mount..."
             sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*
           fi
+          
+          # 5. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
+          echo "Nuking leftover workspace files..."
+          sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           
           echo "📊 Disk space after cleanup:"
           df -h /
@@ -128,6 +135,38 @@ jobs:
           echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
 
+      - name: Prepare Local Cache Directory
+        run: |
+          CACHE_DIR="/opt/boppos-pkg-cache/${{ env.DEFAULT_TAG }}"
+          sudo mkdir -p "$CACHE_DIR"
+          sudo chown -R $USER:$USER "$CACHE_DIR"
+          
+          # Delete problematic lua packages and incomplete downloads before build
+          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
+          
+          # If the manual wipe toggle was checked, clear the cache
+          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
+            echo "Manual wipe triggered. Clearing local pacman cache..."
+            sudo rm -rf "$CACHE_DIR"/*
+          fi
+          
+          echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
+
+      - name: Build AUR Image
+        id: build_aur
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          set -x
+          MARCH="${{ env.DEFAULT_TAG }}"
+
+          echo "::group::Building AUR builder"
+          sudo podman build -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
+            --build-arg BASE_IMAGE_TAG=${{ env.BASE_TAG }} \
+            --build-arg TARGET_CPU_MARCH=$MARCH \
+            --network=host \
+            --tag "localhost/aur-builder:$MARCH" -f "Containerfile.aur" .
+          echo "::endgroup::"
+
       - name: Build Base Image
         id: build_base
         env:
@@ -135,19 +174,15 @@ jobs:
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
           set -x
-
           MARCH="${{ env.DEFAULT_TAG }}"
-          if [ "$MARCH" == "znver4" ]; then
-            BASE_TAG="v4"
-          else
-            BASE_TAG="$MARCH"
-          fi
 
           while IFS= read -r label; do
             if [[ -n "$label" ]]; then
               BUILD_ARGS+=("--label" "$label")
             fi
           done <<< "$META_LABELS"
+
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
 
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
             echo "Manual cache bust triggered. Appending --no-cache..."
@@ -162,7 +197,7 @@ jobs:
           echo "::group::Building base"
           CURRENT_IMAGE_NAME="cachyos-base"
           DOCKERFILE="Containerfile.base"
-          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$BASE_TAG" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
+          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
             --network=host \
@@ -187,6 +222,8 @@ jobs:
             fi
           done <<< "$META_LABELS"
 
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
+
           # Check if the manual 'no_cache' toggle was checked in the GitHub UI
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
             echo "Manual cache bust triggered. Appending --no-cache..."
@@ -199,9 +236,7 @@ jobs:
             BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
           fi
 
-          FLAVORS=("plasma" "gnome" "niri")
-          
-          for FLAVOR in "${FLAVORS[@]}"; do
+          for FLAVOR in ${{ env.FLAVORS }}; do
             echo "::group::Building $FLAVOR"
             CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
             DOCKERFILE="Containerfile.${FLAVOR}"
@@ -221,7 +256,7 @@ jobs:
               --mount=type=image,source=$IMAGE_REF,target=/chunkah \
               -e SOURCE_DATE_EPOCH=0 \
               -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-              quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
+              quay.io/coreos/chunkah build --compressed --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
 
             sudo podman rmi -f "$IMAGE_REF"
             sudo podman system prune -f
@@ -245,9 +280,7 @@ jobs:
         run: |
           set -ex
           
-          FLAVORS=("plasma" "gnome" "niri")
-          
-          for FLAVOR in "${FLAVORS[@]}"; do
+          for FLAVOR in ${{ env.FLAVORS }}; do
             echo "::group::Pushing $FLAVOR"
             CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
             
@@ -302,6 +335,36 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
           COSIGN_PASSWORD: ""
 
+      - name: Prune Pacman Cache
+        if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
+        run: |
+          if [ ! -d "${{ env.LOCAL_CACHE_DIR }}" ] || [ -z "$(ls -A ${{ env.LOCAL_CACHE_DIR }})" ]; then
+            echo "Cache directory is empty or does not exist, skipping prune."
+            exit 0
+          fi
+          echo "🧹 Pruning pacman cache to manage size..."
+          echo "Cache size before pruning:"
+          du -sh ${{ env.LOCAL_CACHE_DIR }}
+
+          # Determine the correct CachyOS base image to reuse for pruning
+          MARCH="${{ env.DEFAULT_TAG }}"
+          if [ "$MARCH" == "znver4" ]; then
+            PRUNE_IMAGE="docker.io/cachyos/cachyos-v4"
+          else
+            PRUNE_IMAGE="docker.io/cachyos/cachyos-$MARCH"
+          fi
+
+          # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
+          sudo podman run --rm --network=host -v ${{ env.LOCAL_CACHE_DIR }}:/host-cache:z \
+            $PRUNE_IMAGE \
+            bash -c "pacman -Sy --noconfirm archlinux-keyring cachyos-keyring && pacman -S --noconfirm pacman-contrib && paccache -c /host-cache -rk1"
+            
+          # Ensure problematic packages are purged after pruning too
+          sudo rm -f ${{ env.LOCAL_CACHE_DIR }}/lua* ${{ env.LOCAL_CACHE_DIR }}/*.part
+
+          echo "Cache size after pruning:"
+          du -sh ${{ env.LOCAL_CACHE_DIR }}
+
       - name: Clean Workspace & Podman Storage
         if: always()
         run: |
@@ -319,8 +382,7 @@ jobs:
           # 4. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
             echo "✨ Build succeeded. Wiping workspace source files..."
-            sudo rm -rf ${{ github.workspace }}/*
-            sudo rm -rf ${{ github.workspace }}/.[!.]* || true
+            sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           else
             echo "⚠️ Build failed. Leaving workspace source files intact for debugging."
           fi

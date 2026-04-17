@@ -8,6 +8,8 @@ system-core:
   - dbus-glib
   - glib2
   - polkit
+  - mesa
+  - lib32-mesa
   - shadow
   - lua-luv
   - gpgme
@@ -24,8 +26,6 @@ bootc:
   - xfsprogs
   - dosfstools
 graphics-drivers:
-  - mesa
-  - lib32-mesa
   - mesa-utils
   - vulkan-icd-loader
   - vulkan-mesa-layers

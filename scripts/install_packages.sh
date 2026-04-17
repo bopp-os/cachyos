@@ -40,7 +40,11 @@ while IFS='|' read -r COMP_TAG INTERVAL PKGS; do
 
     # Cleanup container package cache to keep layers small
     if [ -d "/usr/lib/sysimage/cache/pacman/pkg/" ]; then
-        rm -rf /usr/lib/sysimage/cache/pacman/pkg/*
+        if mountpoint -q /usr/lib/sysimage/cache/pacman/pkg; then
+            echo "Cache is externally mounted. Preserving packages on host."
+        else
+            rm -rf /usr/lib/sysimage/cache/pacman/pkg/*
+        fi
     fi
 
     # Standard /usr/etc relocation (matching your previous Containerfile patterns)

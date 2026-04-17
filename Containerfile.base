@@ -3,79 +3,12 @@
 # A high-performance, atomic image based on CachyOS.
 # Foundation layer including bootc and hardware enablement.
 
-# ==========================================
-# STAGE 1: AUR Builder
-# ==========================================
+# Global build arguments must be declared before FROM to be used in image tags
 ARG TARGET_CPU_MARCH=v3
 ARG BASE_IMAGE_TAG=v3
-ARG WIPE_PKG_CACHE=false
-
-FROM docker.io/cachyos/cachyos-${BASE_IMAGE_TAG} AS aur_builder
-ARG TARGET_CPU_MARCH
-ARG BASE_IMAGE_TAG
-USER root
-
-# Conditionally wipe the AUR builder package cache
-ARG WIPE_PKG_CACHE
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    if [ "$WIPE_PKG_CACHE" = "true" ]; then \
-        echo "Wiping AUR builder package cache..." && \
-        rm -rf /var/cache/pacman/pkg/* ; \
-    fi
-
-# Minimal setup: just enough to build packages
-# Dynamic cache ID ensures builder isolation for different architectures
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    pacman-key --init && \
-    echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
-    pacman-key --populate archlinux cachyos && \
-    pacman-key --recv-keys F3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB 3056513887B78AEB && \
-    pacman-key --lsign-key F3B607488DB35A47 && \
-    pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
-    pacman-key --lsign-key 3056513887B78AEB && \
-    sed -i 's/^#*ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
-    pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-hooks chwd cachyos-rate-mirrors lsb-release gpgme && \
-    pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
-    cachyos-rate-mirrors && \
-    echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf && \
-    if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
-        printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
-        awk -v repo_file="/tmp/znver4-repos.conf" '/^#?\[cachyos-v4\]/ && !done { system("cat " repo_file); done=1 } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
-        mv /etc/pacman.conf.tmp /etc/pacman.conf && \
-        rm -f /tmp/znver4-repos.conf ; \
-    fi && \
-    pacman -Syu --noconfirm --needed base-devel git sudo && \
-    useradd -m builduser && \
-    echo "builduser ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
-    mkdir -p /home/builduser/packages && \
-    chown -R builduser:builduser /home/builduser
-
-# Build Scopebuddy
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    git clone https://aur.archlinux.org/scopebuddy-git.git /tmp/scopebuddy && \
-    chown -R builduser:builduser /tmp/scopebuddy && \
-    cd /tmp/scopebuddy && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
-
-# Build autofs
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    git clone https://aur.archlinux.org/autofs.git /tmp/autofs && \
-    chown -R builduser:builduser /tmp/autofs && \
-    cd /tmp/autofs && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
-
-# Build sddm-theme-noctalia-git
-RUN --mount=type=cache,id=boppos-builder-cache-${TARGET_CPU_MARCH},target=/var/cache/pacman/pkg \
-    git clone https://aur.archlinux.org/sddm-theme-noctalia-git.git /tmp/sddm-theme-noctalia-git && \
-    chown -R builduser:builduser /tmp/sddm-theme-noctalia-git && \
-    cd /tmp/sddm-theme-noctalia-git && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
-
-# Clone bootcrew/mono to access their shared setup scripts
-RUN git clone https://github.com/bootcrew/mono.git /tmp/bootcrew-mono
 
 # ==========================================
-# STAGE 2: System Build
+# System Build
 # ==========================================
 FROM ghcr.io/ublue-os/brew:latest AS brew
 
@@ -84,25 +17,17 @@ ARG TARGET_CPU_MARCH
 ARG BASE_IMAGE_TAG
 ENV LANG=en_US.UTF-8
 
-# Conditionally wipe the system package cache
-ARG WIPE_PKG_CACHE
-RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    if [ "$WIPE_PKG_CACHE" = "true" ]; then \
-        echo "Wiping system package cache..." && \
-        rm -rf /usr/lib/sysimage/cache/pacman/pkg/* ; \
-    fi
-
 # Copy Homebrew
 COPY --from=brew /system_files /
 RUN setfattr -n user.component -v "homebrew" "/usr/share/homebrew.tar.zst"
 
 # Copy the shared directory from the bootcrew/mono repo
-COPY --from=aur_builder /tmp/bootcrew-mono/shared /bootcrew-shared
+COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /tmp/bootcrew-mono/shared /bootcrew-shared
 
 # Copy configured pacman environment from aur_builder
-COPY --from=aur_builder /etc/pacman.conf /etc/pacman.conf
-COPY --from=aur_builder /etc/pacman.d /etc/pacman.d
-COPY --from=aur_builder /usr/share/pacman/keyrings /usr/share/pacman/keyrings
+COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /etc/pacman.conf /etc/pacman.conf
+COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /etc/pacman.d /etc/pacman.d
+COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /usr/share/pacman/keyrings /usr/share/pacman/keyrings
 
 # Re-initialize and trust keys in the system stage to avoid GPGME environment issues
 RUN rm -rf /etc/pacman.d/gnupg && \
@@ -157,11 +82,12 @@ RUN COMPONENT_TAG="default-base" pacman -Qq | /usr/libexec/assign-usercomponent.
 # ==========================================
 # CPU ARCHITECTURE REPOSITORY SETUP
 # ==========================================
-RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    export COMPONENT_TAG="arch-optimizations" && \
+RUN export COMPONENT_TAG="arch-optimizations" && \
     rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
     rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
-    pacman -Sc --noconfirm && \
+    if ! mountpoint -q /usr/lib/sysimage/cache/pacman/pkg; then \
+        pacman -Sc --noconfirm ; \
+    fi && \
     if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
         echo "Architecture $TARGET_CPU_MARCH detected. Reinstalling packages for Zen 4/5 optimization..." && \
         pacman -Syy && \
@@ -176,15 +102,17 @@ RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysim
 # ==========================================
 
 RUN --mount=type=tmpfs,dst=/run \
-    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth mesa-git lib32-mesa-git || echo "Conflicting packages not found, skipping."
+    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth || true && \
+    pacman -Rdd --noconfirm mesa-git || true && \
+    pacman -Rdd --noconfirm lib32-mesa-git || true
 
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run \
     COMPONENT_TAG="install-base" pacman -Sy --noconfirm --needed python python-yaml yq
 
 COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/base/base-analyzed.yaml /tmp/base-analyzed.yaml
 
-RUN --mount=type=tmpfs,dst=/run --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
+RUN --mount=type=tmpfs,dst=/run \
     chmod +x /tmp/install_packages.sh && \
     /tmp/install_packages.sh /tmp/base-analyzed.yaml
 
@@ -197,9 +125,8 @@ COPY files/base/usr/bin /usr/bin
 RUN chmod -R 0755 /usr/bin /usr/share/libalpm/scripts
 
 # Install AUR packages from Stage 1
-COPY --from=aur_builder /home/builduser/packages/ /tmp/aur-pkgs/
-RUN --mount=type=cache,id=boppos-cache-${TARGET_CPU_MARCH},target=/usr/lib/sysimage/cache/pacman/pkg \
-    COMPONENT_TAG="aur-packages" pacman -U --noconfirm /tmp/aur-pkgs/*.pkg.tar.zst && \
+COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /export-pkgs/ /tmp/aur-pkgs/
+RUN COMPONENT_TAG="aur-packages" pacman -U --noconfirm /tmp/aur-pkgs/*.pkg.tar.zst && \
     rm -rf /tmp/aur-pkgs && \
     if [ -e /usr/etc ]; then \
         echo "Workaround: mitigating rogue /usr/etc to satisfy bootc..." && \
@@ -268,9 +195,15 @@ RUN mkdir -p /usr/lib/opt && \
 # Final system setup and cleanup
 RUN sed -i 's|^HOME=.*|HOME=/var/home|' "/etc/default/useradd" && \
     mkdir -p /run /tmp && \
+    # Patch the cleanup script to NOT delete our mounted pacman cache
+    sed -i 's|/usr/lib/sysimage/cache/pacman/pkg||g' /bootcrew-shared/bootc-rootfs.sh && \
     bash /bootcrew-shared/bootc-rootfs.sh && \
     rm -rf /bootcrew-shared && \
-    rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true
+    # Recreate essential directories for bootc lint to pass, then clean runtime dirs
+    mkdir -p /var /boot /sysroot && \
+    rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true && \
+    # Run lint in the same layer as the cleanup to avoid stale /run /tmp files
+    bootc container lint
 
 RUN ln -sf ../usr/lib/os-release /etc/os-release
 RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
@@ -281,5 +214,3 @@ COPY cosign.pub /etc/pki/containers/bopp-os.pub
 
 RUN rm -f /README.md
 LABEL containers.bootc=1
-
-RUN bootc container lint
