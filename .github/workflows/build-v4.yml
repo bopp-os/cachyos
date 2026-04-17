@@ -146,6 +146,21 @@ jobs:
           
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
+      - name: Build AUR Image
+        id: build_aur
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          set -x
+          MARCH="${{ env.DEFAULT_TAG }}"
+
+          echo "::group::Building AUR builder"
+          sudo podman build -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
+            --build-arg BASE_IMAGE_TAG=${{ env.DEFAULT_TAG }} \
+            --build-arg TARGET_CPU_MARCH=$MARCH \
+            --network=host \
+            --tag "localhost/aur-builder:$MARCH" -f "Containerfile.aur" .
+          echo "::endgroup::"
+
       - name: Build Base Image
         id: build_base
         env:
