@@ -17,16 +17,15 @@ while IFS='|' read -r COMP_TAG INTERVAL PKGS; do
     # Skip empty lines
     [ -z "$COMP_TAG" ] && continue
 
-    # Export COMPONENT_TAG so child processes (like chunkah hooks) can see it
-    export COMPONENT_TAG="$COMP_TAG"
-
     # Handle the UPDATE_INTERVAL_TAG
     if [ "$INTERVAL" = "unknown" ]; then
         unset UPDATE_INTERVAL_TAG
         DISPLAY_INTERVAL="[Unset (unknown)]"
+        export COMPONENT_TAG="$COMP_TAG"
     else
         export UPDATE_INTERVAL_TAG="$INTERVAL"
         DISPLAY_INTERVAL="$UPDATE_INTERVAL_TAG"
+        export COMPONENT_TAG="${COMP_TAG}-${INTERVAL}"
     fi
 
     echo "======================================================="
