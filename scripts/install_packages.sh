@@ -35,7 +35,8 @@ while IFS='|' read -r COMP_TAG INTERVAL PKGS; do
     echo "======================================================="
 
     # Execute pacman installation
-    pacman -Sy --noconfirm --needed $PKGS
+    # Use --ask 4 to automatically answer "yes" to conflict removal prompts across different transaction groups
+    pacman -Sy --noconfirm --ask 4 --needed $PKGS
 
     # Cleanup container package cache to keep layers small
     if [ -d "/usr/lib/sysimage/cache/pacman/pkg/" ]; then
