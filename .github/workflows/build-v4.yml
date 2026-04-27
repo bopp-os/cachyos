@@ -29,9 +29,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_push:
-    name: Build and push image (v4)
+  build_base:
+    name: Build base image (v4)
     runs-on: x86-64-v4
+    outputs:
+      should_skip: ${{ steps.check_compatibility.outputs.should_skip }}
 
     permissions:
       contents: read
@@ -202,133 +204,11 @@ jobs:
           sudo podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           echo "::endgroup::"
 
-      - name: Build & Rechunk Flavor Images
-        id: build_flavors
+      - name: Export Base Image
         if: steps.check_compatibility.outputs.should_skip != 'true'
-        env:
-          META_LABELS: ${{ steps.metadata.outputs.labels }}
         run: |
-          set -x
-
-          # get labels from metadata action
-          while IFS= read -r label; do
-            if [[ -n "$label" ]]; then
-              BUILD_ARGS+=("--label" "$label")
-            fi
-          done <<< "$META_LABELS"
-
-          # Check if the manual 'no_cache' toggle was checked in the GitHub UI
-          if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
-            echo "Manual cache bust triggered. Appending --no-cache..."
-            BUILD_ARGS+=("--no-cache")
-          fi
-
-          # Check if the manual 'wipe_pkg_cache' toggle was checked in the GitHub UI
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Manual wipe package cache triggered. Appending build arg..."
-            BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
-          fi
-
-          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
-          
-          for FLAVOR in ${{ env.FLAVORS }}; do
-            echo "::group::Building $FLAVOR"
-            CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
-            DOCKERFILE="Containerfile.${FLAVOR}"
-            FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
-
-            # For DE overlays, just build! They layer natively on the rechunked base.
-            sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
-              --network=host \
-              --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
-            
-            echo "Rechunking $FLAVOR image..."
-            IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
-            ARCHIVE_PATH="${{ github.workspace }}/rechunked_${FLAVOR}.tar"
-
-            # Run chunkah
-            sudo podman run --rm --network=none \
-              --mount=type=image,source=$IMAGE_REF,target=/chunkah \
-              -e SOURCE_DATE_EPOCH=0 \
-              -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-              quay.io/coreos/chunkah build --compressed --compression-level 6 --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
-
-            sudo podman rmi -f "$IMAGE_REF"
-            sudo podman system prune -f
-            sudo podman load -i "$ARCHIVE_PATH" > /tmp/podman_load_output.txt
-            sudo rm -f "$ARCHIVE_PATH"
-
-            IMAGE_ID=$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $3}')
-            sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
-
-            echo "::endgroup::"
-          done
-
-      - name: Push Flavor Images to GHCR
-        if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
-        id: push_flavors
-        env:
-          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
-          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
-          MAX_RETRIES: 3
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -ex
-          
-          for FLAVOR in ${{ env.FLAVORS }}; do
-            echo "::group::Pushing $FLAVOR"
-            CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
-            
-            for tag in $IMAGE_TAGS; do
-              SUCCESS=false
-              for i in $(seq "${MAX_RETRIES}"); do
-                if sudo podman push "localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"; then
-                  SUCCESS=true
-                  break
-                fi
-                echo "Push failed, retrying in $((5 * i)) seconds..."
-                sleep $((5 * i))
-              done
-              if [ "$SUCCESS" = "false" ]; then
-                echo "::error::Failed to push tag $tag after $MAX_RETRIES retries."
-                exit 1
-              fi
-            done
-            
-            # Fetch remote digest with retries and explicit auth to account for GHCR private package visibility
-            SUCCESS_DIGEST=false
-            for i in $(seq "${MAX_RETRIES}"); do
-              if REMOTE_DIGEST=$(skopeo inspect --creds="${{ github.actor }}:${GITHUB_TOKEN}" --format '{{.Digest}}' "docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"); then
-                SUCCESS_DIGEST=true
-                break
-              fi
-              echo "Failed to fetch remote digest, retrying in $((5 * i)) seconds..."
-              sleep $((5 * i))
-            done
-            if [ "$SUCCESS_DIGEST" = "false" ]; then
-              echo "::error::Failed to fetch remote digest for ${CURRENT_IMAGE_NAME} after ${MAX_RETRIES} retries."
-              exit 1
-            fi
-            
-            echo "Captured remote digest: $REMOTE_DIGEST"
-            echo "${CURRENT_IMAGE_NAME}=${REMOTE_DIGEST}" >> digests.env
-            echo "::endgroup::"
-          done
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
-        if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
-
-      - name: Sign container image
-        if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
-        run: |
-          while IFS='=' read -r img digest; do
-            cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY "${IMAGE_REGISTRY}/${img}:${DEFAULT_TAG}@${digest}" < /dev/null
-          done < digests.env
-        env:
-          COSIGN_EXPERIMENTAL: false
-          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
-          COSIGN_PASSWORD: ""
+          echo "Saving base image to persistent tarball..."
+          sudo podman save "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" -o /var/tmp/cachyos-base-${{ github.sha }}.tar
 
       - name: Prune Pacman Cache
         if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
@@ -381,3 +261,204 @@ jobs:
           
           echo "📊 Final Disk Space:"
           df -h /
+
+  build_flavors:
+    name: Build ${{ matrix.flavor }} (v4)
+    needs: build_base
+    if: needs.build_base.outputs.should_skip != 'true'
+    runs-on: x86-64-v4
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [plasma, gnome, niri]
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Prepare environment
+        run: |
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
+
+      - name: Free Disk Space (Self-Hosted)
+        run: |
+          echo "🧹 Sweeping the runner for free space..."
+          if command -v apt-get &> /dev/null; then sudo apt-get clean; elif command -v pacman &> /dev/null; then sudo pacman -Scc --noconfirm; fi
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman*
+          sudo podman system prune --all --force --build
+          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*; fi
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Get current date
+        id: date
+        run: |
+          echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> $GITHUB_OUTPUT
+
+      - name: Image Metadata
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        id: metadata
+        with:
+          tags: |
+            type=raw,value=${{ env.DEFAULT_TAG }}
+            type=raw,value=${{ env.DEFAULT_TAG }}-{{date 'YYYYMMDD'}}
+            type=sha,enable=${{ github.event_name == 'pull_request' }}
+            type=ref,event=pr
+          labels: |
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            org.opencontainers.image.description=${{ env.IMAGE_DESC }}
+            org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
+            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}
+            org.opencontainers.image.title=cachyos
+            org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/tree/${{ github.sha }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
+            io.artifacthub.package.deprecated=false
+            io.artifacthub.package.keywords=${{ env.IMAGE_KEYWORDS }}
+            io.artifacthub.package.license=Apache-2.0
+            io.artifacthub.package.logo-url=${{ env.IMAGE_LOGO_URL }}
+            io.artifacthub.package.prerelease=false
+            containers.bootc=1
+          sep-tags: " "
+          sep-annotations: " "
+
+      - name: Load Base Image
+        run: |
+          echo "Loading base image into Podman..."
+          sudo podman load -i /var/tmp/cachyos-base-${{ github.sha }}.tar
+
+      - name: Login to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOGIN_USER: ${{ github.actor }}
+        run: |
+          echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+          echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+
+      - name: Prepare Local Cache Directory
+        run: |
+          CACHE_DIR="/opt/boppos-pkg-cache/${{ env.DEFAULT_TAG }}"
+          sudo mkdir -p "$CACHE_DIR"
+          sudo chown -R $USER:$USER "$CACHE_DIR"
+          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
+          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf "$CACHE_DIR"/*; fi
+          echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
+
+      - name: Build & Rechunk Flavor Image
+        env:
+          META_LABELS: ${{ steps.metadata.outputs.labels }}
+        run: |
+          set -x
+          while IFS= read -r label; do
+            if [[ -n "$label" ]]; then BUILD_ARGS+=("--label" "$label"); fi
+          done <<< "$META_LABELS"
+
+          if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then BUILD_ARGS+=("--no-cache"); fi
+          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true"); fi
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
+          
+          FLAVOR="${{ matrix.flavor }}"
+          echo "::group::Building $FLAVOR"
+          CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
+          DOCKERFILE="Containerfile.${FLAVOR}"
+          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
+
+          sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=host --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
+          
+          echo "Rechunking $FLAVOR image..."
+          IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
+          ARCHIVE_PATH="${{ github.workspace }}/rechunked_${FLAVOR}.tar"
+
+          sudo podman run --rm --network=none --mount=type=image,source=$IMAGE_REF,target=/chunkah -e SOURCE_DATE_EPOCH=0 -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" quay.io/coreos/chunkah build --compressed --compression-level 6 --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
+
+          sudo podman rmi -f "$IMAGE_REF"
+          sudo podman system prune -f
+          sudo podman load -i "$ARCHIVE_PATH" > /tmp/podman_load_output.txt
+          sudo rm -f "$ARCHIVE_PATH"
+
+          IMAGE_ID=$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $3}')
+          sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
+          echo "::endgroup::"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cachyos-${{ matrix.flavor }}-${{ github.sha }}
+          path: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
+          retention-days: 90
+
+      - name: Push Flavor Image to GHCR
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+          MAX_RETRIES: 3
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -ex
+          FLAVOR="${{ matrix.flavor }}"
+          CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
+          
+          for tag in $IMAGE_TAGS; do
+            SUCCESS=false
+            for i in $(seq "${MAX_RETRIES}"); do
+              if sudo podman push "localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"; then SUCCESS=true; break; fi
+              echo "Push failed, retrying in $((5 * i)) seconds..."; sleep $((5 * i))
+            done
+            if [ "$SUCCESS" = "false" ]; then exit 1; fi
+          done
+          
+          SUCCESS_DIGEST=false
+          for i in $(seq "${MAX_RETRIES}"); do
+            if REMOTE_DIGEST=$(skopeo inspect --creds="${{ github.actor }}:${GITHUB_TOKEN}" --format '{{.Digest}}' "docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"); then SUCCESS_DIGEST=true; break; fi
+            echo "Failed to fetch remote digest, retrying..."; sleep $((5 * i))
+          done
+          if [ "$SUCCESS_DIGEST" = "false" ]; then exit 1; fi
+          echo "${CURRENT_IMAGE_NAME}=${REMOTE_DIGEST}" >> digests.env
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+        if: github.event_name != 'pull_request'
+
+      - name: Sign container image
+        if: github.event_name != 'pull_request'
+        run: |
+          while IFS='=' read -r img digest; do
+            cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY "${IMAGE_REGISTRY}/${img}:${DEFAULT_TAG}@${digest}" < /dev/null
+          done < digests.env
+        env:
+          COSIGN_EXPERIMENTAL: false
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          COSIGN_PASSWORD: ""
+
+      - name: Clean Workspace & Podman Storage
+        if: always()
+        run: |
+          echo "🧹 Sweeping up the heavy Podman assets..."
+          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman*
+          sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
+          sudo podman system prune --all --force --build
+          if [ "${{ job.status }}" == "success" ]; then
+            sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
+          fi
+          df -h /
+
+  cleanup_base:
+    name: Cleanup Base Tarball (v4)
+    needs: [build_base, build_flavors]
+    if: always() && needs.build_base.outputs.should_skip != 'true'
+    runs-on: x86-64-v4
+    steps:
+      - name: Remove Persistent Tarball
+        run: sudo rm -f /var/tmp/cachyos-base-${{ github.sha }}.tar
