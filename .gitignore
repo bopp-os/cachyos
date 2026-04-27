@@ -2,3 +2,4 @@ out.ociarchive
 bootable.img
 cosign.key
 .venv/
+test.yaml

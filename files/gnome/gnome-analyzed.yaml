@@ -52,18 +52,18 @@ gnome-themes:
 gnome-extensions:
   monthly:
   - gnome-shell-extension-arc-menu
+  - gnome-shell-extension-dash-to-dock
   quarterly:
   - gnome-shell-extension-appindicator
   - gnome-shell-extension-caffeine
   - gnome-shell-extension-vitals
   yearly:
   - gnome-browser-connector
+  - gnome-shell-extension-gnome-ui-tune-git
+  - gnome-shell-extension-no-overview
   unknown:
   - gnome-shell-extension-bing-wallpaper
-  - gnome-shell-extension-dash-to-dock
-  - gnome-shell-extension-gnome-ui-tune-git
   - gnome-shell-extension-gsconnect
-  - gnome-shell-extension-no-overview
 gnome-media:
   monthly:
   - showtime

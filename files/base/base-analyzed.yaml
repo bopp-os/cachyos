@@ -1,9 +1,11 @@
 system-core:
   weekly:
-  - mesa 
-  - lib32-mesa
+  - mesa
   biweekly:
   - glib2
+  - lib32-mesa
+  - linux-cachyos
+  - linux-cachyos-headers
   - systemd
   - systemd-sysvcompat
   quarterly:
@@ -17,9 +19,6 @@ system-core:
   - dbus-glib
   - lua-luv
   - ufw
-  unknown:
-  - linux-cachyos
-  - linux-cachyos-headers
 bootc:
   biweekly:
   - containers-common
@@ -62,6 +61,7 @@ fonts:
   yearly:
   - awesome-terminal-fonts
   - cantarell-fonts
+  - noto-color-emoji-fontconfig
   - noto-fonts-cjk
   - noto-fonts-emoji
   - ttf-bitstream-vera
@@ -71,7 +71,6 @@ fonts:
   - ttf-opensans
   - ttf-ubuntu-font-family
   unknown:
-  - noto-color-emoji-fontconfig
   - ttf-ms-fonts
 filesystems:
   monthly:
@@ -103,12 +102,11 @@ archiving:
   - p7zip
   - rpmextract
   - sharutils
+  - unace
   - unarj
   - unp
   - unzip
   - zip
-  unknown:
-  - unace
 printing-scanning:
   monthly:
   - cups-filters
@@ -169,6 +167,7 @@ networking:
   - bluez-hid2hci
   - bluez-libs
   - bluez-utils
+  - cloudflare-warp-bin
   - ethtool
   - modemmanager
   - openvpn
@@ -182,9 +181,10 @@ networking:
   - wpa_supplicant
   - xl2tpd
   unknown:
-  - cloudflare-warp-bin
   - dnsutils
 hardware-management:
+  biweekly:
+  - chwd
   monthly:
   - cpupower
   - fwupd
@@ -205,7 +205,6 @@ hardware-management:
   - sg3_utils
   - xdg-user-dirs
   unknown:
-  - chwd
   - dmemcg-booster
 shells:
   monthly:
@@ -289,10 +288,9 @@ devel-base:
   - git-lfs
   yearly:
   - make
+  - paru
   - patch
   - tig
-  unknown:
-  - paru
 containers:
   biweekly:
   - docker-compose
@@ -305,10 +303,11 @@ containers:
   - distrobox
   - podman-compose
 schedulers:
-  unknown:
+  monthly:
+  - scx-tools-git
+  quarterly:
   - scx-manager
   - scx-scheds-git
-  - scx-tools-git
 desktop-integration:
   biweekly:
   - gtk4
@@ -330,17 +329,20 @@ desktop-integration:
   - libxss
   - xdg-utils
 themes-aesthetics:
-  unknown:
+  yearly:
   - cachyos-plymouth-bootanimation
   - cachyos-plymouth-theme
+  unknown:
   - cachyos-wallpapers
 media-video:
+  weekly:
+  - mpv-git
   biweekly:
+  - gpu-screen-recorder-ui
   - gst-plugin-pipewire
   - gst-plugins-bad
   monthly:
   - ffmpeg
-  - gpu-screen-recorder-ui
   - gst-libav
   - gst-plugins-ugly
   - vlc
@@ -348,51 +350,49 @@ media-video:
   yearly:
   - ffmpegthumbnailer
   - libdvdcss
-  unknown:
-  - mpv-git
 gaming-core:
   biweekly:
   - lib32-systemd
+  - lsfg-vk
   - waydroid
   - wine
   monthly:
+  - coolercontrol
   - goverlay
   - lact
   - lib32-glibc
   - lutris
+  - proton-cachyos
+  - sunshine
+  - winboat
   quarterly:
   - lib32-gcc-libs
   - lib32-libx11
   - mangohud
   - openrgb
+  - pascube
   - steam
   - yad
   yearly:
   - gamemode
+  - heroic-games-launcher
   - lib32-alsa-plugins
   - nvtop
+  - vkbasalt-cli
   - xdotool
   - xorg-xwininfo
   unknown:
-  - coolercontrol
   - game-devices-udev
   - gamescope-session-git
-  - heroic-games-launcher
-  - lsfg-vk
   - openrgb-plugin-effects-git
-  - pascube
-  - proton-cachyos
-  - sunshine
   - udev-joystick-blacklist-git
   - vkbasalt
-  - vkbasalt-cli
-  - winboat
 web-browsers:
   weekly:
   - firefox
-  unknown:
-  - cachyos-firefox-settings
   - helium-browser-bin
+  yearly:
+  - cachyos-firefox-settings
 development-languages:
   biweekly:
   - cargo-binstall
@@ -411,16 +411,19 @@ development-languages:
   yearly:
   - python-defusedxml
 cachyos-settings:
-  unknown:
+  weekly:
   - cachyos-ananicy-rules
+  biweekly:
+  - cachyos-settings
+  quarterly:
   - cachyos-fish-config
+  yearly:
   - cachyos-micro-settings
   - cachyos-samba-settings
-  - cachyos-settings
   - cachyos-zsh-config
 base-meta:
+  quarterly:
+  - cachyos-gaming-meta
   yearly:
   - base-devel
-  unknown:
   - cachyos-gaming-applications
-  - cachyos-gaming-meta

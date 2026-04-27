@@ -44,7 +44,7 @@ niri-themes-aesthetics:
   unknown:
   - cachyos-nord-gtk-theme-git
 niri-meta:
+  weekly:
+  - cachyos-niri-noctalia
   monthly:
   - niri
-  unknown:
-  - cachyos-niri-noctalia

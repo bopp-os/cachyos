@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+import os
 import yaml
 import aiohttp
 import asyncio
@@ -16,7 +17,9 @@ CACHY_REPOS = [
     ("x86_64_v4", "cachyos-v4"),
     ("x86_64_v4", "cachyos-extra-v4"),
     ("x86_64_v4", "cachyos-core-v4"),
-    ("x86_64", "cachyos")
+    ("x86_64", "cachyos"),
+    ("x86_64", "cachyos-extra"),
+    ("x86_64", "cachyos-core")
 ]
 CACHY_MIRROR_BASE = "https://mirror.cachyos.org/repo"
 CACHY_ARCHIVE_BASE = "https://archive.cachyos.org/archive"
@@ -54,15 +57,64 @@ async def get_arch_archive_dates(session, pkg_name):
         logging.debug(f"[{pkg_name}] Arch Archive: Request failed - {e}")
         return []
 
+async def get_chaotic_aur_dates(session, pkg_name):
+    """Scrape the Chaotic-AUR repository commits via GitHub API for a specific package's history."""
+    if not pkg_name: return []
+    
+    url = f"https://api.github.com/repos/chaotic-aur/packages/commits?path={pkg_name}/PKGBUILD"
+    headers = {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'BoppOS-Package-Analyzer'
+    }
+    
+    token = os.environ.get('GITHUB_TOKEN')
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+        
+    logging.debug(f"[{pkg_name}] Chaotic-AUR: Fetching {url}")
+    try:
+        async with session.get(url, headers=headers, timeout=15) as response:
+            if response.status == 403:
+                logging.warning(f"[{pkg_name}] Chaotic-AUR: GitHub API Rate Limit Exceeded (403). Set GITHUB_TOKEN to bypass.")
+                return []
+            if response.status == 404:
+                logging.debug(f"[{pkg_name}] Chaotic-AUR: Package not found (404).")
+                return []
+            if response.status != 200:
+                logging.debug(f"[{pkg_name}] Chaotic-AUR: HTTP {response.status}")
+                return []
+            
+            data = await response.json()
+            dates = []
+            for item in data:
+                try:
+                    date_str = item['commit']['author']['date']
+                    dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
+                    dates.append(dt)
+                except (KeyError, ValueError, TypeError):
+                    continue
+                    
+            unique_dates = sorted(list(set(dates)))
+            logging.debug(f"[{pkg_name}] Chaotic-AUR: Found {len(unique_dates)} history entries")
+            return unique_dates
+    except Exception as e:
+        logging.debug(f"[{pkg_name}] Chaotic-AUR: Request failed - {e}")
+        return []
+
 async def fetch_all_cachyos_data(session):
     """Fetch and parse all CachyOS mirrors and archives once to build a local historical database."""
     cachy_data = {}
-    urls_to_fetch = []
+    urls_to_fetch = set()
     
+    # Live mirrors have core/extra subdirectories
     for arch, repo in CACHY_REPOS:
-        urls_to_fetch.append(f"{CACHY_MIRROR_BASE}/{arch}/{repo}/")
-        urls_to_fetch.append(f"{CACHY_ARCHIVE_BASE}/{repo}/")
-        
+        urls_to_fetch.add(f"{CACHY_MIRROR_BASE}/{arch}/{repo}/")
+
+    # Archives consolidate packages into a single directory per architecture
+    urls_to_fetch.add(f"{CACHY_ARCHIVE_BASE}/cachyos/")
+    urls_to_fetch.add(f"{CACHY_ARCHIVE_BASE}/cachyos-v3/")
+    urls_to_fetch.add(f"{CACHY_ARCHIVE_BASE}/cachyos-v4/")
+
     logging.info(f"Fetching {len(urls_to_fetch)} CachyOS directory indexes to build history cache...")
     
     # Matches: href="pkgname-1.0-1-x86_64_v4.pkg.tar.zst" ... <td class="date">YYYY-MMM-dd hh:mm</td>
@@ -78,7 +130,7 @@ async def fetch_all_cachyos_data(session):
             logging.debug(f"Failed to fetch {url}: {e}")
         return ""
 
-    html_pages = await asyncio.gather(*(fetch_url(url) for url in urls_to_fetch))
+    html_pages = await asyncio.gather(*(fetch_url(url) for url in sorted(list(urls_to_fetch))))
     
     for html in html_pages:
         if not html: continue
@@ -149,8 +201,27 @@ async def analyze_package(session, pkg, cachy_data):
         else:
             logging.debug(f"[{pkg}] No history found in CachyOS cache.")
             
+    if not dates or len(dates) < 2:
+        logging.debug(f"[{pkg}] Insufficient history. Checking Chaotic-AUR via GitHub API...")
+        chaotic_dates = await get_chaotic_aur_dates(session, pkg)
+        if chaotic_dates and len(chaotic_dates) > len(dates):
+            dates = chaotic_dates
+            
     avg_days = calculate_average_days(dates)
-    category = categorize_interval(avg_days)
+        
+    if avg_days is not None:
+        category = categorize_interval(avg_days)
+    elif dates and len(dates) == 1:
+        age_days = (datetime.now() - dates[0]).days
+        if age_days >= 365:
+            category = "yearly"
+            logging.debug(f"[{pkg}] Single release is {age_days} days old. Defaulting to yearly.")
+        else:
+            category = "unknown"
+            logging.debug(f"[{pkg}] Single release is only {age_days} days old. Keeping as unknown.")
+    else:
+        category = "unknown"
+    
     logging.debug(f"[{pkg}] Calculated avg_days: {avg_days} -> Category: {category}")
     return pkg, category
 
