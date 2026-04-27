@@ -1,0 +1,150 @@
+#!/bin/bash
+set -euo pipefail
+
+JSON_OUTPUT=false
+TARGET_INPUT=""
+
+for arg in "$@"; do
+    if [ "$arg" == "--json" ]; then
+        JSON_OUTPUT=true
+    else
+        TARGET_INPUT="$arg"
+    fi
+done
+
+log_info() {
+    if [ "$JSON_OUTPUT" != true ]; then echo "$1"; fi
+}
+log_err() {
+    echo "$1" >&2
+}
+
+if [ "$EUID" -ne 0 ]; then
+    log_err "❌ Error: This script must be run as root (e.g., using sudo)."
+    exit 1
+fi
+
+for cmd in jq cosign pacman vercmp; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        log_err "❌ Error: Required command '$cmd' is not installed."
+        exit 1
+    fi
+done
+
+log_info "🔍 Gathering current system packages..."
+# Get current packages directly from the running host
+pacman -Q | sort > /tmp/current_pkgs.txt
+
+BOOTED=$(bootc status --json | jq -r '.status.booted.image.image.image // empty')
+
+# If no image is provided, try to intelligently guess based on bootc status
+if [ -z "$TARGET_INPUT" ]; then
+    log_info "No target image provided. Checking bootc status..."
+    
+    # 1. Check if there is an update already staged for the next boot
+    STAGED=$(bootc status --json | jq -r '.status.staged.image.image.image // empty')
+    
+    if [ -n "$STAGED" ]; then
+        TARGET_IMAGE="$STAGED"
+        log_info "Found staged update! Target: $TARGET_IMAGE"
+    else
+        # 2. Fallback to checking the remote tracking image for new updates
+        if [ -n "$BOOTED" ]; then
+            TARGET_IMAGE="$BOOTED"
+            log_info "No staged image. Checking upstream tracking image: $TARGET_IMAGE"
+        else
+            log_err "❌ Error: Could not determine target image from bootc."
+            exit 1
+        fi
+    fi
+else
+    # Smart input: if it doesn't contain a slash, treat it as a tag for the current base image
+    if [[ "$TARGET_INPUT" != *"/"* ]]; then
+        if [ -z "$BOOTED" ]; then
+            log_err "❌ Error: Could not determine current booted image to append tag."
+            exit 1
+        fi
+        BASE_IMAGE="${BOOTED%%:*}"
+        TARGET_IMAGE="${BASE_IMAGE}:${TARGET_INPUT}"
+        log_info "Parsed tag input. Target: $TARGET_IMAGE"
+    else
+        TARGET_IMAGE="$TARGET_INPUT"
+        log_info "Using specified image: $TARGET_IMAGE"
+    fi
+fi
+
+log_info "📥 Downloading SBOM from target image registry via cosign..."
+if ! cosign download sbom "$TARGET_IMAGE" > /tmp/target_sbom.json 2>/dev/null; then
+    log_err "❌ Error: Failed to download SBOM from GHCR for $TARGET_IMAGE."
+    log_err "Ensure the image exists and has an attached SBOM."
+    exit 1
+fi
+
+log_info "📦 Parsing SBOM for package differences..."
+jq -r '.packages[] | "\(.name) \(.versionInfo)"' /tmp/target_sbom.json | sort > /tmp/target_pkgs.txt
+
+awk '{print $1}' /tmp/current_pkgs.txt | sort > /tmp/curr_names.txt
+awk '{print $1}' /tmp/target_pkgs.txt | sort > /tmp/tgt_names.txt
+
+comm -13 /tmp/curr_names.txt /tmp/tgt_names.txt > /tmp/added_names.txt
+comm -23 /tmp/curr_names.txt /tmp/tgt_names.txt > /tmp/removed_names.txt
+comm -12 /tmp/curr_names.txt /tmp/tgt_names.txt > /tmp/common_names.txt
+
+> /tmp/upgraded.txt
+> /tmp/downgraded.txt
+
+join /tmp/common_names.txt /tmp/current_pkgs.txt > /tmp/curr_common.txt
+join /tmp/common_names.txt /tmp/target_pkgs.txt > /tmp/tgt_common.txt
+
+join -j 1 /tmp/curr_common.txt /tmp/tgt_common.txt | while read -r pkg curr_ver tgt_ver; do
+    if [ "$curr_ver" != "$tgt_ver" ]; then
+        cmp=$(vercmp "$tgt_ver" "$curr_ver")
+        if [ "$cmp" -gt 0 ]; then
+            echo "$pkg $curr_ver $tgt_ver" >> /tmp/upgraded.txt
+        else
+            echo "$pkg $curr_ver $tgt_ver" >> /tmp/downgraded.txt
+        fi
+    fi
+done
+
+join /tmp/added_names.txt /tmp/target_pkgs.txt > /tmp/added.txt
+join /tmp/removed_names.txt /tmp/current_pkgs.txt > /tmp/removed.txt
+
+if [ "$JSON_OUTPUT" = true ]; then
+    # Map the text files strictly to JSON arrays using jq
+    [ -s /tmp/upgraded.txt ] && jq -R -s 'split("\n")[:-1] | map(split(" ") | {name: .[0], old: .[1], new: .[2]})' /tmp/upgraded.txt > /tmp/up.json || echo "[]" > /tmp/up.json
+    [ -s /tmp/downgraded.txt ] && jq -R -s 'split("\n")[:-1] | map(split(" ") | {name: .[0], old: .[1], new: .[2]})' /tmp/downgraded.txt > /tmp/down.json || echo "[]" > /tmp/down.json
+    [ -s /tmp/added.txt ] && jq -R -s 'split("\n")[:-1] | map(split(" ") | {name: .[0], version: .[1]})' /tmp/added.txt > /tmp/add.json || echo "[]" > /tmp/add.json
+    [ -s /tmp/removed.txt ] && jq -R -s 'split("\n")[:-1] | map(split(" ") | {name: .[0], version: .[1]})' /tmp/removed.txt > /tmp/rem.json || echo "[]" > /tmp/rem.json
+    
+    jq -n --slurpfile up /tmp/up.json \
+          --slurpfile down /tmp/down.json \
+          --slurpfile add /tmp/add.json \
+          --slurpfile rem /tmp/rem.json \
+          '{upgraded: $up[0], downgraded: $down[0], added: $add[0], removed: $rem[0]}'
+else
+    # Standard terminal format
+    echo -e "\n==================================="
+    if [ -s /tmp/upgraded.txt ]; then
+        echo " 🔼 Upgraded:"
+        awk '{print "  "$1": "$2" -> "$3}' /tmp/upgraded.txt
+    fi
+    if [ -s /tmp/downgraded.txt ]; then
+        echo " 🔽 Downgraded:"
+        awk '{print "  "$1": "$2" -> "$3}' /tmp/downgraded.txt
+    fi
+    if [ -s /tmp/removed.txt ]; then
+        echo " ❌ Removed:"
+        awk '{print "  "$1" "$2}' /tmp/removed.txt
+    fi
+    if [ -s /tmp/added.txt ]; then
+        echo " 📦 Added:"
+        awk '{print "  "$1" "$2}' /tmp/added.txt
+    fi
+    if [ ! -s /tmp/upgraded.txt ] && [ ! -s /tmp/downgraded.txt ] && [ ! -s /tmp/removed.txt ] && [ ! -s /tmp/added.txt ]; then
+        echo " ✨ No package changes detected."
+    fi
+    echo "==================================="
+fi
+
+rm -f /tmp/current_pkgs.txt /tmp/target_pkgs.txt /tmp/target_sbom.json /tmp/curr_names.txt /tmp/tgt_names.txt /tmp/added_names.txt /tmp/removed_names.txt /tmp/common_names.txt /tmp/curr_common.txt /tmp/tgt_common.txt /tmp/upgraded.txt /tmp/downgraded.txt /tmp/added.txt /tmp/removed.txt /tmp/up.json /tmp/down.json /tmp/add.json /tmp/rem.json

@@ -297,14 +297,6 @@ jobs:
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
 
-      - name: Free Disk Space
-        run: |
-          echo "🧹 Sweeping the runner for free space..."
-          if command -v apt-get &> /dev/null; then sudo apt-get clean; elif command -v pacman &> /dev/null; then sudo pacman -Scc --noconfirm; fi
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman*
-          sudo podman system prune --all --force --build
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*; fi
-
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -406,13 +398,6 @@ jobs:
           format: spdx-json
           output-file: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
 
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-cachyos-${{ matrix.flavor }}-${{ github.sha }}
-          path: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
-          retention-days: 90
-
       - name: Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'
         env:
@@ -446,10 +431,11 @@ jobs:
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
         if: github.event_name != 'pull_request'
 
-      - name: Sign container image
+      - name: Attach SBOM and Sign container image
         if: github.event_name != 'pull_request'
         run: |
           while IFS='=' read -r img digest; do
+            cosign attach sbom --sbom sbom-${{ matrix.flavor }}-${{ github.sha }}.json "${IMAGE_REGISTRY}/${img}:${DEFAULT_TAG}@${digest}"
             cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY "${IMAGE_REGISTRY}/${img}:${DEFAULT_TAG}@${digest}" < /dev/null
           done < digests.env
         env:
@@ -457,23 +443,20 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
           COSIGN_PASSWORD: ""
 
-      - name: Clean Workspace & Podman Storage
-        if: always()
-        run: |
-          echo "🧹 Sweeping up the heavy Podman assets..."
-          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman*
-          sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
-          sudo podman system prune --all --force --build
-          if [ "${{ job.status }}" == "success" ]; then
-            sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
-          fi
-          df -h /
-
-  cleanup_base:
-    name: Cleanup Base Tarball (znver4)
+  cleanup:
+    name: Cleanup Runner Workspace (znver4)
     needs: [build_base, build_flavors]
     if: always() && needs.build_base.outputs.should_skip != 'true'
     runs-on: znver4
     steps:
-      - name: Remove Persistent Tarball
-        run: sudo rm -f /var/tmp/cachyos-base-${{ github.sha }}.tar
+      - name: Clean Workspace & Podman Storage
+        run: |
+          echo "🧹 Sweeping up the heavy Podman assets..."
+          sudo rm -f /var/tmp/cachyos-base-${{ github.sha }}.tar
+          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman*
+          sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
+          sudo podman system prune --all --force --build
+          if [ "${{ needs.build_flavors.result }}" == "success" ]; then
+            sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
+          fi
+          df -h /
