@@ -216,7 +216,7 @@ jobs:
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
           echo "Saving base image to persistent tarball..."
-          sudo podman save "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" -o /var/tmp/cachyos-base-${{ github.sha }}.tar
+          sudo podman save "${IMAGE_REGISTRY}/cachyos-base:${{ env.DEFAULT_TAG }}" -o /var/tmp/cachyos-base-${{ github.sha }}.tar
 
       - name: Prune Pacman Cache
         if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'

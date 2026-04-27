@@ -2,8 +2,9 @@
 #
 # Desktop overlay containing the Niri Wayland Compositor, gaming utilities, and developer tools.
 
+ARG IMAGE_REGISTRY=ghcr.io/bopp-os
 ARG BASE_IMAGE_TAG=latest
-FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
+FROM ${IMAGE_REGISTRY}/cachyos-base:${BASE_IMAGE_TAG}
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
