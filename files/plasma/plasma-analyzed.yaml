@@ -88,12 +88,8 @@ kde-themes-aesthetics:
   - appmenu-gtk-module
   - cachyos-themes-sddm
   unknown:
-  - cachyos-emerald-kde-theme-git
   - cachyos-iridescent-kde
   - cachyos-kde-settings
-  - cachyos-lavender-kde-theme-git
-  - cachyos-nord-gtk-theme-git
-  - cachyos-nord-kde-theme-git
   - char-white
 kde-meta:
   biweekly:
@@ -101,3 +97,9 @@ kde-meta:
   - plasma-workspace
   unknown:
   - plasma
+kde-git-themes:
+  unknown:
+  - cachyos-emerald-kde-theme-git
+  - cachyos-lavender-kde-theme-git
+  - cachyos-nord-gtk-theme-git
+  - cachyos-nord-kde-theme-git

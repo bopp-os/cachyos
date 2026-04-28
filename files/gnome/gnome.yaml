@@ -7,7 +7,6 @@ gnome-core:
   - gnome-control-center
   - gnome-keyring
   - libnma
-  - gnome-backgrounds
   - xdg-desktop-portal
   - xdg-desktop-portal-gnome
   - xdg-desktop-portal-gtk
@@ -54,6 +53,24 @@ gnome-media:
   - sushi
   - showtime
   - celluloid
+gnome-webkit:
+  - webkitgtk-6.0
+  - webkit2gtk-4.1
+gnome-input-methods:
+  - ibus
+gnome-js-engine:
+  - gjs
+gnome-static-assets:
+  - gnome-backgrounds
+  - gnome-user-docs
+gnome-webdav-server:
+  - apache
+  - apr
+  - apr-util
 gnome-meta:
   - gnome-shell
+  - baobab
+  - gnome-characters
+  - gnome-clocks
+  - gnome-font-viewer
   - gnome

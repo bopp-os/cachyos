@@ -72,13 +72,14 @@ kde-themes-aesthetics:
   - appmenu-gtk-module
   - cachyos-kde-settings
   - cachyos-themes-sddm
-  - cachyos-emerald-kde-theme-git
-  - cachyos-nord-kde-theme-git
-  - cachyos-lavender-kde-theme-git
-  - cachyos-nord-gtk-theme-git
   - cachyos-iridescent-kde
   - char-white
 kde-meta:
   - plasma-desktop
   - plasma-workspace
   - plasma
+kde-git-themes:
+  - cachyos-emerald-kde-theme-git
+  - cachyos-nord-kde-theme-git
+  - cachyos-lavender-kde-theme-git
+  - cachyos-nord-gtk-theme-git
