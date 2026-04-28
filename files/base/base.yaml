@@ -8,8 +8,6 @@ system-core:
   - dbus-glib
   - glib2
   - polkit
-  - mesa
-  - lib32-mesa
   - shadow
   - lua-luv
   - gpgme
@@ -20,7 +18,6 @@ system-toolchains:
   - clang
 dev-languages:
   - go
-  - python
   - python-numpy
   - python-matplotlib
 gui-frameworks:

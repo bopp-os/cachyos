@@ -1,9 +1,6 @@
 system-core:
-  weekly:
-  - mesa
   biweekly:
   - glib2
-  - lib32-mesa
   - linux-cachyos
   - linux-cachyos-headers
   - systemd
@@ -26,7 +23,6 @@ system-toolchains:
 dev-languages:
   monthly:
   - go
-  - python
   - python-matplotlib
   - python-numpy
 gui-frameworks:

@@ -102,12 +102,10 @@ RUN export COMPONENT_TAG="arch-optimizations" && \
 # ==========================================
 
 RUN --mount=type=tmpfs,dst=/run \
-    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth || true && \
-    pacman -Rdd --noconfirm mesa-git || true && \
-    pacman -Rdd --noconfirm lib32-mesa-git || true
+    pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth || true
 
 RUN --mount=type=tmpfs,dst=/run \
-    COMPONENT_TAG="install-base" pacman -Sy --noconfirm --needed python python-yaml yq
+    COMPONENT_TAG="install-base" pacman -Sy --noconfirm --ask 4 --needed python python-yaml yq mesa lib32-mesa
 
 COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/base/base-analyzed.yaml /tmp/base-analyzed.yaml
