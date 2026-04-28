@@ -62,7 +62,7 @@ rechunk arch='v3' flavor='base':
         echo "Rechunking cachyos-boppos-base:{{arch}}..."; \
         podman run --rm --mount=type=image,source={{registry}}/{{user}}/cachyos-boppos-base:{{arch}},target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$$(podman inspect {{registry}}/{{user}}/cachyos-boppos-base:{{arch}})" \
-            quay.io/coreos/chunkah build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 256 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | podman load > /tmp/podman_load_output.txt; \
+            quay.io/coreos/chunkah build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | podman load > /tmp/podman_load_output.txt; \
         IMAGE_ID=$$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $$3}'); \
         podman tag "$$IMAGE_ID" "{{registry}}/{{user}}/cachyos-boppos-base:{{arch}}"; \
     else \
