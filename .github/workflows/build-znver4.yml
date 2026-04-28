@@ -385,10 +385,11 @@ jobs:
           sudo podman rmi -f "$IMAGE_REF"
           sudo podman system prune -f
           sudo podman load -i "$ARCHIVE_PATH" > /tmp/podman_load_output.txt
-          sudo chmod 644 "$ARCHIVE_PATH"
 
           IMAGE_ID=$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $3}')
           sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
+          
+          sudo rm -f "$ARCHIVE_PATH"
           echo "::endgroup::"
 
       - name: Push Flavor Image to GHCR
@@ -423,6 +424,8 @@ jobs:
       - name: Generate SBOM
         if: github.event_name != 'pull_request'
         uses: anchore/sbom-action@v0
+        env:
+          TMPDIR: /var/tmp
         with:
           image: ${{ env.IMAGE_REGISTRY }}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}
           registry-username: ${{ github.actor }}
