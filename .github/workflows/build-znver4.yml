@@ -391,13 +391,6 @@ jobs:
           sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
           echo "::endgroup::"
 
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          image: docker-archive:${{ github.workspace }}/rechunked_${{ matrix.flavor }}.tar
-          format: spdx-json
-          output-file: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
-
       - name: Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'
         env:
@@ -426,6 +419,16 @@ jobs:
           done
           if [ "$SUCCESS_DIGEST" = "false" ]; then exit 1; fi
           echo "${CURRENT_IMAGE_NAME}=${REMOTE_DIGEST}" >> digests.env
+
+      - name: Generate SBOM
+        if: github.event_name != 'pull_request'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_REGISTRY }}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
