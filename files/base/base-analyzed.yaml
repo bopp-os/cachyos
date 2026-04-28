@@ -115,14 +115,17 @@ printing-scanning:
   - hplip
   quarterly:
   - cups
+  - cups-browsed
   - foomatic-db
   - foomatic-db-nonfree
   - foomatic-db-nonfree-ppds
   - foomatic-db-ppds
   - ghostscript
+  - ipp-usb
   - python-pyqt5
   - python-reportlab
   - sane
+  - sane-airscan
   yearly:
   - cups-pdf
   - foomatic-db-engine
@@ -233,6 +236,7 @@ cli-utilities:
   - rclone
   quarterly:
   - bottom
+  - chafa
   - conky
   - fd
   - file
@@ -341,6 +345,7 @@ media-video:
   - gpu-screen-recorder-ui
   - gst-plugin-pipewire
   - gst-plugins-bad
+  - yt-dlp
   monthly:
   - ffmpeg
   - gst-libav
@@ -361,6 +366,7 @@ gaming-core:
   - lact
   - lib32-glibc
   - lutris
+  - python-pyclip
   - sunshine
   - winboat
   quarterly:
@@ -374,13 +380,15 @@ gaming-core:
   - yad
   yearly:
   - game-devices-udev
-  - gamemode
   - gamescope-session-git
   - heroic-games-launcher
   - lib32-alsa-plugins
+  - lib32-vkd3d
   - nvtop
+  - python-pefile
   - vkbasalt
   - vkbasalt-cli
+  - vkd3d
   - xdotool
   - xorg-xwininfo
   unknown:

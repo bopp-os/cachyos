@@ -69,8 +69,11 @@ kde-utilities:
   monthly:
   - haruna
   - partitionmanager
+  quarterly:
+  - tesseract
   yearly:
   - phonon-qt6-vlc
+  - tesseract-data-eng
 kde-media:
   biweekly:
   - ffmpegthumbs

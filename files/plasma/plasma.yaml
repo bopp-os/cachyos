@@ -60,6 +60,8 @@ kde-utilities:
   - plasma-foreground-booster
   - haruna
   - phonon-qt6-vlc
+  - tesseract
+  - tesseract-data-eng
 kde-media:
   - ffmpegthumbnailer
   - ffmpegthumbs

@@ -106,6 +106,9 @@ printing-scanning:
   - hplip
   - python-pyqt5
   - python-reportlab
+  - cups-browsed
+  - ipp-usb
+  - sane-airscan
 audio:
   - pipewire-pulse
   - pipewire-alsa
@@ -211,6 +214,7 @@ cli-utilities:
   - duf
   - fsarchiver
   - pv
+  - chafa
 text-editors-ides:
   - nano
   - nano-syntax-highlighting
@@ -278,12 +282,12 @@ media-video:
   - gst-plugins-bad
   - gst-plugins-ugly
   - vlc-plugins-all
+  - yt-dlp
 gaming-core:
   - xorg-xwininfo
   - xdotool
   - yad
   - mangohud
-  - gamemode
   - lutris
   - heroic-games-launcher
   - steam
@@ -308,6 +312,10 @@ gaming-core:
   - pascube
   - vkbasalt
   - vkbasalt-cli
+  - vkd3d
+  - lib32-vkd3d
+  - python-pefile
+  - python-pyclip
 web-browsers:
   - helium-browser-bin
   - cachyos-firefox-settings

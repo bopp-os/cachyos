@@ -55,7 +55,6 @@ gnome-extensions:
   quarterly:
   - gnome-shell-extension-appindicator
   - gnome-shell-extension-caffeine
-  - gnome-shell-extension-gsconnect
   - gnome-shell-extension-vitals
   yearly:
   - gnome-browser-connector
@@ -63,6 +62,7 @@ gnome-extensions:
   - gnome-shell-extension-no-overview
   unknown:
   - gnome-shell-extension-bing-wallpaper
+  - gnome-shell-extension-gsconnect
 gnome-media:
   monthly:
   - showtime
