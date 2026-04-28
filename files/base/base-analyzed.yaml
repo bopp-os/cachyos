@@ -19,8 +19,38 @@ system-core:
   - dbus-glib
   - lua-luv
   - ufw
+system-toolchains:
+  monthly:
+  - clang
+  - llvm-libs
+dev-languages:
+  monthly:
+  - go
+  - python
+  - python-matplotlib
+  - python-numpy
+gui-frameworks:
+  biweekly:
+  - qt5-base
+  - qt6-base
+  - qt6-declarative
+  monthly:
+  - electron39
+fonts-heavy:
+  quarterly:
+  - ttf-meslo-nerd
+  yearly:
+  - noto-fonts-cjk
+gaming-runtimes:
+  biweekly:
+  - wine
+  monthly:
+  - proton-cachyos
+  - proton-cachyos-slr
+  - wine-cachyos-opt
 bootc:
   biweekly:
+  - bootc
   - containers-common
   monthly:
   - btrfs-progs
@@ -32,8 +62,6 @@ bootc:
   - e2fsprogs
   yearly:
   - dosfstools
-  unknown:
-  - bootc
 graphics-drivers:
   weekly:
   - lib32-libdisplay-info
@@ -56,22 +84,19 @@ graphics-drivers:
 fonts:
   quarterly:
   - noto-fonts
-  - ttf-meslo-nerd
   - ttf-nerd-fonts-symbols
   yearly:
   - awesome-terminal-fonts
   - cantarell-fonts
   - noto-color-emoji-fontconfig
-  - noto-fonts-cjk
   - noto-fonts-emoji
   - ttf-bitstream-vera
   - ttf-dejavu
   - ttf-liberation
+  - ttf-ms-fonts
   - ttf-nerd-fonts-symbols-mono
   - ttf-opensans
   - ttf-ubuntu-font-family
-  unknown:
-  - ttf-ms-fonts
 filesystems:
   monthly:
   - gvfs
@@ -213,13 +238,12 @@ shells:
   quarterly:
   - bash
   - fish
+  - oh-my-zsh-git
   yearly:
   - bash-completion
   - bash-preexec
   - zsh
   - zsh-completions
-  unknown:
-  - oh-my-zsh-git
 cli-utilities:
   weekly:
   - eza
@@ -251,6 +275,7 @@ cli-utilities:
   - duf
   - fsarchiver
   - jq
+  - konsave
   - pkgfile
   - procps-ng
   - ripgrep
@@ -258,9 +283,9 @@ cli-utilities:
   - tealdeer
   - wget
   - wl-clipboard
-  unknown:
-  - konsave
 text-editors-ides:
+  weekly:
+  - visual-studio-code-bin
   biweekly:
   - vim
   quarterly:
@@ -270,8 +295,6 @@ text-editors-ides:
   - micro
   - nano-syntax-highlighting
   - vi
-  unknown:
-  - visual-studio-code-bin
 devel-base:
   biweekly:
   - containers-common
@@ -355,14 +378,12 @@ gaming-core:
   - lib32-systemd
   - lsfg-vk
   - waydroid
-  - wine
   monthly:
   - coolercontrol
   - goverlay
   - lact
   - lib32-glibc
   - lutris
-  - proton-cachyos
   - sunshine
   - winboat
   quarterly:
@@ -370,23 +391,23 @@ gaming-core:
   - lib32-libx11
   - mangohud
   - openrgb
+  - openrgb-plugin-effects-git
   - pascube
   - steam
   - yad
   yearly:
+  - game-devices-udev
   - gamemode
+  - gamescope-session-git
   - heroic-games-launcher
   - lib32-alsa-plugins
   - nvtop
+  - vkbasalt
   - vkbasalt-cli
   - xdotool
   - xorg-xwininfo
   unknown:
-  - game-devices-udev
-  - gamescope-session-git
-  - openrgb-plugin-effects-git
   - udev-joystick-blacklist-git
-  - vkbasalt
 web-browsers:
   weekly:
   - firefox
@@ -401,7 +422,6 @@ development-languages:
   - php
   monthly:
   - cargo-update
-  - go
   - python-pip
   - rust
   quarterly:

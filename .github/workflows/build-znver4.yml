@@ -385,7 +385,7 @@ jobs:
           sudo podman rmi -f "$IMAGE_REF"
           sudo podman system prune -f
           sudo podman load -i "$ARCHIVE_PATH" > /tmp/podman_load_output.txt
-          sudo rm -f "$ARCHIVE_PATH"
+          sudo chmod 644 "$ARCHIVE_PATH"
 
           IMAGE_ID=$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $3}')
           sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
@@ -394,7 +394,7 @@ jobs:
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}
+          image: docker-archive:${{ github.workspace }}/rechunked_${{ matrix.flavor }}.tar
           format: spdx-json
           output-file: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
 
@@ -442,6 +442,16 @@ jobs:
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
           COSIGN_PASSWORD: ""
+
+      - name: Cleanup Flavor Assets
+        if: always()
+        run: |
+          echo "🧹 Cleaning up flavor-specific residual files..."
+          sudo rm -f ${{ github.workspace }}/rechunked_${{ matrix.flavor }}.tar
+          sudo rm -f sbom-${{ matrix.flavor }}-${{ github.sha }}.json digests.env
+          sudo podman rmi -f "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          sudo podman rmi -f "${IMAGE_REGISTRY}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
 
   cleanup:
     name: Cleanup Runner Workspace (znver4)

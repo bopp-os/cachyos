@@ -15,6 +15,27 @@ system-core:
   - gpgme
   - gnupg
   - ufw
+system-toolchains:
+  - llvm-libs
+  - clang
+dev-languages:
+  - go
+  - python
+  - python-numpy
+  - python-matplotlib
+gui-frameworks:
+  - qt5-base
+  - qt6-base
+  - qt6-declarative
+  - electron39
+fonts-heavy:
+  - noto-fonts-cjk
+  - ttf-meslo-nerd
+gaming-runtimes:
+  - proton-cachyos
+  - proton-cachyos-slr
+  - wine
+  - wine-cachyos-opt
 bootc:
   - bootc
   - dracut
@@ -45,7 +66,6 @@ fonts:
   - ttf-bitstream-vera
   - ttf-ubuntu-font-family
   - noto-fonts
-  - noto-fonts-cjk
   - noto-fonts-emoji
   - noto-color-emoji-fontconfig
   - ttf-nerd-fonts-symbols
@@ -54,7 +74,6 @@ fonts:
   - cantarell-fonts
   - ttf-liberation
   - ttf-opensans
-  - ttf-meslo-nerd
 filesystems:
   - fuse2
   - fuse3
@@ -291,8 +310,6 @@ gaming-core:
   - lib32-libx11
   - lib32-alsa-plugins
   - winboat
-  - proton-cachyos
-  - wine
   - gamescope-session-git
   - sunshine
   - lact
@@ -316,7 +333,6 @@ development-languages:
   - nodejs
   - npm
   - rust
-  - go
   - python-pip
   - python-pipx
   - ruby
