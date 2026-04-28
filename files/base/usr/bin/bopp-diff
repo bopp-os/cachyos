@@ -73,15 +73,15 @@ else
     fi
 fi
 
-log_info "📥 Downloading SBOM from target image registry via cosign..."
-if ! cosign download sbom "$TARGET_IMAGE" > /tmp/target_sbom.json 2>/dev/null; then
-    log_err "❌ Error: Failed to download SBOM from GHCR for $TARGET_IMAGE."
-    log_err "Ensure the image exists and has an attached SBOM."
+log_info "📥 Downloading package manifest from target image registry via cosign..."
+if ! cosign download sbom "$TARGET_IMAGE" > /tmp/target_manifest.json 2>/dev/null; then
+    log_err "❌ Error: Failed to download package manifest from GHCR for $TARGET_IMAGE."
+    log_err "Ensure the image exists and has an attached manifest."
     exit 1
 fi
 
-log_info "📦 Parsing SBOM for package differences..."
-jq -r '.packages[] | "\(.name) \(.versionInfo)"' /tmp/target_sbom.json | sort > /tmp/target_pkgs.txt
+log_info "📦 Parsing manifest for package differences..."
+jq -r '.packages[] | "\(.name) \(.versionInfo)"' /tmp/target_manifest.json | sort > /tmp/target_pkgs.txt
 
 awk '{print $1}' /tmp/current_pkgs.txt | sort > /tmp/curr_names.txt
 awk '{print $1}' /tmp/target_pkgs.txt | sort > /tmp/tgt_names.txt
@@ -147,4 +147,4 @@ else
     echo "==================================="
 fi
 
-rm -f /tmp/current_pkgs.txt /tmp/target_pkgs.txt /tmp/target_sbom.json /tmp/curr_names.txt /tmp/tgt_names.txt /tmp/added_names.txt /tmp/removed_names.txt /tmp/common_names.txt /tmp/curr_common.txt /tmp/tgt_common.txt /tmp/upgraded.txt /tmp/downgraded.txt /tmp/added.txt /tmp/removed.txt /tmp/up.json /tmp/down.json /tmp/add.json /tmp/rem.json
+rm -f /tmp/current_pkgs.txt /tmp/target_pkgs.txt /tmp/target_manifest.json /tmp/curr_names.txt /tmp/tgt_names.txt /tmp/added_names.txt /tmp/removed_names.txt /tmp/common_names.txt /tmp/curr_common.txt /tmp/tgt_common.txt /tmp/upgraded.txt /tmp/downgraded.txt /tmp/added.txt /tmp/removed.txt /tmp/up.json /tmp/down.json /tmp/add.json /tmp/rem.json

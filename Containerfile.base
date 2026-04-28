@@ -125,6 +125,10 @@ RUN --mount=type=tmpfs,dst=/run \
     chmod +x /tmp/install_packages.sh && \
     /tmp/install_packages.sh /tmp/base-analyzed.yaml
 
+# Generate package list for diffing
+RUN chmod +x /usr/share/boppos/generate-package-list.sh && \
+    /usr/share/boppos/generate-package-list.sh
+
 # ==========================================
 # POST-INSTALL CONFIGURATION
 # ==========================================
