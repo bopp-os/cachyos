@@ -105,7 +105,18 @@ RUN --mount=type=tmpfs,dst=/run \
     pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth || true
 
 RUN --mount=type=tmpfs,dst=/run \
-    COMPONENT_TAG="install-base" pacman -Sy --noconfirm --ask 4 --needed python python-yaml yq mesa lib32-mesa
+    COMPONENT_TAG="install-python" pacman -Sy --noconfirm --ask 4 --needed \
+    python python-yaml yq
+
+RUN --mount=type=tmpfs,dst=/run \
+    COMPONENT_TAG="install-mesa" pacman -S --noconfirm --ask 4 --needed \
+    mesa lib32-mesa mesa-utils intel-media-driver libdisplay-info lib32-libdisplay-info
+
+RUN --mount=type=tmpfs,dst=/run \
+    COMPONENT_TAG="install-vulkan" pacman -S --noconfirm --ask 4 --needed \
+    vulkan-radeon lib32-vulkan-radeon vulkan-intel lib32-vulkan-intel \
+    vulkan-nouveau lib32-vulkan-nouveau vulkan-mesa-layers lib32-vulkan-mesa-layers \
+    vulkan-icd-loader lib32-vulkan-icd-loader
 
 COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/base/base-analyzed.yaml /tmp/base-analyzed.yaml

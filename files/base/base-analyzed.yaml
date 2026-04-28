@@ -58,25 +58,6 @@ bootc:
   - e2fsprogs
   yearly:
   - dosfstools
-graphics-drivers:
-  weekly:
-  - lib32-libdisplay-info
-  - lib32-vulkan-nouveau
-  - vulkan-intel
-  - vulkan-nouveau
-  - vulkan-radeon
-  biweekly:
-  - lib32-vulkan-intel
-  - lib32-vulkan-mesa-layers
-  - lib32-vulkan-radeon
-  - vulkan-mesa-layers
-  monthly:
-  - intel-media-driver
-  - vulkan-icd-loader
-  quarterly:
-  - mesa-utils
-  yearly:
-  - libdisplay-info
 fonts:
   quarterly:
   - noto-fonts
