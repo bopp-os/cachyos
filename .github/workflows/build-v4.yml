@@ -377,6 +377,12 @@ jobs:
           sudo rm -f "$ARCHIVE_PATH"
           echo "::endgroup::"
 
+      - name: Export Image for SBOM
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Exporting uncompressed image to tarball for Syft to scan..."
+          sudo podman save "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" -o /var/tmp/sbom-image-${{ matrix.flavor }}.tar
+
       - name: Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'
         env:
@@ -412,9 +418,7 @@ jobs:
         env:
           TMPDIR: /var/tmp
         with:
-          image: ${{ env.IMAGE_REGISTRY }}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image: docker-archive:/var/tmp/sbom-image-${{ matrix.flavor }}.tar
           format: spdx-json
           output-file: sbom-${{ matrix.flavor }}-${{ github.sha }}.json
 
@@ -438,7 +442,7 @@ jobs:
         if: always()
         run: |
           echo "🧹 Cleaning up flavor-specific residual files..."
-          sudo rm -f ${{ github.workspace }}/rechunked_${{ matrix.flavor }}.tar
+          sudo rm -f /var/tmp/sbom-image-${{ matrix.flavor }}.tar
           sudo rm -f sbom-${{ matrix.flavor }}-${{ github.sha }}.json digests.env
           sudo podman rmi -f "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           sudo podman rmi -f "${IMAGE_REGISTRY}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
