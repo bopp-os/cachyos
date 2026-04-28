@@ -17,8 +17,8 @@ RUN chmod +x /tmp/install_packages.sh && \
     /tmp/install_packages.sh /tmp/plasma-analyzed.yaml
 
 # Copy Plasma-specific configuration files
-COPY files/plasma/etc /etc/
-COPY files/plasma/usr /usr/
+#COPY files/plasma/etc /etc/
+#COPY files/plasma/usr /usr/
 
 # Enable DE services
 RUN systemctl disable sddm.service || true && \
