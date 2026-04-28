@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export LC_ALL=C
+
 JSON_OUTPUT=false
 TARGET_INPUT=""
 
