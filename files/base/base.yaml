@@ -8,13 +8,31 @@ system-core:
   - dbus-glib
   - glib2
   - polkit
-  - mesa
-  - lib32-mesa
   - shadow
   - lua-luv
   - gpgme
   - gnupg
   - ufw
+system-toolchains:
+  - llvm-libs
+  - clang
+dev-languages:
+  - go
+  - python-numpy
+  - python-matplotlib
+gui-frameworks:
+  - qt5-base
+  - qt6-base
+  - qt6-declarative
+  - electron39
+fonts-heavy:
+  - noto-fonts-cjk
+  - ttf-meslo-nerd
+gaming-runtimes:
+  - proton-cachyos
+  - proton-cachyos-slr
+  - wine
+  - wine-cachyos-opt
 bootc:
   - bootc
   - dracut
@@ -25,27 +43,12 @@ bootc:
   - e2fsprogs
   - xfsprogs
   - dosfstools
-graphics-drivers:
-  - mesa-utils
-  - vulkan-icd-loader
-  - vulkan-mesa-layers
-  - vulkan-intel
-  - vulkan-radeon
-  - intel-media-driver
-  - vulkan-nouveau
-  - lib32-vulkan-mesa-layers
-  - lib32-vulkan-intel
-  - lib32-vulkan-radeon
-  - lib32-vulkan-nouveau
-  - libdisplay-info
-  - lib32-libdisplay-info
 fonts:
   - ttf-ms-fonts
   - ttf-dejavu
   - ttf-bitstream-vera
   - ttf-ubuntu-font-family
   - noto-fonts
-  - noto-fonts-cjk
   - noto-fonts-emoji
   - noto-color-emoji-fontconfig
   - ttf-nerd-fonts-symbols
@@ -54,7 +57,6 @@ fonts:
   - cantarell-fonts
   - ttf-liberation
   - ttf-opensans
-  - ttf-meslo-nerd
 filesystems:
   - fuse2
   - fuse3
@@ -104,6 +106,9 @@ printing-scanning:
   - hplip
   - python-pyqt5
   - python-reportlab
+  - cups-browsed
+  - ipp-usb
+  - sane-airscan
 audio:
   - pipewire-pulse
   - pipewire-alsa
@@ -209,6 +214,7 @@ cli-utilities:
   - duf
   - fsarchiver
   - pv
+  - chafa
 text-editors-ides:
   - nano
   - nano-syntax-highlighting
@@ -276,12 +282,12 @@ media-video:
   - gst-plugins-bad
   - gst-plugins-ugly
   - vlc-plugins-all
+  - yt-dlp
 gaming-core:
   - xorg-xwininfo
   - xdotool
   - yad
   - mangohud
-  - gamemode
   - lutris
   - heroic-games-launcher
   - steam
@@ -291,8 +297,6 @@ gaming-core:
   - lib32-libx11
   - lib32-alsa-plugins
   - winboat
-  - proton-cachyos
-  - wine
   - gamescope-session-git
   - sunshine
   - lact
@@ -308,6 +312,10 @@ gaming-core:
   - pascube
   - vkbasalt
   - vkbasalt-cli
+  - vkd3d
+  - lib32-vkd3d
+  - python-pefile
+  - python-pyclip
 web-browsers:
   - helium-browser-bin
   - cachyos-firefox-settings
@@ -316,7 +324,6 @@ development-languages:
   - nodejs
   - npm
   - rust
-  - go
   - python-pip
   - python-pipx
   - ruby

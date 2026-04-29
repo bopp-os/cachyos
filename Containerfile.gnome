@@ -2,8 +2,9 @@
 #
 # Desktop overlay containing GNOME, gaming utilities, and developer tools.
 
+ARG IMAGE_REGISTRY=ghcr.io/bopp-os
 ARG BASE_IMAGE_TAG=latest
-FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
+FROM ${IMAGE_REGISTRY}/cachyos-base:${BASE_IMAGE_TAG}
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
@@ -16,8 +17,8 @@ RUN chmod +x /tmp/install_packages.sh && \
     /tmp/install_packages.sh /tmp/gnome-analyzed.yaml
 
 # Copy GNOME-specific configuration files
-# COPY files/gnome/etc /etc/
-# COPY files/gnome/usr /usr/
+#COPY files/gnome/etc /etc/
+#COPY files/gnome/usr /usr/
 
 # Enable DE services
 # We disable SDDM if it was enabled, and enable GDM
@@ -30,3 +31,6 @@ RUN systemctl disable sddm.service || true && \
 RUN if [ -d /var/opt ] && [ "$(ls -A /var/opt)" ]; then \
         mkdir -p /usr/lib/opt && cp -r /var/opt/* /usr/lib/opt/ && rm -rf /var/opt/* ; \
     fi
+
+# Update the SBOM / Package Manifest for the overlay
+RUN /usr/share/boppos/generate-package-list.sh

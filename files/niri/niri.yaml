@@ -13,6 +13,9 @@ niri-core:
   - qt6-svg
 niri-utilities:
   - nautilus
+  - thunar
+  - thunar-archive-plugin
+  - thunar-volman
   - loupe
   - papers
   - file-roller

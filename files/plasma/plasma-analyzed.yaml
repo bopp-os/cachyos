@@ -45,6 +45,8 @@ kde-integration:
   - xdg-utils
   - xsettingsd
 kde-utilities:
+  daily:
+  - plasma-foreground-booster
   biweekly:
   - ark
   - dolphin
@@ -67,10 +69,11 @@ kde-utilities:
   monthly:
   - haruna
   - partitionmanager
+  quarterly:
+  - tesseract
   yearly:
   - phonon-qt6-vlc
-  unknown:
-  - plasma-foreground-booster
+  - tesseract-data-eng
 kde-media:
   biweekly:
   - ffmpegthumbs
@@ -86,14 +89,10 @@ kde-themes-aesthetics:
   - kde-gtk-config
   yearly:
   - appmenu-gtk-module
+  - cachyos-themes-sddm
   unknown:
-  - cachyos-emerald-kde-theme-git
   - cachyos-iridescent-kde
   - cachyos-kde-settings
-  - cachyos-lavender-kde-theme-git
-  - cachyos-nord-gtk-theme-git
-  - cachyos-nord-kde-theme-git
-  - cachyos-themes-sddm
   - char-white
 kde-meta:
   biweekly:
@@ -101,3 +100,9 @@ kde-meta:
   - plasma-workspace
   unknown:
   - plasma
+kde-git-themes:
+  unknown:
+  - cachyos-emerald-kde-theme-git
+  - cachyos-lavender-kde-theme-git
+  - cachyos-nord-gtk-theme-git
+  - cachyos-nord-kde-theme-git

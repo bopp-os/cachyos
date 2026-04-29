@@ -23,6 +23,10 @@ niri-utilities:
   - papers
   quarterly:
   - file-roller
+  - thunar
+  yearly:
+  - thunar-archive-plugin
+  - thunar-volman
 niri-applets-integration:
   biweekly:
   - kdeconnect
@@ -44,7 +48,7 @@ niri-themes-aesthetics:
   unknown:
   - cachyos-nord-gtk-theme-git
 niri-meta:
+  weekly:
+  - cachyos-niri-noctalia
   monthly:
   - niri
-  unknown:
-  - cachyos-niri-noctalia

@@ -7,7 +7,30 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 update_os() {
-    echo -e "${GREEN}==> Updating OS image (bootc)...${NC}"
+    if [ "$AUTO_YES" = true ]; then
+        echo -e "${GREEN}==> Auto-yes enabled. Skipping package diff...${NC}"
+    else
+        echo -e "${GREEN}==> Checking for OS package changes...${NC}"
+        
+        local diff_cmd=""
+        if command -v bopp-diff &> /dev/null; then
+            diff_cmd="bopp-diff"
+        elif command -v bopp-diff.sh &> /dev/null; then
+            diff_cmd="bopp-diff.sh"
+        fi
+
+        if [ -n "$diff_cmd" ]; then
+            sudo "$diff_cmd" || echo -e "${BLUE}Warning: Failed to calculate update diff.${NC}"
+            echo -ne "\n${BLUE}Proceed with the OS update? [Y/n]${NC} "
+            read -r response
+            if [[ "$response" =~ ^([nN][oO]|[nN])$ ]]; then
+                echo "OS update cancelled."
+                return
+            fi
+        fi
+    fi
+
+    echo -e "\n${GREEN}==> Updating OS image (bootc)...${NC}"
     sudo bootc upgrade
 }
 
@@ -62,6 +85,8 @@ show_help() {
     echo "  -d, --distrobox  Update all Distroboxes"
     echo "  -a, --all        Run default updates (OS, FW, Flatpak, Brew)"
     echo "                   Note: Distrobox updates must be called explicitly."
+    echo "  -y, --yes        Auto-confirm updates and skip interactive prompts (e.g. diffs)"
+    echo "  -F, --force      Alias for --yes"
     echo "  -h, --help       Show this help message"
 }
 
@@ -71,6 +96,7 @@ RUN_FW=false
 RUN_FLATPAK=false
 RUN_BREW=false
 RUN_DISTROBOX=false
+AUTO_YES=false
 
 if [ "$#" -eq 0 ]; then
     RUN_OS=true; RUN_FW=true; RUN_FLATPAK=true; RUN_BREW=true
@@ -83,6 +109,7 @@ else
             --brew) RUN_BREW=true ;;
             --distrobox) RUN_DISTROBOX=true ;;
             --all) RUN_OS=true; RUN_FW=true; RUN_FLATPAK=true; RUN_BREW=true ;;
+            --yes|-y|--force|-F) AUTO_YES=true ;;
             --help) show_help; exit 0 ;;
             -[!-]* ) # Match short flags (a single dash followed by non-dash characters)
                 flags="${1#-}"
@@ -94,6 +121,7 @@ else
                         b) RUN_BREW=true ;;
                         d) RUN_DISTROBOX=true ;;
                         a) RUN_OS=true; RUN_FW=true; RUN_FLATPAK=true; RUN_BREW=true ;;
+                        y|F) AUTO_YES=true ;;
                         h) show_help; exit 0 ;;
                         *) echo "Unknown parameter passed: -${flags:$i:1}"; show_help; exit 1 ;;
                     esac

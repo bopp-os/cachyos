@@ -1,9 +1,8 @@
 system-core:
-  weekly:
-  - mesa 
-  - lib32-mesa
   biweekly:
   - glib2
+  - linux-cachyos
+  - linux-cachyos-headers
   - systemd
   - systemd-sysvcompat
   quarterly:
@@ -17,11 +16,37 @@ system-core:
   - dbus-glib
   - lua-luv
   - ufw
-  unknown:
-  - linux-cachyos
-  - linux-cachyos-headers
+system-toolchains:
+  monthly:
+  - clang
+  - llvm-libs
+dev-languages:
+  monthly:
+  - go
+  - python-matplotlib
+  - python-numpy
+gui-frameworks:
+  biweekly:
+  - qt5-base
+  - qt6-base
+  - qt6-declarative
+  monthly:
+  - electron39
+fonts-heavy:
+  quarterly:
+  - ttf-meslo-nerd
+  yearly:
+  - noto-fonts-cjk
+gaming-runtimes:
+  biweekly:
+  - wine
+  monthly:
+  - proton-cachyos
+  - proton-cachyos-slr
+  - wine-cachyos-opt
 bootc:
   biweekly:
+  - bootc
   - containers-common
   monthly:
   - btrfs-progs
@@ -33,46 +58,22 @@ bootc:
   - e2fsprogs
   yearly:
   - dosfstools
-  unknown:
-  - bootc
-graphics-drivers:
-  weekly:
-  - lib32-libdisplay-info
-  - lib32-vulkan-nouveau
-  - vulkan-intel
-  - vulkan-nouveau
-  - vulkan-radeon
-  biweekly:
-  - lib32-vulkan-intel
-  - lib32-vulkan-mesa-layers
-  - lib32-vulkan-radeon
-  - vulkan-mesa-layers
-  monthly:
-  - intel-media-driver
-  - vulkan-icd-loader
-  quarterly:
-  - mesa-utils
-  yearly:
-  - libdisplay-info
 fonts:
   quarterly:
   - noto-fonts
-  - ttf-meslo-nerd
   - ttf-nerd-fonts-symbols
   yearly:
   - awesome-terminal-fonts
   - cantarell-fonts
-  - noto-fonts-cjk
+  - noto-color-emoji-fontconfig
   - noto-fonts-emoji
   - ttf-bitstream-vera
   - ttf-dejavu
   - ttf-liberation
+  - ttf-ms-fonts
   - ttf-nerd-fonts-symbols-mono
   - ttf-opensans
   - ttf-ubuntu-font-family
-  unknown:
-  - noto-color-emoji-fontconfig
-  - ttf-ms-fonts
 filesystems:
   monthly:
   - gvfs
@@ -103,26 +104,28 @@ archiving:
   - p7zip
   - rpmextract
   - sharutils
+  - unace
   - unarj
   - unp
   - unzip
   - zip
-  unknown:
-  - unace
 printing-scanning:
   monthly:
   - cups-filters
   - hplip
   quarterly:
   - cups
+  - cups-browsed
   - foomatic-db
   - foomatic-db-nonfree
   - foomatic-db-nonfree-ppds
   - foomatic-db-ppds
   - ghostscript
+  - ipp-usb
   - python-pyqt5
   - python-reportlab
   - sane
+  - sane-airscan
   yearly:
   - cups-pdf
   - foomatic-db-engine
@@ -169,6 +172,7 @@ networking:
   - bluez-hid2hci
   - bluez-libs
   - bluez-utils
+  - cloudflare-warp-bin
   - ethtool
   - modemmanager
   - openvpn
@@ -182,9 +186,10 @@ networking:
   - wpa_supplicant
   - xl2tpd
   unknown:
-  - cloudflare-warp-bin
   - dnsutils
 hardware-management:
+  biweekly:
+  - chwd
   monthly:
   - cpupower
   - fwupd
@@ -205,7 +210,6 @@ hardware-management:
   - sg3_utils
   - xdg-user-dirs
   unknown:
-  - chwd
   - dmemcg-booster
 shells:
   monthly:
@@ -214,13 +218,12 @@ shells:
   quarterly:
   - bash
   - fish
+  - oh-my-zsh-git
   yearly:
   - bash-completion
   - bash-preexec
   - zsh
   - zsh-completions
-  unknown:
-  - oh-my-zsh-git
 cli-utilities:
   weekly:
   - eza
@@ -233,6 +236,7 @@ cli-utilities:
   - rclone
   quarterly:
   - bottom
+  - chafa
   - conky
   - fd
   - file
@@ -252,6 +256,7 @@ cli-utilities:
   - duf
   - fsarchiver
   - jq
+  - konsave
   - pkgfile
   - procps-ng
   - ripgrep
@@ -259,9 +264,9 @@ cli-utilities:
   - tealdeer
   - wget
   - wl-clipboard
-  unknown:
-  - konsave
 text-editors-ides:
+  weekly:
+  - visual-studio-code-bin
   biweekly:
   - vim
   quarterly:
@@ -271,8 +276,6 @@ text-editors-ides:
   - micro
   - nano-syntax-highlighting
   - vi
-  unknown:
-  - visual-studio-code-bin
 devel-base:
   biweekly:
   - containers-common
@@ -289,10 +292,9 @@ devel-base:
   - git-lfs
   yearly:
   - make
+  - paru
   - patch
   - tig
-  unknown:
-  - paru
 containers:
   biweekly:
   - docker-compose
@@ -305,10 +307,11 @@ containers:
   - distrobox
   - podman-compose
 schedulers:
-  unknown:
+  monthly:
+  - scx-tools-git
+  quarterly:
   - scx-manager
   - scx-scheds-git
-  - scx-tools-git
 desktop-integration:
   biweekly:
   - gtk4
@@ -330,17 +333,21 @@ desktop-integration:
   - libxss
   - xdg-utils
 themes-aesthetics:
-  unknown:
+  yearly:
   - cachyos-plymouth-bootanimation
   - cachyos-plymouth-theme
+  unknown:
   - cachyos-wallpapers
 media-video:
+  weekly:
+  - mpv-git
   biweekly:
+  - gpu-screen-recorder-ui
   - gst-plugin-pipewire
   - gst-plugins-bad
+  - yt-dlp
   monthly:
   - ffmpeg
-  - gpu-screen-recorder-ui
   - gst-libav
   - gst-plugins-ugly
   - vlc
@@ -348,51 +355,50 @@ media-video:
   yearly:
   - ffmpegthumbnailer
   - libdvdcss
-  unknown:
-  - mpv-git
 gaming-core:
   biweekly:
   - lib32-systemd
+  - lsfg-vk
   - waydroid
-  - wine
   monthly:
+  - coolercontrol
   - goverlay
   - lact
   - lib32-glibc
   - lutris
+  - python-pyclip
+  - sunshine
+  - winboat
   quarterly:
   - lib32-gcc-libs
   - lib32-libx11
   - mangohud
   - openrgb
+  - openrgb-plugin-effects-git
+  - pascube
   - steam
   - yad
   yearly:
-  - gamemode
-  - lib32-alsa-plugins
-  - nvtop
-  - xdotool
-  - xorg-xwininfo
-  unknown:
-  - coolercontrol
   - game-devices-udev
   - gamescope-session-git
   - heroic-games-launcher
-  - lsfg-vk
-  - openrgb-plugin-effects-git
-  - pascube
-  - proton-cachyos
-  - sunshine
-  - udev-joystick-blacklist-git
+  - lib32-alsa-plugins
+  - lib32-vkd3d
+  - nvtop
+  - python-pefile
   - vkbasalt
   - vkbasalt-cli
-  - winboat
+  - vkd3d
+  - xdotool
+  - xorg-xwininfo
+  unknown:
+  - udev-joystick-blacklist-git
 web-browsers:
   weekly:
   - firefox
-  unknown:
-  - cachyos-firefox-settings
   - helium-browser-bin
+  yearly:
+  - cachyos-firefox-settings
 development-languages:
   biweekly:
   - cargo-binstall
@@ -401,7 +407,6 @@ development-languages:
   - php
   monthly:
   - cargo-update
-  - go
   - python-pip
   - rust
   quarterly:
@@ -411,16 +416,19 @@ development-languages:
   yearly:
   - python-defusedxml
 cachyos-settings:
-  unknown:
+  weekly:
   - cachyos-ananicy-rules
+  biweekly:
+  - cachyos-settings
+  quarterly:
   - cachyos-fish-config
+  yearly:
   - cachyos-micro-settings
   - cachyos-samba-settings
-  - cachyos-settings
   - cachyos-zsh-config
 base-meta:
+  quarterly:
+  - cachyos-gaming-meta
   yearly:
   - base-devel
-  unknown:
   - cachyos-gaming-applications
-  - cachyos-gaming-meta

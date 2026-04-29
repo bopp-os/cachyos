@@ -12,7 +12,6 @@ gnome-core:
   - xorg-xwayland
   quarterly:
   - gdm
-  - gnome-backgrounds
   - gnome-console
   - gnome-session
   - gnome-tweaks
@@ -52,26 +51,52 @@ gnome-themes:
 gnome-extensions:
   monthly:
   - gnome-shell-extension-arc-menu
+  - gnome-shell-extension-dash-to-dock
   quarterly:
   - gnome-shell-extension-appindicator
   - gnome-shell-extension-caffeine
+  - gnome-shell-extension-gsconnect
   - gnome-shell-extension-vitals
   yearly:
   - gnome-browser-connector
+  - gnome-shell-extension-gnome-ui-tune-git
+  - gnome-shell-extension-no-overview
   unknown:
   - gnome-shell-extension-bing-wallpaper
-  - gnome-shell-extension-dash-to-dock
-  - gnome-shell-extension-gnome-ui-tune-git
-  - gnome-shell-extension-gsconnect
-  - gnome-shell-extension-no-overview
 gnome-media:
   monthly:
   - showtime
   yearly:
   - celluloid
   - sushi
+gnome-webkit:
+  biweekly:
+  - webkit2gtk-4.1
+  - webkitgtk-6.0
+gnome-input-methods:
+  quarterly:
+  - ibus
+gnome-js-engine:
+  monthly:
+  - gjs
+gnome-static-assets:
+  quarterly:
+  - gnome-backgrounds
+  - gnome-user-docs
+gnome-webdav-server:
+  quarterly:
+  - apache
+  yearly:
+  - apr
+  - apr-util
 gnome-meta:
   biweekly:
   - gnome-shell
+  quarterly:
+  - baobab
+  - gnome-clocks
+  yearly:
+  - gnome-characters
+  - gnome-font-viewer
   unknown:
   - gnome

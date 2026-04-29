@@ -2,8 +2,9 @@
 #
 # Desktop overlay containing KDE Plasma, gaming utilities, and developer tools.
 
+ARG IMAGE_REGISTRY=ghcr.io/bopp-os
 ARG BASE_IMAGE_TAG=latest
-FROM ghcr.io/bopp-os/cachyos-base:${BASE_IMAGE_TAG}
+FROM ${IMAGE_REGISTRY}/cachyos-base:${BASE_IMAGE_TAG}
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
@@ -16,8 +17,8 @@ RUN chmod +x /tmp/install_packages.sh && \
     /tmp/install_packages.sh /tmp/plasma-analyzed.yaml
 
 # Copy Plasma-specific configuration files
-# COPY files/plasma/etc /etc/
-# COPY files/plasma/usr /usr/
+#COPY files/plasma/etc /etc/
+#COPY files/plasma/usr /usr/
 
 # Enable DE services
 RUN systemctl disable sddm.service || true && \
@@ -29,3 +30,6 @@ RUN systemctl disable sddm.service || true && \
 RUN if [ -d /var/opt ] && [ "$(ls -A /var/opt)" ]; then \
         mkdir -p /usr/lib/opt && cp -r /var/opt/* /usr/lib/opt/ && rm -rf /var/opt/* ; \
     fi
+
+# Update the SBOM / Package Manifest for the overlay
+RUN /usr/share/boppos/generate-package-list.sh
