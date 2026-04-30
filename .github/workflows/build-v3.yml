@@ -75,7 +75,7 @@ jobs:
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar
           
           # 3. Prune dangling Podman data AND aggressively wipe the build cache
-          sudo podman system prune --all --force --build
+          sudo podman system prune --all --force --volumes --build
           
           # 4. Wipe the Podman package cache if the manual UI toggle was checked
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
@@ -256,7 +256,7 @@ jobs:
           sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
           
           # 3. Prune dangling (<none>) images AND the intermediate build cache
-          sudo podman system prune --all --force --build
+          sudo podman system prune --all --force --volumes --build
           
           # 4. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
@@ -459,7 +459,7 @@ jobs:
           echo "🧹 Sweeping up the heavy Podman assets..."
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman*
           sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
-          sudo podman system prune --all --force --build
+          sudo podman system prune --all --force --volumes --build
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
             echo "✨ All flavors built successfully. Removing base tarball and workspace..."
             sudo rm -f /var/tmp/cachyos-base-${{ github.sha }}.tar
