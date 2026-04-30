@@ -12,7 +12,7 @@ USER root
 
 # Minimal setup: just enough to build packages
 RUN pacman-key --init && \
-    echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
+    echo "no-tty" >> /etc/pacman.d/gpg.conf && \
     pacman-key --populate archlinux cachyos && \
     pacman-key --recv-keys F3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB 3056513887B78AEB && \
     pacman-key --lsign-key F3B607488DB35A47 && \
@@ -44,18 +44,18 @@ COPY --chown=builduser:builduser ./files/aur/pkgbuilds/scopebuddy-git/ /tmp/scop
 COPY --chown=root:root ./files/aur/bootcrew-shared/ /bootcrew-shared/
 
 # Build Scopebuddy
-RUN sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -C /tmp/scopebuddy-git/ && \
-    chown -R builduser:builduser /tmp/scopebuddy-git/ && \
+RUN cd /tmp/scopebuddy-git/ && \
+    sudo -E -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -c && \
     rm -rf /tmp/scopebuddy-git/
 
 # Build autofs
-RUN sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -C /tmp/autofs/ && \
-    chown -R builduser:builduser /tmp/autofs/ && \
+RUN cd /tmp/autofs/ && \
+    sudo -E -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -c && \
     rm -rf /tmp/autofs/
 
 # Build sddm-theme-noctalia-git
-RUN sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -C /tmp/sddm-theme-noctalia-git/ && \
-    chown -R builduser:builduser /tmp/sddm-theme-noctalia-git/ && \
+RUN cd /tmp/sddm-theme-noctalia-git/ && \
+    sudo -E -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -c && \
     rm -rf /tmp/sddm-theme-noctalia-git/
 
 # Stage exported files for the base image
