@@ -71,7 +71,7 @@ jobs:
           fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman*
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar
           
           # 3. Prune dangling Podman data AND aggressively wipe the build cache
           sudo podman system prune --all --force --build
@@ -463,11 +463,14 @@ jobs:
       - name: Clean Workspace & Podman Storage
         run: |
           echo "🧹 Sweeping up the heavy Podman assets..."
-          sudo rm -f /var/tmp/cachyos-base-${{ github.sha }}.tar
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman*
           sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
           sudo podman system prune --all --force --build
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
+            echo "✨ All flavors built successfully. Removing base tarball and workspace..."
+            sudo rm -f /var/tmp/cachyos-base-${{ github.sha }}.tar
             sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
+          else
+            echo "⚠️ Some flavors failed. Preserving base tarball for retry."
           fi
           df -h /
