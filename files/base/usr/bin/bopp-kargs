@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+# bopp-kargs: Deployment & karg manager for BoppOS/bootc.
+# Fixed: ANSI C-quoted color variables for proper sed/diff colorization.
+
+BIN_NAME="bopp-kargs"
+BACKUP_DIR="/var/lib/${BIN_NAME}/backups"
+BLS_DIR="/boot/loader/entries"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+ACTIVE_EDITOR="${SUDO_EDITOR:-${VISUAL:-${EDITOR:-vi}}}"
+
+# --- Colors & Styling ---
+# Using ANSI C-quoting ($'\e') embeds the literal escape byte into the variable,
+# ensuring it survives being piped through sed and awk.
+C_RESET=$'\e[0m'
+C_BOLD=$'\e[1m'
+C_RED=$'\e[31m'
+C_GREEN=$'\e[32m'
+C_YELLOW=$'\e[33m'
+C_BLUE=$'\e[34m'
+C_CYAN=$'\e[36m'
+
+log_info() { echo -e "${C_BLUE}[INFO]${C_RESET} $*"; }
+log_warn() { echo -e "${C_YELLOW}[WARN]${C_RESET} $*"; }
+log_err()  { echo -e "${C_RED}[ERROR]${C_RESET} $*" >&2; exit 1; }
+
+pad() {
+    local str="$1"
+    local len=$2
+    printf "%-${len}s" "$str"
+}
+
+usage() {
+    cat <<EOF
+Usage: ${BIN_NAME} [OPTIONS] COMMAND [ARGS]
+
+A tool for managing Boot Loader Specification (BLS) kernel arguments.
+
+Commands:
+  status            List all deployments, including Pinned and Staged states.
+  list [index]      Show detailed kernel arguments for a deployment (default: 0).
+  edit [index]      Interactively edit kernel arguments (uses ${ACTIVE_EDITOR}).
+  add <arg>         Appends a new kernel argument to the current deployment.
+  remove <arg>      Removes a specific kernel argument.
+  diff [idx1] [idx2] Compares arguments between two deployments (default: 0 and 1).
+
+Options:
+  -h, --help        Show this help message
+EOF
+    exit 0
+}
+
+# --- Detection Logic ---
+
+find_bls_match() {
+    local deploy_hash="$1"
+    local index="$2"
+    local match=""
+
+    match=$(grep -l "$deploy_hash" "${BLS_DIR}"/*.conf 2>/dev/null | head -n 1 || true)
+
+    if [[ -z "$match" ]]; then
+        local files=($(ls -1 "${BLS_DIR}"/*.conf 2>/dev/null | sort -rV || true))
+        if [[ "$index" -lt "${#files[@]}" ]]; then
+            match="${files[$index]}"
+        fi
+    fi
+    echo "$match"
+}
+
+get_bls_by_index() {
+    local idx="$1"
+    local hash=$(ostree admin status | grep -oE '[0-9a-f]{64}' | sed -n "$((idx + 1))p" || true)
+    if [[ -n "$hash" ]]; then
+        find_bls_match "$hash" "$idx"
+    fi
+}
+
+# --- Core Logic ---
+
+print_deployment_row() {
+    local idx="$1"
+    local d_hash="$2"
+    local booted="$3"
+    local pinned="$4"
+    local staged="$5"
+
+    local raw_status="Available"
+    if [[ "$booted" == "Yes" ]]; then raw_status="Booted"
+    elif [[ "$idx" -eq 1 ]]; then raw_status="Fallback"
+    fi
+    if [[ "$staged" == "Yes" ]]; then raw_status="Staged"
+    fi
+
+    local bls_path=$(find_bls_match "$d_hash" "$idx")
+    local raw_bls="[NOT FOUND]"
+    if [[ -n "$bls_path" ]]; then
+        raw_bls=$(basename "$bls_path")
+    fi
+
+    local f_idx=$(pad "$idx" 7)
+    local f_stat=$(pad "$raw_status" 12)
+    local f_pin=$(pad "$pinned" 9)
+    local f_hash=$(pad "${d_hash:0:12}..." 16)
+    local f_bls="$raw_bls"
+
+    case "$raw_status" in
+        "Booted")   f_stat="${C_GREEN}${f_stat}${C_RESET}" ;;
+        "Fallback") f_stat="${C_YELLOW}${f_stat}${C_RESET}" ;;
+        "Staged")   f_stat="${C_CYAN}${f_stat}${C_RESET}" ;;
+    esac
+
+    if [[ "$pinned" == "Yes" ]]; then
+        f_pin="${C_CYAN}${f_pin}${C_RESET}"
+    fi
+
+    if [[ "$raw_bls" == "[NOT FOUND]" ]]; then
+        f_bls="${C_RED}${f_bls}${C_RESET}"
+    fi
+
+    echo -e "${f_idx} ${f_stat} ${f_pin} ${f_hash} ${f_bls}"
+}
+
+cmd_status() {
+    echo -e "${C_BOLD}Index   Status       Pinned?   Hash (Short)     BLS File${C_RESET}"
+    echo -e "${C_BOLD}-----   ------       -------   ------------     --------${C_RESET}"
+
+    local current_hash=""
+    local is_booted="No"
+    local is_pinned="No"
+    local is_staged="No"
+    local index=0
+
+    while IFS= read -r line; do
+        if echo "$line" | grep -qE '[0-9a-f]{64}'; then
+            if [[ -n "$current_hash" ]]; then
+                print_deployment_row "$index" "$current_hash" "$is_booted" "$is_pinned" "$is_staged"
+                index=$((index + 1))
+            fi
+
+            current_hash=$(echo "$line" | grep -oE '[0-9a-f]{64}' || true)
+            is_booted="No"
+            is_pinned="No"
+            is_staged="No"
+
+            [[ "$line" =~ ^\* ]] && is_booted="Yes"
+            [[ "$line" =~ "(staged)" ]] && is_staged="Yes"
+            [[ "$line" =~ "(pinned)" ]] && is_pinned="Yes"
+        else
+            if [[ "${line,,}" =~ "pinned" ]]; then
+                is_pinned="Yes"
+            fi
+        fi
+    done < <(ostree admin status || true)
+
+    if [[ -n "$current_hash" ]]; then
+        print_deployment_row "$index" "$current_hash" "$is_booted" "$is_pinned" "$is_staged"
+    fi
+}
+
+cmd_list() {
+    local index=${1:-0}
+    local bls=$(get_bls_by_index "$index")
+
+    if [[ -z "$bls" ]]; then log_err "Could not find BLS file for index $index."; fi
+
+    local bname=$(basename "$bls")
+    echo -e "\n${C_BOLD}--- Kernel Arguments: [$index] $bname ---${C_RESET}"
+    grep '^options' "$bls" | sed 's/^options //' | tr ' ' '\n'
+}
+
+cmd_edit() {
+    local index=${1:-0}
+    local bls=$(get_bls_by_index "$index")
+
+    if [[ -z "$bls" ]]; then log_err "Could not find BLS file for index $index."; fi
+
+    local tmp=$(mktemp)
+    local original_line=$(grep '^options' "$bls" || true)
+
+    echo "$original_line" | sed 's/^options //' > "$tmp"
+
+    local bname=$(basename "$bls")
+    mkdir -p "${BACKUP_DIR}"
+    cp "$bls" "${BACKUP_DIR}/${bname}.${TIMESTAMP}.bak"
+
+    $ACTIVE_EDITOR "$tmp"
+
+    local new_opts=$(cat "$tmp" | tr '\n' ' ' | xargs)
+    if [[ ! "$new_opts" =~ ostree= ]]; then
+        log_err "CRITICAL: 'ostree=' argument missing! Edit aborted to prevent bricking."
+    fi
+
+    if [[ "options $new_opts" != "$original_line" ]]; then
+        sed -i "s|^options .*|options ${new_opts}|" "$bls"
+        log_info "Changes applied to $bname."
+    else
+        log_info "No changes detected."
+    fi
+    rm -f "$tmp"
+}
+
+cmd_diff() {
+    local idx1=${1:-0}
+    local idx2=${2:-1}
+
+    local bls1=$(get_bls_by_index "$idx1")
+    local bls2=$(get_bls_by_index "$idx2")
+
+    if [[ -z "$bls1" || -z "$bls2" ]]; then
+        log_err "Could not locate BLS files for indices $idx1 and/or $idx2."
+    fi
+
+    local opts1=$(grep '^options' "$bls1" | sed 's/^options //' | tr ' ' '\n' | sort || true)
+    local opts2=$(grep '^options' "$bls2" | sed 's/^options //' | tr ' ' '\n' | sort || true)
+
+    local bname1=$(basename "$bls1")
+    local bname2=$(basename "$bls2")
+
+    echo -e "\n${C_BOLD}--- Comparing Deployment [$idx1] vs [$idx2] ---${C_RESET}"
+    echo -e "${C_RED}(-) $bname1${C_RESET}"
+    echo -e "${C_GREEN}(+) $bname2${C_RESET}\n"
+
+    diff -u <(echo "$opts1") <(echo "$opts2") | tail -n +3 | \
+        sed -e 's/^\(-.*\)/'"${C_RED}"'\1'"${C_RESET}"'/' -e 's/^\(+.*\)/'"${C_GREEN}"'\1'"${C_RESET}"'/' || true
+}
+
+# --- Main Execution ---
+
+if [[ $EUID -ne 0 ]]; then
+    log_err "This script must be run with sudo."
+fi
+
+if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" || "$1" == "-help" ]]; then
+    usage
+fi
+
+COMMAND=$1
+shift || true
+
+case "$COMMAND" in
+    status) cmd_status ;;
+    list)   cmd_list "${1:-0}" ;;
+    edit)   cmd_edit "${1:-0}" ;;
+    diff)   cmd_diff "${1:-0}" "${2:-1}" ;;
+    add)
+            if [[ -z "${1:-}" ]]; then log_err "Usage: add <argument>"; fi
+            bls=$(get_bls_by_index 0)
+            if [[ -z "$bls" ]]; then log_err "Could not find booted BLS entry."; fi
+            sed -i "/^options / s/$/ $1/" "$bls"
+
+            bname=$(basename "$bls")
+            log_info "Added '$1' to $bname."
+            ;;
+    remove)
+            if [[ -z "${1:-}" ]]; then log_err "Usage: remove <argument>"; fi
+            bls=$(get_bls_by_index 0)
+            if [[ -z "$bls" ]]; then log_err "Could not find booted BLS entry."; fi
+            sed -i "s/\b$1\b//g" "$bls"
+
+            bname=$(basename "$bls")
+            log_info "Removed '$1' from $bname."
+            ;;
+    *)      usage ;;
+esac
