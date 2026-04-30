@@ -1,0 +1,6 @@
+pkg
+src
+autofs-5.1.9-*.patch
+*.sign
+*.tar.xz
+*.tar.zst

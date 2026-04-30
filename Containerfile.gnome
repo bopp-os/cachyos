@@ -17,6 +17,8 @@ RUN chmod +x /tmp/install_packages.sh && \
     /tmp/install_packages.sh /tmp/gnome-analyzed.yaml
 
 # Copy GNOME-specific configuration files
+# These are commented out intentionally. Git does not track empty directories,
+# and including these lines would cause the build to fail if the dirs are empty.
 #COPY files/gnome/etc /etc/
 #COPY files/gnome/usr /usr/
 
@@ -28,8 +30,8 @@ RUN systemctl disable sddm.service || true && \
 
 # Preserve /opt contents for OverlayFS
 # (visual-studio-code-bin and others install here)
-RUN if [ -d /var/opt ] && [ "$(ls -A /var/opt)" ]; then \
-        mkdir -p /usr/lib/opt && cp -r /var/opt/* /usr/lib/opt/ && rm -rf /var/opt/* ; \
+RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
+        mkdir -p /usr/lib/opt && cp -r /opt/* /usr/lib/opt/ && rm -rf /opt/* ; \
     fi
 
 # Update the SBOM / Package Manifest for the overlay

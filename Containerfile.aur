@@ -18,7 +18,7 @@ RUN pacman-key --init && \
     pacman-key --lsign-key F3B607488DB35A47 && \
     pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB && \
     pacman-key --lsign-key 3056513887B78AEB && \
-    sed -i 's/^#*ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
+    sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
     pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring cachyos-mirrorlist cachyos-v3-mirrorlist cachyos-v4-mirrorlist cachyos-hooks chwd cachyos-rate-mirrors lsb-release gpgme && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
     cachyos-rate-mirrors && \
@@ -35,26 +35,28 @@ RUN pacman-key --init && \
     mkdir -p /home/builduser/packages && \
     chown -R builduser:builduser /home/builduser
 
+# Copy pkgbuilds from the new location
+COPY --chown=builduser:builduser ./files/aur/pkgbuilds/sddm-theme-noctalia-git/ /tmp/sddm-theme-noctalia-git/
+COPY --chown=builduser:builduser ./files/aur/pkgbuilds/autofs/ /tmp/autofs/
+COPY --chown=builduser:builduser ./files/aur/pkgbuilds/scopebuddy-git/ /tmp/scopebuddy-git/
+
+# Copy bootcrew-shared files from the new location
+COPY --chown=root:root ./files/aur/bootcrew-shared/ /bootcrew-shared/
+
 # Build Scopebuddy
-RUN git clone https://aur.archlinux.org/scopebuddy-git.git /tmp/scopebuddy && \
-    chown -R builduser:builduser /tmp/scopebuddy && \
-    cd /tmp/scopebuddy && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
+RUN sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -C /tmp/scopebuddy-git/ && \
+    chown -R builduser:builduser /tmp/scopebuddy-git/ && \
+    rm -rf /tmp/scopebuddy-git/
 
 # Build autofs
-RUN git clone https://aur.archlinux.org/autofs.git /tmp/autofs && \
-    chown -R builduser:builduser /tmp/autofs && \
-    cd /tmp/autofs && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
+RUN sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -C /tmp/autofs/ && \
+    chown -R builduser:builduser /tmp/autofs/ && \
+    rm -rf /tmp/autofs/
 
 # Build sddm-theme-noctalia-git
-RUN git clone https://aur.archlinux.org/sddm-theme-noctalia-git.git /tmp/sddm-theme-noctalia-git && \
-    chown -R builduser:builduser /tmp/sddm-theme-noctalia-git && \
-    cd /tmp/sddm-theme-noctalia-git && \
-    sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg
-
-# Clone bootcrew/mono to access their shared setup scripts
-RUN git clone https://github.com/bootcrew/mono.git /tmp/bootcrew-mono
+RUN sudo -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -C /tmp/sddm-theme-noctalia-git/ && \
+    chown -R builduser:builduser /tmp/sddm-theme-noctalia-git/ && \
+    rm -rf /tmp/sddm-theme-noctalia-git/
 
 # Stage exported files for the base image
 RUN mkdir -p /export-pkgs && \

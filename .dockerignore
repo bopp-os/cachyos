@@ -1,0 +1,3 @@
+# Exclude .git directories from being copied
+.git/
+.gitignore

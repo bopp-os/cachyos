@@ -91,7 +91,7 @@ RUN export COMPONENT_TAG="arch-optimizations" && \
     if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
         echo "Architecture $TARGET_CPU_MARCH detected. Reinstalling packages for Zen 4/5 optimization..." && \
         pacman -Syy && \
-        PKGS=$(pacman -Qqn) && pacman -S --noconfirm $PKGS ; \
+        pacman -Qqn | pacman -S --noconfirm - ; \
     else \
         echo "Architecture $TARGET_CPU_MARCH detected. Using standard image repositories." ; \
     fi && \
@@ -200,7 +200,7 @@ RUN --mount=type=tmpfs,dst=/run \
     mkdir -p /usr/lib/dracut/dracut.conf.d/ && \
     printf "systemdsystemconfdir=/etc/systemd/system\nsystemdsystemunitdir=/usr/lib/systemd/system\n" | tee /usr/lib/dracut/dracut.conf.d/30-bootcrew-fix-bootc-module.conf && \
     printf 'reproducible=yes\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc "' | tee "/usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf" && \
-    dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | tail -n 1)/initramfs.img"
+    dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)/initramfs.img"
 
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
