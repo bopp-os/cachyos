@@ -22,7 +22,7 @@ COPY --from=brew /system_files /
 RUN setfattr -n user.component -v "homebrew" "/usr/share/homebrew.tar.zst"
 
 # Copy the shared directory from the bootcrew/mono repo
-COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /tmp/bootcrew-mono/shared /bootcrew-shared
+COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /bootcrew-shared /bootcrew-shared
 
 # Copy configured pacman environment from aur_builder
 COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /etc/pacman.conf /etc/pacman.conf
