@@ -34,9 +34,17 @@ This is all very experimental. So use at your own risk.
 - **Desktop First:** Stripped away Steam Deck/handheld-specific UI elements and scaling tweaks in favor of standard desktop environments (with support for KDE Plasma, GNOME, and Niri).
 - **Developer Ready:** Pre-installed essentials like Distrobox, Homebrew (`brew`), Docker, VS Code, Node.js, Rust, and Python.
 - **Streamlined Management:** Integrated `just` for simplified building and introduced custom tools for easy system administration:
-  - **OS Updates:** Seamlessly update your atomic system.
+  - **System Update Manager (`boppos-update`):** A comprehensive update script that seamlessly updates your OS (`bootc`), firmware, Flatpaks, Homebrew, and Distroboxes. Includes an interactive package diff preview.
     ```bash
     boppos-update
+    ```
+  - **Package Diff Tool (`bopp-diff`):** Analyzes the current running system against staged or upstream `bootc` images and provides a clear breakdown of upgraded, downgraded, added, or removed packages.
+    ```bash
+    sudo bopp-diff
+    ```
+  - **Kernel Arguments Manager (`bopp-kargs`):** A utility to easily view, edit, add, remove, and diff Boot Loader Specification (BLS) kernel arguments for your atomic deployments.
+    ```bash
+    sudo bopp-kargs help
     ```
   - **TPM Refresh:** Easily re-enroll LUKS/TPM2 decryption keys after system updates.
     ```bash
@@ -46,7 +54,7 @@ This is all very experimental. So use at your own risk.
     ```bash
     sudo bopp-migrate
     ```
-- **Optional Flatpaks:** Includes an interactive script to easily fetch, customize, and install a curated list of essential Flatpak applications. To use it, simply open your terminal and run:
+- **Optional Flatpaks (`install-optional-flatpaks`):** Includes an interactive script to easily fetch, customize, and install a curated list of essential Flatpak applications (sourced from Bazzite-DX and BoppOS). To use it, simply open your terminal and run:
   ```bash
   install-optional-flatpaks
   ```
@@ -63,6 +71,40 @@ To use the migration tool, run it with `sudo` after booting into BoppOS for the 
 
 ```bash
 sudo bopp-migrate
+```
+
+## Installation & Switching
+
+This image is designed to be managed by `bootc`. The recommended and easiest way to install BoppOS is to switch an existing `bootc`-based OS directly to it without losing your data. Alternatively, you can perform a fresh installation on a new system.
+
+### 1. Switching from an Existing bootc OS (Recommended)
+
+If you are already running a `bootc`-based system (e.g., Bazzite, Bluefin, or Fedora Atomic desktops with bootc), you can switch to BoppOS directly without needing to reformat or reinstall. This is one of the major advantages of `bootc`.
+
+To switch, run the following command, pointing to the BoppOS image in your registry:
+
+```bash
+sudo bootc switch ghcr.io/bopp-os/cachyos-plasma:latest
+```
+
+Your system will download the new image and stage it for the next boot.
+
+**Note on Signature Verification**: For a secure transition, you may need to configure your system to trust the signature of the new image. The `Containerfile` includes a `cosign.pub` key and `policy.json`, which you may need to adapt for your registry and signing setup.
+
+### 2. Fresh Installation
+
+After building the container image, you can:
+
+1.  Push it to a container registry (like `ghcr.io`, `quay.io`, or a local registry).
+2.  Use `bootc install` from a live environment to install CachyOS BoppOS to a target disk.
+
+For detailed installation instructions, refer to the official bootc documentation.
+
+A typical installation command would look like this:
+
+```bash
+# Example:
+bootc install to-disk --image ghcr.io/bopp-os/cachyos-plasma:latest /dev/sdX
 ```
 
 ## Build Instructions
@@ -106,40 +148,6 @@ just build znver4 base
 # 2. Build your preferred flavor (e.g., plasma, gnome, niri)
 just build znver4 plasma
 ```
-
-## Installation & Switching
-
-This image is designed to be managed by `bootc`. You can either perform a fresh installation on a new system or switch an existing `bootc`-based OS to BoppOS without losing your data.
-
-### Fresh Installation
-
-After building the container image, you can:
-
-1.  Push it to a container registry (like `ghcr.io`, `quay.io`, or a local registry).
-2.  Use `bootc install` from a live environment to install CachyOS BoppOS to a target disk.
-
-For detailed installation instructions, refer to the [official bootc documentation](https://bootc-dev.github.io/book/installation.html).
-
-A typical installation command would look like this:
-
-```bash
-# Example:
-bootc install to-disk --image ghcr.io/bopp-os/cachyos-plasma:latest /dev/sdX
-```
-
-### Switching from an Existing bootc OS (e.g., Bazzite)
-
-If you are already running a `bootc`-based system, you can switch to BoppOS directly without needing to reformat or reinstall. This is one of the major advantages of `bootc`.
-
-To switch, run the following command, pointing to the BoppOS image in your registry:
-
-```bash
-sudo bootc switch ghcr.io/bopp-os/cachyos-plasma:latest
-```
-
-Your system will download the new image and stage it for the next boot.
-
-**Note on Signature Verification**: For a secure transition, you may need to configure your system to trust the signature of the new image. The `Containerfile` includes a `cosign.pub` key and `policy.json`, which you may need to adapt for your registry and signing setup.
 
 ### Switching to a Local Build
 
