@@ -158,7 +158,7 @@ fi
 DIFF_OUTPUT=""
 if [[ "${UPDATE_AVAILABLE}" == "true" ]] && command -v bopp-diff &>/dev/null; then
     # bopp-diff compares current vs staged package lists; run non-interactively
-    DIFF_OUTPUT=$(bopp-diff --staged 2>&1 || true)
+    DIFF_OUTPUT=$(bopp-diff 2>&1 || true)
 fi
 
 write_status \
