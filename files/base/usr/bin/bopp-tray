@@ -289,7 +289,7 @@ class BoppTray:
 
     def _on_apply_update(self, _icon, _item) -> None:
         open_in_terminal(
-            ["bash", "-c", "boppos-update; echo; echo 'Press Enter to close...'; read"],
+            ["bash", "-c", "boppos-update --os --flatpak; echo; read -p 'Update complete. Reboot now? [y/N] ' -r reply; echo; if [[ $reply =~ ^[Yy]$ ]]; then systemctl reboot; else echo 'Press Enter to close...'; read; fi"],
             title="BoppOS Update",
         )
 
