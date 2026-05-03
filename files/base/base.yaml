@@ -25,6 +25,10 @@ gui-frameworks:
   - qt6-base
   - qt6-declarative
   - electron39
+update-notifier:
+  - python-pystray
+  - python-pillow
+  - librsvg
 fonts-heavy:
   - noto-fonts-cjk
   - ttf-meslo-nerd

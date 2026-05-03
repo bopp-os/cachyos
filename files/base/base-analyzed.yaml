@@ -1,8 +1,9 @@
 system-core:
-  biweekly:
-  - glib2
+  weekly:
   - linux-cachyos
   - linux-cachyos-headers
+  biweekly:
+  - glib2
   - systemd
   - systemd-sysvcompat
   quarterly:
@@ -32,6 +33,13 @@ gui-frameworks:
   - qt6-declarative
   monthly:
   - electron39
+update-notifier:
+  monthly:
+  - librsvg
+  quarterly:
+  - python-pillow
+  yearly:
+  - python-pystray
 fonts-heavy:
   quarterly:
   - ttf-meslo-nerd
@@ -368,7 +376,6 @@ gaming-core:
   - lutris
   - python-pyclip
   - sunshine
-  - winboat
   quarterly:
   - lib32-gcc-libs
   - lib32-libx11
@@ -377,6 +384,7 @@ gaming-core:
   - openrgb-plugin-effects-git
   - pascube
   - steam
+  - winboat
   - yad
   yearly:
   - game-devices-udev
@@ -416,9 +424,8 @@ development-languages:
   yearly:
   - python-defusedxml
 cachyos-settings:
-  weekly:
-  - cachyos-ananicy-rules
   biweekly:
+  - cachyos-ananicy-rules
   - cachyos-settings
   quarterly:
   - cachyos-fish-config

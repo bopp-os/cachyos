@@ -1,0 +1,23 @@
+[Unit]
+Description=BoppOS Update Monitor - Check for available system updates
+Documentation=https://github.com/bopp-os/cachyos
+After=network-online.target bootc.service
+Wants=network-online.target
+ConditionPathExists=/usr/bin/bootc
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/boppos/update-check.sh
+# Write status to /run so it's tmpfs (ephemeral, world-readable)
+RuntimeDirectory=boppos
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+
+# Security hardening — we still need to run bootc as root
+PrivateTmp=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictNamespaces=true
+LockPersonality=true

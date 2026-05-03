@@ -1,0 +1,21 @@
+[Unit]
+Description=BoppOS Update Notifier Tray App
+Documentation=https://github.com/bopp-os/cachyos
+# Don't start until we have a graphical session
+After=graphical-session.target tray.target
+PartOf=graphical-session.target
+
+# Restart if it crashes, but not if the user explicitly stops it
+Requires=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bopp-tray
+Restart=on-failure
+RestartSec=10s
+
+# Give pystray time to detect the right backend
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=graphical-session.target tray.target
