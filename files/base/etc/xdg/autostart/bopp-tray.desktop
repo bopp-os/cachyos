@@ -3,7 +3,7 @@ Type=Application
 Name=BoppOS Update Notifier
 Comment=System tray notifier for BoppOS atomic image updates
 Exec=/usr/bin/bopp-tray
-Icon=system-software-update
+Icon=boppos-icon
 Categories=System;
 Keywords=update;notifier;bootc;
 # Start with every graphical session

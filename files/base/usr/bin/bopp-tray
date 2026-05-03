@@ -119,7 +119,7 @@ def _make_icon(has_update: bool) -> Image.Image:
     else:
         is_dark = _is_dark_theme()
         icon_name = "boppos-white.svg" if is_dark else "boppos-black.svg"
-        icon_path = f"/usr/share/boppos/{icon_name}"
+        icon_path = f"/usr/share/icons/hicolor/scalable/apps/{icon_name}"
 
         try:
             # Pillow doesn't support SVG natively. Rasterize dynamically via librsvg.
