@@ -1,0 +1,389 @@
+#!/usr/bin/env python3
+"""
+bopp-tray — BoppOS update notifier tray app.
+
+Runs as a regular user.  Reads the status JSON written by the
+boppos-update-monitor.service (root) at /run/boppos/update-status.json,
+shows a system-tray icon, and sends desktop notifications when a new
+image is available.
+
+Right-click menu
+----------------
+  • Check for updates now   — triggers an immediate systemd run via polkit
+  • View changes            — shows bopp-diff output in a terminal/dialog
+  • Apply update & reboot   — launches boppos-update in a terminal (requires auth)
+  • ──────────────────────
+  • Last checked: <time>
+  • Quit
+
+Dependencies (all available in CachyOS / AUR):
+    python-pystray   — cross-DE tray icon (GTK/Qt/AppIndicator backends)
+    python-pillow    — icon rendering
+    libnotify        — notify-send for desktop notifications
+    polkit           — pkexec for privileged one-shot service trigger
+
+Signals
+-------
+  SIGUSR1 — re-read status file immediately (sent by update-check.sh)
+"""
+
+import json
+import logging
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+import time
+import io
+from datetime import datetime, timezone
+from pathlib import Path
+
+# ── Third-party — fail early with a friendly message ─────────────────────────
+try:
+    import pystray
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError as exc:
+    sys.exit(
+        f"bopp-tray: missing dependency — {exc}\n"
+        "Install with: sudo pacman -S python-pystray python-pillow"
+    )
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+STATUS_FILE = Path("/run/boppos/update-status.json")
+POLL_INTERVAL_SECONDS = 300           # 5 min fallback poll
+NOTIFY_COOLDOWN_SECONDS = 3600        # don't re-notify for the same digest within 1 h
+STATE_FILE = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "bopp-tray-state.json"
+
+ICON_SIZE = 64
+
+# Terminal emulators tried in order when we need to open an interactive window
+TERMINALS = [
+    "kitty", "alacritty", "foot", "wezterm", "ghostty",
+    "konsole", "gnome-terminal", "xterm",
+]
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s bopp-tray %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("bopp-tray")
+
+
+# ── Icon rendering ────────────────────────────────────────────────────────────
+
+def _is_dark_theme() -> bool:
+    """Attempt to detect if the system is using a dark theme via XDG Desktop Portal."""
+    try:
+        result = subprocess.run(
+            [
+                "busctl", "--user", "call",
+                "org.freedesktop.portal.Desktop",
+                "/org/freedesktop/portal/desktop",
+                "org.freedesktop.portal.Settings",
+                "Read", "ss",
+                "org.freedesktop.appearance", "color-scheme"
+            ],
+            capture_output=True, text=True, timeout=1.0
+        )
+        if "u 2" in result.stdout:
+            return False  # 2 = Prefer light
+        elif "u 1" in result.stdout:
+            return True   # 1 = Prefer dark
+    except Exception:
+        pass
+
+    return True  # Default to dark theme if detection fails
+
+def _make_icon(has_update: bool) -> Image.Image:
+    """
+    Draw or load the tray icon:
+      idle    — loads an SVG (boppos-white.svg or boppos-black.svg) based on theme
+      update  — orange circle with a white exclamation mark
+    """
+    cx = ICON_SIZE // 2
+
+    if has_update:
+        img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        bg = (230, 126, 34, 255)   # orange
+        # Background circle
+        margin = 4
+        draw.ellipse([margin, margin, ICON_SIZE - margin, ICON_SIZE - margin], fill=bg)
+        # Exclamation mark
+        draw.rectangle([cx - 4, 16, cx + 4, 38], fill="white")
+        draw.ellipse([cx - 4, 43, cx + 4, 51], fill="white")
+        return img
+    else:
+        is_dark = _is_dark_theme()
+        icon_name = "boppos-white.svg" if is_dark else "boppos-black.svg"
+        icon_path = f"/usr/share/boppos/{icon_name}"
+
+        try:
+            # Pillow doesn't support SVG natively. Rasterize dynamically via librsvg.
+            png_data = subprocess.check_output(
+                ["rsvg-convert", "-w", str(ICON_SIZE), "-h", str(ICON_SIZE), icon_path],
+                stderr=subprocess.DEVNULL
+            )
+            return Image.open(io.BytesIO(png_data)).convert("RGBA")
+        except Exception as e:
+            log.warning(f"Failed to load {icon_name}: {e}")
+            # Fallback to a simple square if rsvg-convert is missing or the file is absent
+            img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            fg = (255, 255, 255, 255) if is_dark else (0, 0, 0, 255)
+            draw.rectangle([16, 16, ICON_SIZE - 16, ICON_SIZE - 16], fill=fg)
+            return img
+
+
+# ── State persistence ─────────────────────────────────────────────────────────
+
+def _load_local_state() -> dict:
+    try:
+        return json.loads(STATE_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _save_local_state(state: dict) -> None:
+    try:
+        STATE_FILE.write_text(json.dumps(state))
+    except Exception:
+        pass
+
+
+# ── Status reading ────────────────────────────────────────────────────────────
+
+def read_status() -> dict | None:
+    try:
+        return json.loads(STATUS_FILE.read_text())
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError as exc:
+        log.warning("Malformed status file: %s", exc)
+        return None
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def find_terminal() -> str | None:
+    for term in TERMINALS:
+        if shutil.which(term):
+            return term
+    return None
+
+
+def open_in_terminal(cmd: list[str], title: str = "BoppOS") -> None:
+    term = find_terminal()
+    if term is None:
+        _notify("No terminal found", "Install kitty, alacritty, or another terminal.", urgent=True)
+        return
+    full_cmd: list[str]
+    if term in ("kitty", "alacritty", "foot", "ghostty", "wezterm"):
+        full_cmd = [term, "--title", title, "--"] + cmd
+    elif term == "konsole":
+        full_cmd = ["konsole", "--title", title, "-e"] + cmd
+    elif term == "gnome-terminal":
+        full_cmd = ["gnome-terminal", "--title", title, "--"] + cmd
+    else:
+        full_cmd = [term, "-T", title, "-e"] + cmd
+    subprocess.Popen(full_cmd)
+
+
+def _notify(summary: str, body: str = "", urgent: bool = False) -> None:
+    cmd = ["notify-send", "--app-name=BoppOS Updater", "--icon=system-software-update"]
+    if urgent:
+        cmd += ["--urgency=critical"]
+    else:
+        cmd += ["--urgency=normal"]
+    cmd += [summary, body]
+    try:
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except FileNotFoundError:
+        log.warning("notify-send not found; install libnotify")
+
+
+def _trigger_update_check() -> None:
+    """Ask polkit to run the system service as a one-shot."""
+    try:
+        subprocess.Popen(
+            ["pkexec", "systemctl", "start", "boppos-update-monitor.service"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        log.info("Triggered boppos-update-monitor.service via pkexec")
+    except FileNotFoundError:
+        _notify("pkexec not found", "Install polkit to trigger manual checks.", urgent=True)
+
+
+# ── Tray application ──────────────────────────────────────────────────────────
+
+class BoppTray:
+    def __init__(self) -> None:
+        self._status: dict | None = None
+        self._local_state = _load_local_state()
+        self._icon = pystray.Icon(
+            name="bopp-tray",
+            icon=_make_icon(False),
+            title="BoppOS: checking for updates...",
+            menu=self._build_menu(),
+        )
+        self._lock = threading.Lock()
+        self._wakeup = threading.Event()
+
+    # ── Menu ─────────────────────────────────────────────────────────────────
+
+    def _build_menu(self) -> pystray.Menu:
+        return pystray.Menu(
+            pystray.MenuItem("Check for updates now", self._on_check_now),
+            pystray.MenuItem("View changes (bopp-diff)", self._on_view_diff,
+                             enabled=self._has_diff),
+            pystray.MenuItem("Apply update & reboot", self._on_apply_update,
+                             enabled=self._has_update),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(self._last_checked_label, None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Quit", self._on_quit),
+        )
+
+    def _has_update(self, _item) -> bool:
+        return bool(self._status and self._status.get("update_available"))
+
+    def _has_diff(self, _item) -> bool:
+        return bool(self._status and self._status.get("diff"))
+
+    def _last_checked_label(self, _item) -> str:
+        if self._status:
+            ts = self._status.get("checked_at", "")
+            if ts:
+                try:
+                    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    local = dt.astimezone()
+                    return f"Last checked: {local.strftime('%H:%M')}"
+                except ValueError:
+                    pass
+        return "Last checked: never"
+
+    # ── Callbacks ─────────────────────────────────────────────────────────────
+
+    def _on_check_now(self, _icon, _item) -> None:
+        _trigger_update_check()
+
+    def _on_view_diff(self, _icon, _item) -> None:
+        diff = self._status and self._status.get("diff")
+        if diff:
+            # Write diff to a temp file, then less it
+            import tempfile
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", prefix="bopp-diff-",
+                delete=False
+            ) as f:
+                f.write(diff)
+                tmppath = f.name
+            open_in_terminal(["bash", "-c", f"less '{tmppath}'; rm -f '{tmppath}'"],
+                             title="BoppOS — Pending Changes")
+        else:
+            open_in_terminal(["bopp-diff"], title="BoppOS — Pending Changes")
+
+    def _on_apply_update(self, _icon, _item) -> None:
+        open_in_terminal(
+            ["bash", "-c", "boppos-update; echo; echo 'Press Enter to close...'; read"],
+            title="BoppOS Update",
+        )
+
+    def _on_quit(self, icon, _item) -> None:
+        icon.stop()
+
+    # ── Core loop ─────────────────────────────────────────────────────────────
+
+    def _refresh(self) -> None:
+        """Read the status file and update the icon/menu/notification."""
+        new_status = read_status()
+
+        with self._lock:
+            self._status = new_status
+
+        if new_status is None:
+            self._icon.icon = _make_icon(False)
+            self._icon.title = "BoppOS: update status unavailable"
+            self._icon.menu = self._build_menu()
+            return
+
+        has_update: bool = bool(new_status.get("update_available"))
+        error: str | None = new_status.get("error")
+        staged: str = new_status.get("staged_image") or ""
+
+        if error:
+            log.warning("Update check error: %s", error)
+
+        self._icon.icon = _make_icon(has_update)
+        self._icon.menu = self._build_menu()
+
+        if has_update:
+            self._icon.title = "BoppOS: system update available!"
+            # Only notify if we haven't already notified for this staged digest
+            last_notified = self._local_state.get("last_notified_digest", "")
+            last_notified_at = self._local_state.get("last_notified_at", 0)
+            now = time.time()
+            if staged != last_notified or (now - last_notified_at) > NOTIFY_COOLDOWN_SECONDS:
+                _notify(
+                    "BoppOS update available!",
+                    "A new system image is ready. Right-click the tray icon to apply.",
+                )
+                self._local_state["last_notified_digest"] = staged
+                self._local_state["last_notified_at"] = now
+                _save_local_state(self._local_state)
+        else:
+            self._icon.title = "BoppOS: system is up to date"
+
+    def _poll_loop(self) -> None:
+        """Background thread: refresh on SIGUSR1 wakeup or POLL_INTERVAL timeout."""
+        while True:
+            self._wakeup.wait(timeout=POLL_INTERVAL_SECONDS)
+            self._wakeup.clear()
+            try:
+                self._refresh()
+            except Exception as exc:
+                log.error("Refresh error: %s", exc)
+
+    def _on_sigusr1(self, _signum, _frame) -> None:
+        log.info("Received SIGUSR1 — re-reading update status")
+        self._wakeup.set()
+
+    def run(self) -> None:
+        # Initial read
+        self._refresh()
+
+        # Wire SIGUSR1 from the system service
+        signal.signal(signal.SIGUSR1, self._on_sigusr1)
+
+        # Background polling thread
+        poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
+        poll_thread.start()
+
+        log.info("bopp-tray running")
+        self._icon.run()
+        log.info("bopp-tray exiting")
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+def main() -> None:
+    # Avoid running multiple instances
+    lock_file = STATE_FILE.parent / "bopp-tray.lock"
+    try:
+        import fcntl
+        lf = open(lock_file, "w")
+        fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        sys.exit("bopp-tray is already running")
+    except Exception:
+        pass  # non-fatal if we can't lock
+
+    BoppTray().run()
+
+
+if __name__ == "__main__":
+    main()

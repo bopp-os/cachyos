@@ -1,0 +1,16 @@
+[Unit]
+Description=BoppOS Update Monitor - Periodic update check timer
+Documentation=https://github.com/bopp-os/cachyos
+
+[Timer]
+# Run once on boot (after 3 min delay to let network settle)
+OnBootSec=3min
+# Then every hour
+OnUnitActiveSec=1h
+# Spread load a bit to avoid thundering herd on shared infra
+RandomizedDelaySec=3min
+Persistent=true
+Unit=boppos-update-monitor.service
+
+[Install]
+WantedBy=timers.target

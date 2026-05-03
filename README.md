@@ -38,6 +38,10 @@ This is all very experimental. So use at your own risk.
     ```bash
     boppos-update
     ```
+  - **System Update Notifier (`bopp-tray`):** A background tray application that checks for new image updates periodically and notifies you when one is available. By default, it should autostart with your desktop environment. If you need to enable it manually for your user, run:
+    ```bash
+    systemctl --user enable --now bopp-tray.service
+    ```
   - **Package Diff Tool (`bopp-diff`):** Analyzes the current running system against staged or upstream `bootc` images and provides a clear breakdown of upgraded, downgraded, added, or removed packages.
     ```bash
     sudo bopp-diff

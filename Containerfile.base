@@ -193,6 +193,7 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable brew-setup.service && \
     systemctl enable power-profiles-daemon.service && \
     systemctl enable fstrim.timer && \
+    systemctl enable boppos-update-monitor.timer && \
     systemctl enable cups.socket
 
 # Bootc / Dracut Fixes

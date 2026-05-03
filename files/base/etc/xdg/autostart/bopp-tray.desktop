@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=BoppOS Update Notifier
+Comment=System tray notifier for BoppOS atomic image updates
+Exec=/usr/bin/bopp-tray
+Icon=system-software-update
+Categories=System;
+Keywords=update;notifier;bootc;
+# Start with every graphical session
+X-GNOME-Autostart-enabled=true
+# Don't show in app launchers
+NoDisplay=true
+# Don't show a splash/loading indicator
+StartupNotify=false

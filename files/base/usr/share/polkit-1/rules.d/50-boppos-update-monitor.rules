@@ -1,0 +1,16 @@
+// /usr/share/polkit-1/rules.d/50-boppos-update-monitor.rules
+//
+// Allow any user at the local seat to start the boppos-update-monitor
+// service via systemctl (triggered from the tray "Check now" button).
+// This avoids an annoying password prompt for a read-only network check.
+
+polkit.addRule(function(action, subject) {
+    if (action.id === "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") === "boppos-update-monitor.service" &&
+        action.lookup("verb") === "start" &&
+        subject.local &&
+        subject.active)
+    {
+        return polkit.Result.YES;
+    }
+});

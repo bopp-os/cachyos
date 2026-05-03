@@ -5,13 +5,14 @@ export LC_ALL=C
 
 JSON_OUTPUT=false
 TARGET_INPUT=""
+USE_STAGED=false
 
-for arg in "$@"; do
-    if [ "$arg" == "--json" ]; then
-        JSON_OUTPUT=true
-    else
-        TARGET_INPUT="$arg"
-    fi
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --json) JSON_OUTPUT=true; shift ;;
+        --staged) USE_STAGED=true; shift ;;
+        *) TARGET_INPUT="$1"; shift ;;
+    esac
 done
 
 log_info() {
@@ -39,8 +40,17 @@ pacman -Q | sort > /tmp/current_pkgs.txt
 
 BOOTED=$(bootc status --json | jq -r '.status.booted.image.image.image // empty')
 
-# If no image is provided, try to intelligently guess based on bootc status
-if [ -z "$TARGET_INPUT" ]; then
+if [ "$USE_STAGED" = true ]; then
+    log_info "Explicitly checking for staged update..."
+    STAGED=$(bootc status --json | jq -r '.status.staged.image.image.image // empty')
+    if [ -n "$STAGED" ]; then
+        TARGET_IMAGE="$STAGED"
+        log_info "Found staged update! Target: $TARGET_IMAGE"
+    else
+        log_err "❌ Error: --staged was requested but no staged update was found by bootc."
+        exit 1
+    fi
+elif [ -z "$TARGET_INPUT" ]; then
     log_info "No target image provided. Checking bootc status..."
     
     # 1. Check if there is an update already staged for the next boot
