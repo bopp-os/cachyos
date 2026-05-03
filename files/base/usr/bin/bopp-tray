@@ -206,16 +206,16 @@ def _notify(summary: str, body: str = "", urgent: bool = False) -> None:
 
 
 def _trigger_update_check() -> None:
-    """Ask polkit to run the system service as a one-shot."""
+    """Trigger the system service as a one-shot via systemctl (polkit handles auth)."""
     try:
         subprocess.Popen(
-            ["pkexec", "systemctl", "start", "boppos-update-monitor.service"],
+            ["systemctl", "start", "boppos-update-monitor.service"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        log.info("Triggered boppos-update-monitor.service via pkexec")
+        log.info("Triggered boppos-update-monitor.service")
     except FileNotFoundError:
-        _notify("pkexec not found", "Install polkit to trigger manual checks.", urgent=True)
+        _notify("systemctl not found", "systemd is required.", urgent=True)
 
 
 # ── Tray application ──────────────────────────────────────────────────────────
