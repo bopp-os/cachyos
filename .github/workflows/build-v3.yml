@@ -18,6 +18,11 @@ on:
         required: false
         type: boolean
         default: false
+      test_tag:
+        description: 'Append -test to the image tag'
+        required: false
+        type: boolean
+        default: false
 
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image"
@@ -25,7 +30,7 @@ env:
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   FLAVORS: "plasma gnome niri"
-  DEFAULT_TAG: "v3"
+  DEFAULT_TAG: "${{ inputs.test_tag && 'v3-test' || 'v3' }}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}

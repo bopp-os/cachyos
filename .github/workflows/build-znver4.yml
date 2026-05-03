@@ -15,13 +15,18 @@ on:
         required: false
         type: boolean
         default: false
+      test_tag:
+        description: 'Append -test to the image tag'
+        required: false
+        type: boolean
+        default: false
 
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image (znver4)"
   IMAGE_KEYWORDS: "bootc,arch,cachyos"
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
-  DEFAULT_TAG: "znver4"
+  DEFAULT_TAG: "${{ inputs.test_tag && 'znver4-test' || 'znver4' }}"
   FLAVORS: "plasma gnome niri"
 
 concurrency:
