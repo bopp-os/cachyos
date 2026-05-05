@@ -82,44 +82,13 @@ BOOTC_STATUS_JSON=$(bootc status --format=json 2>&1) || {
     exit 0
 }
 
-# Use python (already required by the image) to parse the status JSON
-PARSE_RESULT=$(python3 - "${BOOTC_STATUS_JSON}" <<'PYEOF'
-import json, sys
-
-try:
-    data = json.loads(sys.argv[1])
-except json.JSONDecodeError as e:
-    print(f"ERROR:parse:{e}")
-    sys.exit(0)
-
-spec = data.get("spec", {}) or {}
-status = data.get("status", {}) or {}
-booted = (status.get("booted") or {})
-staged = (status.get("staged") or {})
-
-transport = spec.get("image", {}).get("transport", "registry")
-
-# Current image: prefer imageDigest, fall back to image reference
-booted_img = (booted.get("image") or {})
-current = booted_img.get("imageDigest") or booted_img.get("image", {}).get("image", "unknown")
-
-# If there is a staged deployment AND its digest differs from booted, an update is available
-staged_img = (staged.get("image") or {})
-staged_digest = staged_img.get("imageDigest") or staged_img.get("image", {}).get("image", "")
-
-update_available = bool(staged_digest and staged_digest != current)
-
-print(f"UPDATE:{update_available}")
-print(f"CURRENT:{current}")
-print(f"STAGED:{staged_digest}")
-print(f"TRANSPORT:{transport}")
-PYEOF
-)
+PARSE_RESULT=$(python3 /usr/lib/boppos/parse-bootc-status.py <<< "${BOOTC_STATUS_JSON}")
 
 UPDATE_AVAILABLE="false"
 CURRENT_IMAGE="unknown"
 STAGED_IMAGE=""
 TRANSPORT="registry"
+IMAGE_REF=""
 PARSE_ERROR=""
 
 while IFS= read -r line; do
@@ -130,6 +99,7 @@ while IFS= read -r line; do
         CURRENT:*)       CURRENT_IMAGE="${line#CURRENT:}" ;;
         STAGED:*)        STAGED_IMAGE="${line#STAGED:}" ;;
         TRANSPORT:*)     TRANSPORT="${line#TRANSPORT:}" ;;
+        IMAGE_REF:*)     IMAGE_REF="${line#IMAGE_REF:}" ;;
     esac
 done <<< "${PARSE_RESULT}"
 
@@ -137,20 +107,32 @@ done <<< "${PARSE_RESULT}"
 # (bootc status only shows a staged image *after* a prior `bootc upgrade --check`
 # has downloaded/staged metadata.  Run the lightweight check now.)
 if [[ "${UPDATE_AVAILABLE}" == "false" && -z "${PARSE_ERROR}" ]]; then
-    CHECK_OUT=$(bootc upgrade --check 2>&1) || true
-    # bootc upgrade --check exits 0 whether or not update is available;
-    # look for a line like "Update available:" or "No update available"
-    if echo "${CHECK_OUT}" | grep -qi "update available"; then
-        UPDATE_AVAILABLE="true"
-        # Re-read status to pick up the newly staged digest
+    # 1. Use skopeo for a highly reliable registry check if available
+    if command -v skopeo &>/dev/null && [[ -n "${IMAGE_REF}" ]]; then
+        REMOTE_DIGEST=$(skopeo inspect --format '{{.Digest}}' "docker://${IMAGE_REF}" 2>/dev/null || true)
+        if [[ -n "${REMOTE_DIGEST}" && "${REMOTE_DIGEST}" != "${CURRENT_IMAGE}" ]]; then
+            UPDATE_AVAILABLE="true"
+            STAGED_IMAGE="${REMOTE_DIGEST}"
+        fi
+    fi
+
+    # 2. Fallback to bootc upgrade --check
+    if [[ "${UPDATE_AVAILABLE}" == "false" ]]; then
+        CHECK_OUT=$(bootc upgrade --check 2>&1) || true
+        # bootc outputs "Available update: <digest>" if one exists
+        if echo "${CHECK_OUT}" | grep -qi -E "available update|upgrade available"; then
+            UPDATE_AVAILABLE="true"
+            STAGED_IMAGE=$(echo "${CHECK_OUT}" | grep -i -E "available update|upgrade available" | awk '{print $NF}')
+        fi
+    fi
+
+    # 3. Re-read status if update was found just in case bootc --check actually staged metadata
+    if [[ "${UPDATE_AVAILABLE}" == "true" ]]; then
         BOOTC_STATUS_JSON=$(bootc status --format=json 2>/dev/null) || true
-        STAGED_IMAGE=$(python3 -c "
-import json,sys
-d=json.loads(sys.stdin.read())
-s=(d.get('status',{}) or {}).get('staged') or {}
-i=(s.get('image') or {})
-print(i.get('imageDigest') or i.get('image',{}).get('image',''))
-" <<< "${BOOTC_STATUS_JSON}" 2>/dev/null || echo "")
+        STAGED_STATUS=$(python3 /usr/lib/boppos/parse-bootc-status.py --staged-only <<< "${BOOTC_STATUS_JSON}" 2>/dev/null || echo "")
+        if [[ -n "${STAGED_STATUS}" ]]; then
+            STAGED_IMAGE="${STAGED_STATUS}"
+        fi
     fi
 fi
 
