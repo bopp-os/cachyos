@@ -165,7 +165,7 @@ jobs:
           mkdir -p ${{ github.workspace }}/mirrors
           PODMAN_OPTS=""
           if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-          sudo podman run $PODMAN_OPTS --rm -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z docker.io/cachyos/cachyos-v3:latest bash -c "pacman -Sy --noconfirm cachyos-rate-mirrors && cachyos-rate-mirrors && cp /etc/pacman.d/cachyos-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v3-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v4-mirrorlist /workspace-mirrors/"
+          sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z docker.io/cachyos/cachyos-v3:latest bash -c "pacman -Sy --noconfirm cachyos-rate-mirrors && cachyos-rate-mirrors && cp /etc/pacman.d/cachyos-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v3-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v4-mirrorlist /workspace-mirrors/"
           echo "::endgroup::"
 
       - name: Build AUR Image
