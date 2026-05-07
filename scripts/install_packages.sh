@@ -56,7 +56,7 @@ while IFS='|' read -r COMP_TAG INTERVAL PKGS; do
             # Try to refresh mirrors if the command is available to recover from 404s
             if command -v cachyos-rate-mirrors >/dev/null 2>&1; then
                 echo "🌐 Refreshing mirrors with cachyos-rate-mirrors..."
-                cachyos-rate-mirrors || true
+                timeout 120 cachyos-rate-mirrors < /dev/null || true
             fi
         fi
     done
