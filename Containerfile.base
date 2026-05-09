@@ -51,7 +51,8 @@ RUN pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring && \
     pkill gpg-agent || true && pkill dirmngr || true
 
 RUN pacman -S --noconfirm --needed cachyos-hooks chwd gpgme && \
-    pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+    pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
+    pkill gpg-agent || true && pkill dirmngr || true
 
 # Tag pacman config and mirrorlists as a unique component to avoid ostree layer hash non-determinism
 RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings -exec setfattr -n user.component -v "pacman-config" {} +
@@ -98,7 +99,8 @@ RUN export COMPONENT_TAG="arch-optimizations" && \
     if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
         echo "Architecture $TARGET_CPU_MARCH detected. Reinstalling packages for Zen 4/5 optimization..." && \
         pacman -Syy && \
-        pacman -Qqn | pacman -S --noconfirm - ; \
+        pacman -Qqn | pacman -S --noconfirm - && \
+        pkill gpg-agent || true && pkill dirmngr || true ; \
     else \
         echo "Architecture $TARGET_CPU_MARCH detected. Standard repositories already up to date." ; \
     fi

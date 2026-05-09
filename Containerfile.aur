@@ -40,7 +40,8 @@ RUN pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring && \
 # chwd and cachyos-hooks are omitted here since AUR packages don't require hardware detection
 RUN pacman -S --noconfirm --needed gpgme && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
-    echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf
+    echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf && \
+    pkill gpg-agent || true && pkill dirmngr || true
 
 RUN if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
         printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
