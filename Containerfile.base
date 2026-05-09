@@ -56,7 +56,7 @@ RUN pacman -S --noconfirm --needed cachyos-hooks chwd gpgme && \
     pkill -9 gpg-agent; pkill -9 dirmngr; pkill -9 keyboxd; pkill -9 scdaemon; true
 
 # Tag pacman config and mirrorlists as a unique component to avoid ostree layer hash non-determinism
-RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings -exec setfattr -n user.component -v "pacman-config" {} +
+RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings ! -type l -exec setfattr -n user.component -v "pacman-config" {} +
 
 # Ensure the log file exists
 RUN touch /var/log/pacman.log
