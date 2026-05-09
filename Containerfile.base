@@ -46,7 +46,8 @@ RUN mkdir -p /etc/pacman.d/hooks && \
     ln -sf /dev/null /etc/pacman.d/hooks/systemd-hwdb.hook && \
     ln -sf /dev/null /etc/pacman.d/hooks/udev-hwdb.hook
 
-RUN pacman -Sy --noconfirm --needed cachyos-keyring archlinux-keyring && \
+RUN rm -rf /var/lib/pacman/sync/* && \
+    pacman -Syy --noconfirm --needed cachyos-keyring archlinux-keyring && \
     pacman -Su --noconfirm && \
     pkill gpg-agent || true && pkill dirmngr || true
 
@@ -98,6 +99,7 @@ RUN export COMPONENT_TAG="arch-optimizations" && \
     fi && \
     if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
         echo "Architecture $TARGET_CPU_MARCH detected. Reinstalling packages for Zen 4/5 optimization..." && \
+        rm -rf /var/lib/pacman/sync/* && \
         pacman -Syy && \
         pacman -Qqn | pacman -S --noconfirm - && \
         pkill gpg-agent || true && pkill dirmngr || true ; \
