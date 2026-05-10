@@ -82,14 +82,6 @@ RUN cd /tmp/sddm-theme-noctalia-git/ && \
     sudo -E -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -c && \
     rm -rf /tmp/sddm-theme-noctalia-git/
 
-# Build mullvad-vpn-daemon-bin from AUR (Dependency for mullvad-vpn-bin)
-RUN cd /tmp && \
-    sudo -u builduser git clone https://aur.archlinux.org/mullvad-vpn-daemon-bin.git && \
-    cd mullvad-vpn-daemon-bin && \
-    sudo -E -u builduser PKGDEST=/home/builduser/packages makepkg --noconfirm -s --skipinteg -c && \
-    pacman -U --noconfirm /home/builduser/packages/mullvad-vpn-daemon-bin-*.pkg.tar.zst && \
-    rm -rf /tmp/mullvad-vpn-daemon-bin
-
 # Build mullvad-vpn-bin from AUR
 RUN cd /tmp && \
     sudo -u builduser git clone https://aur.archlinux.org/mullvad-vpn-bin.git && \
