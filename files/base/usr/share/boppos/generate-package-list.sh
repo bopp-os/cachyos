@@ -11,8 +11,8 @@ echo "Generating package list from pacman database..."
 
 # Build a JSON mapping of package names to their source repositories
 (
-  pacman -Sl | awk '/\[installed\]/ {printf "\"%s\":\"%s\",\n", $2, $1}'
-  pacman -Qm | awk '{printf "\"%s\":\"aur\",\n", $1}'
+  pacman -Sl | awk '/\[installed\]/ {printf "\"%s\":\"%s\",\n", $2, $1}' || true
+  pacman -Qm | awk '{printf "\"%s\":\"aur\",\n", $1}' || true
 ) | sed '$ s/,$//' | sed '1 i\{' | sed '$ a\}' > /tmp/boppos_repo_map.json
 
 # Use pacman -Q to list all packages and versions (e.g., "package-name 1.0-1")
