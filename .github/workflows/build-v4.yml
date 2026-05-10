@@ -98,6 +98,8 @@ jobs:
       - name: Checkout
         if: steps.check_compatibility.outputs.should_skip != 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: recursive
 
       - name: Restore Package Intervals
         if: steps.check_compatibility.outputs.should_skip != 'true'
@@ -330,6 +332,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: recursive
 
       - name: Restore Package Intervals
         uses: actions/cache/restore@v4

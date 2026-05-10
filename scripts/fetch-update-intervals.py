@@ -66,8 +66,8 @@ async def fetch_all_cachyos_data(session):
 
     logging.info(f"Bulk fetching {len(urls_to_fetch)} CachyOS directory indexes...")
     
-    # Matches: href="pkgname-1.0-1-x86_64_v4.pkg.tar.zst" ... <td class="date">YYYY-MMM-dd hh:mm</td>
-    pattern = re.compile(r'href="([^"]+\.pkg\.tar\.zst)".*?<td class="date">(\d{4}-[a-zA-Z]{3}-\d{2} \d{2}:\d{2})</td>')
+    # Resilient match for both table-based and standard nginx <pre> autoindexes
+    pattern = re.compile(r'href="([^"]+\.pkg\.tar\.zst)".*?(\d{2,4}-[a-zA-Z]{3}-\d{2,4} \d{2}:\d{2})')
     
     html_pages = await asyncio.gather(*(fetch_with_backoff(session, url) for url in urls_to_fetch))
     
@@ -79,7 +79,12 @@ async def fetch_all_cachyos_data(session):
             if pkg_match:
                 pkg_name = pkg_match.group(1)
                 try:
-                    dt = datetime.strptime(date_str, "%Y-%b-%d %H:%M")
+                    # Handle both YYYY-MMM-dd and dd-MMM-YYYY formats gracefully
+                    if len(date_str.split('-')[0]) == 4:
+                        dt = datetime.strptime(date_str, "%Y-%b-%d %H:%M")
+                    else:
+                        dt = datetime.strptime(date_str, "%d-%b-%Y %H:%M")
+                        
                     if pkg_name not in cachy_data:
                         cachy_data[pkg_name] = set()
                     cachy_data[pkg_name].add(dt)
