@@ -55,10 +55,10 @@ async def analyze_arch_package(session, pkg_name):
     dates = []
     for date_td in soup.find_all('td', class_='date'):
         try:
-            dt = datetime.strptime(date_td.text.strip(), "%Y-%b-%d %H:%M")
+            dt = datetime.strptime(date_td.text.strip(), "%d-%b-%Y %H:%M")
             dates.append(dt)
-        except ValueError:
-            pass
+        except ValueError as e:
+            logging.debug(f"[{pkg_name}] Failed to parse ALA date '{date_td.text.strip()}': {e}")
             
     dates = sorted(list(set(dates)))
     return dates, "ala"
