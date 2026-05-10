@@ -117,7 +117,7 @@ jobs:
           tags: |
             type=raw,value=${{ env.DEFAULT_TAG }}
             type=raw,value=${{ env.DEFAULT_TAG }}-{{date 'YYYYMMDD'}}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !inputs.test_tag }}
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
           labels: |
@@ -337,7 +337,7 @@ jobs:
           tags: |
             type=raw,value=${{ env.DEFAULT_TAG }}
             type=raw,value=${{ env.DEFAULT_TAG }}-{{date 'YYYYMMDD'}}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !inputs.test_tag }}
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
           labels: |
