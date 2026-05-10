@@ -98,10 +98,10 @@ RUN export COMPONENT_TAG="arch-optimizations" && \
         pacman -Sc --noconfirm ; \
     fi && \
     if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
-        echo "Architecture $TARGET_CPU_MARCH detected. Reinstalling packages for Zen 4/5 optimization..." && \
+        echo "Architecture $TARGET_CPU_MARCH detected. Syncing with Zen 4/5 optimized repositories..." && \
         rm -rf /var/lib/pacman/sync/* && \
-        pacman -Syy && \
-        pacman -Qqn | pacman -S --noconfirm - && \
+        # Use -Syyuu to allow downgrades, which is necessary when switching from a generic (v4) to a specific (znver4) repo set.
+        pacman -Syyuu --noconfirm && \
         { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; } ; \
     else \
         echo "Architecture $TARGET_CPU_MARCH detected. Standard repositories already up to date." ; \
