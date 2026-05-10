@@ -77,7 +77,7 @@ jobs:
             
             if [ "$USE_PODMAN" == "true" ]; then
               echo "Extracting packages using Podman container fallback..."
-              sudo podman run --rm -v ${{ github.workspace }}/scripts:/scripts:ro -v ${{ github.workspace }}/build:/build:rw "$IMAGE_REF" bash -c "/scripts/extract-ci-pkg-lists.sh"
+              sudo podman run --rm -v ${{ github.workspace }}/scripts:/scripts:ro -v ${{ github.workspace }}/build:/build:rw "$IMAGE_REF" bash /scripts/extract-ci-pkg-lists.sh
               cat build/all-packages.txt >> build/all-packages-temp.txt 2>/dev/null || true
               cat build/cachyos-packages.txt >> build/cachyos-packages-temp.txt 2>/dev/null || true
               cat build/aur-packages.txt >> build/aur-packages-temp.txt 2>/dev/null || true
