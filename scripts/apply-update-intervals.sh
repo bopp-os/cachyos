@@ -11,8 +11,8 @@ if [[ ! -f "$JSON_FILE" ]]; then
     exit 1
 fi
 
-if ! command -v setfattr &>/dev/null || ! command -v jq &>/dev/null; then
-    echo "Error: 'setfattr' (attr package) or 'jq' not found. Please install them in the build container." >&2
+if ! command -v setfattr &>/dev/null || ! command -v getfattr &>/dev/null || ! command -v jq &>/dev/null; then
+    echo "Error: 'setfattr'/'getfattr' (attr package) or 'jq' not found. Please install them in the build container." >&2
     exit 1
 fi
 
@@ -38,6 +38,20 @@ apply_pkg_xattrs() {
         
         # Use -h to avoid dereferencing symlinks, which could traverse out of rootfs or hit RO mounts
         if [[ -e "$full_path" || -L "$full_path" ]]; then
+            # Check if a component exists and dynamically append the interval to satisfy Chunkah
+            local comp
+            comp=$(getfattr -h --absolute-names --only-values -n user.component "$full_path" 2>/dev/null || true)
+            if [[ -n "$comp" ]]; then
+                # Strip any existing interval suffix natively to prevent stacking (-weekly-daily)
+                comp="${comp%-yearly}"
+                comp="${comp%-quarterly}"
+                comp="${comp%-monthly}"
+                comp="${comp%-biweekly}"
+                comp="${comp%-weekly}"
+                comp="${comp%-daily}"
+                setfattr -h -n user.component -v "${comp}-${interval}" "$full_path" 2>/dev/null || true
+            fi
+
             setfattr -h -n user.update-interval -v "$interval" "$full_path" 2>/dev/null || true
             ((count++))
         fi
