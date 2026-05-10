@@ -250,12 +250,6 @@ jobs:
           sudo podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           echo "::endgroup::"
 
-      - name: Export Base Image
-        if: steps.check_compatibility.outputs.should_skip != 'true'
-        run: |
-          echo "Saving base image to persistent tarball..."
-          sudo podman save "${IMAGE_REGISTRY}/cachyos-base:${{ env.DEFAULT_TAG }}" -o /var/tmp/cachyos-base-${{ github.sha }}.tar
-
       - name: Prune Pacman Cache
         if: steps.check_compatibility.outputs.should_skip != 'true' && github.event_name != 'pull_request'
         run: |
@@ -295,8 +289,8 @@ jobs:
           # 2. Delete the massive chunkah tarballs
           sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
           
-          # 3. Prune dangling (<none>) images AND the intermediate build cache
-          sudo podman system prune --all --force --volumes --build
+          # 3. Prune dangling (<none>) images but preserve the tagged base image
+          sudo podman system prune --force --volumes
           
           # 4. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
@@ -379,11 +373,6 @@ jobs:
             containers.bootc=1
           sep-tags: " "
           sep-annotations: " "
-
-      - name: Load Base Image
-        run: |
-          echo "Loading base image into Podman..."
-          sudo podman load -i /var/tmp/cachyos-base-${{ github.sha }}.tar
 
       - name: Login to GitHub Container Registry
         env:
@@ -530,10 +519,9 @@ jobs:
           sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
           sudo podman system prune --all --force --volumes --build
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
-            echo "✨ All flavors built successfully. Removing base tarball and workspace..."
-            sudo rm -f /var/tmp/cachyos-base-${{ github.sha }}.tar
+            echo "✨ All flavors built successfully. Removing workspace..."
             sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
           else
-            echo "⚠️ Some flavors failed. Preserving base tarball for retry."
+            echo "⚠️ Some flavors failed. Preserving workspace for debug."
           fi
           df -h /
