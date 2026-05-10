@@ -469,7 +469,7 @@ jobs:
               # Use skopeo to copy with zstd compression for smaller images
               if sudo skopeo copy \
                   --dest-compress-format zstd:chunked \
-                  --dest-compress-level 19 \
+                  --dest-compress-level 6 \
                   --force-compression \
                   "$SOURCE_IMAGE" "$DEST_IMAGE"; then
                 SUCCESS=true
