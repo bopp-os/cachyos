@@ -1,6 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
+APPLY_UPDATES=0
+for arg in "$@"; do
+    if [[ "$arg" == "--apply" ]]; then
+        APPLY_UPDATES=1
+    fi
+done
+
 # Dynamically resolve the project root based on the script location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -11,7 +18,7 @@ if [ ! -d "$PKGBUILDS_DIR" ]; then
     exit 1
 fi
 
-echo "Checking for upstream updates in $PKGBUILDS_DIR..."
+echo "Checking for upstream updates in $PKGBUILDS_DIR... (use --apply to update)"
 echo "--------------------------------------------------------"
 
 for repo in "$PKGBUILDS_DIR"/*/; do
@@ -35,6 +42,11 @@ for repo in "$PKGBUILDS_DIR"/*/; do
         if [ -n "$NEW_COMMITS" ]; then
             echo -e "\033[1;33m   [!] New commits available upstream:\033[0m"
             git log HEAD..@{u} --oneline --color=always | sed 's/^/       /'
+            
+            if [ "$APPLY_UPDATES" -eq 1 ]; then
+                echo -e "\033[1;36m   [+] Applying updates (fast-forward)...\033[0m"
+                git merge --ff-only @{u} --quiet
+            fi
         else
             echo -e "\033[1;32m   [✓] Up to date.\033[0m"
         fi

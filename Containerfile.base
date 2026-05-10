@@ -144,7 +144,7 @@ RUN chmod -R 0755 /usr/bin /usr/share/libalpm/scripts
 
 # Install AUR packages from Stage 1
 COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /export-pkgs/ /tmp/aur-pkgs/
-RUN COMPONENT_TAG="aur-packages" pacman -U --noconfirm /tmp/aur-pkgs/*.pkg.tar.zst && \
+RUN pacman -U --noconfirm /tmp/aur-pkgs/*.pkg.tar.zst && \
     rm -rf /tmp/aur-pkgs && \
     if [ -e /usr/etc ]; then \
         echo "Workaround: mitigating rogue /usr/etc to satisfy bootc..." && \

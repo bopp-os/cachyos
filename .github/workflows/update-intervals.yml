@@ -10,9 +10,6 @@ on:
         required: false
         default: '30'
 
-permissions:
-  contents: write
-
 jobs:
   update-intervals:
     runs-on: ubuntu-latest
@@ -31,30 +28,46 @@ jobs:
       - name: Install Python dependencies
         run: pip install aiohttp beautifulsoup4
 
-      - name: Generate Package Lists from Base Image
+      - name: Restore Package Intervals Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: scripts/package-intervals.json
+          key: pkg-intervals-latest
+          restore-keys: |
+            pkg-intervals-
+
+      - name: Generate Package Lists from All Images
         run: |
-          # Spin up the latest version of your base image to run the extraction script
           mkdir -p build
-          docker run --rm -v ${{ github.workspace }}/tools:/tools:ro -v ${{ github.workspace }}/build:/build:rw ghcr.io/${{ github.repository_owner }}/cachyos-base:latest bash -c "/tools/generate-package-list.sh && cp -r build/* /build/"
+          touch build/all-packages-temp.txt build/cachyos-packages-temp.txt build/aur-packages-temp.txt
+          
+          # Spin up the latest version of every image flavor to build a master superset of packages
+          for FLAVOR in base plasma gnome niri; do
+            echo "Extracting packages from cachyos-${FLAVOR}:v3..."
+            docker run --rm -v ${{ github.workspace }}/scripts:/scripts:ro -v ${{ github.workspace }}/build:/build:rw ghcr.io/${{ github.repository_owner }}/cachyos-${FLAVOR}:v3 bash -c "/scripts/generate-package-list.sh"
+            
+            cat build/all-packages.txt >> build/all-packages-temp.txt
+            cat build/cachyos-packages.txt >> build/cachyos-packages-temp.txt
+            cat build/aur-packages.txt >> build/aur-packages-temp.txt
+          done
+          
+          sort -u build/all-packages-temp.txt > build/all-packages.txt
+          sort -u build/cachyos-packages-temp.txt > build/cachyos-packages.txt
+          sort -u build/aur-packages-temp.txt > build/aur-packages.txt
 
       - name: Fetch and Calculate Chunkah Intervals
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat build/all-packages.txt | python tools/fetch-update-intervals.py \
+          cat build/all-packages.txt | python scripts/fetch-update-intervals.py \
             --cachyos-packages build/cachyos-packages.txt \
-            --cache-file tools/package-intervals.json \
+            --aur-packages build/aur-packages.txt \
+            --cache-file scripts/package-intervals.json \
             --max-age-days ${{ github.event.inputs.max_age || '30' }} \
             --concurrency 10
 
-      - name: Commit and Push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add tools/package-intervals.json
-          if git diff --staged --quiet; then
-            echo "No changes to package intervals."
-          else
-            git commit -m "chore: update chunkah package intervals"
-            git push
-          fi
+      - name: Save Package Intervals to Cache
+        uses: actions/cache/save@v4
+        with:
+          path: scripts/package-intervals.json
+          key: pkg-intervals-${{ hashFiles('scripts/package-intervals.json') }}

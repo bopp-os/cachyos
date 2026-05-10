@@ -99,6 +99,20 @@ jobs:
         if: steps.check_compatibility.outputs.should_skip != 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Restore Package Intervals
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: scripts/package-intervals.json
+          key: pkg-intervals-latest
+          restore-keys: |
+            pkg-intervals-
+
+      - name: Ensure Package Intervals JSON exists
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          if [ ! -f scripts/package-intervals.json ]; then echo "{}" > scripts/package-intervals.json; fi
+
       - name: Get current date
         id: date
         run: |
@@ -316,6 +330,18 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Restore Package Intervals
+        uses: actions/cache/restore@v4
+        with:
+          path: scripts/package-intervals.json
+          key: pkg-intervals-latest
+          restore-keys: |
+            pkg-intervals-
+
+      - name: Ensure Package Intervals JSON exists
+        run: |
+          if [ ! -f scripts/package-intervals.json ]; then echo "{}" > scripts/package-intervals.json; fi
 
       - name: Get current date
         id: date

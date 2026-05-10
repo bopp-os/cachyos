@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import statistics
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -90,7 +91,48 @@ async def analyze_cachy_package(session, pkg_name):
     dates = sorted(list(set(dates)))
     return dates, "cachyos_git"
 
-async def process_package(session, pkg, is_cachyos, cache, max_age, semaphore):
+async def analyze_aur_package(session, pkg_name):
+    # 1. Resolve PackageBase from AUR RPC (required for correct cgit queries on split packages)
+    rpc_url = f"https://aur.archlinux.org/rpc/v5/info/{pkg_name}"
+    rpc_resp = await fetch_with_backoff(session, rpc_url)
+    if not rpc_resp:
+        return [], "aur_not_found"
+        
+    try:
+        rpc_data = json.loads(rpc_resp)
+        if rpc_data.get("resultcount", 0) == 0:
+            return [], "aur_not_found"
+        
+        pkgbase = rpc_data["results"][0].get("PackageBase", pkg_name)
+    except (json.JSONDecodeError, KeyError):
+        pkgbase = pkg_name
+
+    # 2. Fetch history from cgit Atom feed
+    atom_url = f"https://aur.archlinux.org/cgit/aur.git/atom/?h={pkgbase}"
+    xml = await fetch_with_backoff(session, atom_url)
+    if not xml:
+        return [], "aur_not_found"
+        
+    dates = []
+    entries = re.findall(r'<entry>.*?</entry>', xml, re.DOTALL)
+    for entry in entries:
+        match = re.search(r'<updated>(.*?)</updated>', entry)
+        if match:
+            date_str = match.group(1)
+            try:
+                dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
+                dates.append(dt)
+            except ValueError:
+                try:
+                    dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    dates.append(dt)
+                except ValueError:
+                    pass
+    
+    dates = sorted(list(set(dates)))
+    return dates, "aur"
+
+async def process_package(session, pkg, is_cachyos, is_aur, cache, max_age, semaphore):
     async with semaphore:
         now = datetime.now(timezone.utc)
         
@@ -109,8 +151,12 @@ async def process_package(session, pkg, is_cachyos, cache, max_age, semaphore):
             dates, source = await analyze_cachy_package(session, pkg)
             if len(dates) < 2: # Fallback to ALA if CachyOS-specific check fails
                 dates, source = await analyze_arch_package(session, pkg)
+        elif is_aur:
+            dates, source = await analyze_aur_package(session, pkg)
         else:
             dates, source = await analyze_arch_package(session, pkg)
+            if len(dates) < 2 and source == "ala_not_found":
+                dates, source = await analyze_aur_package(session, pkg)
             
         num_releases = len(dates)
         intervals = [(dates[i] - dates[i-1]).days for i in range(1, num_releases)]
@@ -134,6 +180,7 @@ async def main():
     parser = argparse.ArgumentParser(description="Calculate chunkah update intervals for packages.")
     parser.add_argument("packages", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="List of packages (or stdin)")
     parser.add_argument("--cachyos-packages", type=Path, help="File containing list of known CachyOS packages")
+    parser.add_argument("--aur-packages", type=Path, help="File containing list of known AUR packages")
     parser.add_argument("--cache-file", type=Path, default=Path("tools/package-intervals.json"), help="Output JSON file")
     parser.add_argument("--max-age-days", type=int, default=30, help="Max age for cached entries")
     parser.add_argument("--concurrency", type=int, default=8, help="Concurrent HTTP requests")
@@ -147,6 +194,10 @@ async def main():
     if args.cachyos_packages and args.cachyos_packages.exists():
         cachy_pkgs = {line.strip() for line in args.cachyos_packages.read_text().splitlines() if line.strip()}
         
+    aur_pkgs = set()
+    if args.aur_packages and args.aur_packages.exists():
+        aur_pkgs = {line.strip() for line in args.aur_packages.read_text().splitlines() if line.strip()}
+
     cache = {}
     if args.cache_file.exists():
         try:
@@ -163,7 +214,8 @@ async def main():
         tasks = []
         for pkg in pkg_list:
             is_cachy = pkg in cachy_pkgs
-            tasks.append(process_package(session, pkg, is_cachy, cache, args.max_age_days, semaphore))
+            is_aur = pkg in aur_pkgs
+            tasks.append(process_package(session, pkg, is_cachy, is_aur, cache, args.max_age_days, semaphore))
             
         results = await asyncio.gather(*tasks)
         
