@@ -18,6 +18,8 @@ on:
 jobs:
   update-intervals:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,14 +37,6 @@ jobs:
 
       - name: Install Python dependencies
         run: pip install -r scripts/requirements.txt
-
-      - name: Restore Package Intervals Cache
-        uses: actions/cache/restore@v4
-        with:
-          path: scripts/package-intervals.json
-          key: pkg-intervals-latest
-          restore-keys: |
-            pkg-intervals-
 
       - name: Generate Package Lists from All Images
         run: |
@@ -102,15 +96,9 @@ jobs:
             --max-age-days ${{ github.event.inputs.max_age || '30' }} \
             --concurrency 10
 
-      - name: Save Package Intervals to Cache
-        uses: actions/cache/save@v4
-        with:
-          path: scripts/package-intervals.json
-          key: pkg-intervals-${{ hashFiles('scripts/package-intervals.json') }}
-
-      - name: Upload Package Intervals Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: package-intervals
-          path: scripts/package-intervals.json
-          retention-days: 7
+      - name: Commit and Push Package Intervals
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f scripts/package-intervals.json
+          git diff --staged --exit-code || (git commit -m "chore: update package intervals" && git push)
