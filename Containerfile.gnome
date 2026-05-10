@@ -13,8 +13,12 @@ FROM ${IMAGE_REGISTRY}/cachyos-base:${BASE_IMAGE_TAG}
 COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/gnome/gnome.yaml /tmp/gnome.yaml
 
-RUN chmod +x /tmp/install_packages.sh && \
-    /tmp/install_packages.sh /tmp/gnome.yaml
+# Track package states to apply xattrs only to newly added or upgraded packages
+RUN pacman -Q | sort > /tmp/base_pkgs.txt && \
+    chmod +x /tmp/install_packages.sh && \
+    /tmp/install_packages.sh /tmp/gnome.yaml && \
+    pacman -Q | sort > /tmp/all_pkgs.txt && \
+    comm -13 /tmp/base_pkgs.txt /tmp/all_pkgs.txt | awk '{print $1}' > /tmp/modified_pkgs.txt
 
 # Copy GNOME-specific configuration files
 # These are commented out intentionally. Git does not track empty directories,
@@ -37,7 +41,7 @@ RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
 COPY scripts/package-intervals.json /tmp/package-intervals.json
 COPY scripts/apply-update-intervals.sh /tmp/apply-update-intervals.sh
 RUN chmod +x /tmp/apply-update-intervals.sh && \
-    /tmp/apply-update-intervals.sh /tmp/package-intervals.json /
+    /tmp/apply-update-intervals.sh /tmp/package-intervals.json / /tmp/modified_pkgs.txt
 
 # Update the SBOM / Package Manifest for the overlay
 RUN /usr/share/boppos/generate-package-list.sh

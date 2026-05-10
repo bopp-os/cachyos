@@ -3,6 +3,7 @@ set -euo pipefail
 
 JSON_FILE="${1:-scripts/package-intervals.json}"
 ROOTFS="${2:-/}"
+PKG_FILE="${3:-}"
 CONCURRENCY=4
 
 if [[ ! -f "$JSON_FILE" ]]; then
@@ -47,8 +48,20 @@ apply_pkg_xattrs() {
 
 export -f apply_pkg_xattrs
 
+# Determine which packages to process
+if [[ -n "$PKG_FILE" && -f "$PKG_FILE" ]]; then
+    PKG_LIST=$(cat "$PKG_FILE")
+else
+    PKG_LIST=$(pacman -Qq)
+fi
+
+if [[ -z "$PKG_LIST" ]]; then
+    echo "No packages to process."
+    exit 0
+fi
+
 # Run apply in parallel and print a summarized table at the end
-pacman -Qq | xargs -P "$CONCURRENCY" -I {} bash -c 'apply_pkg_xattrs "$@"' _ {} | awk '
+echo "$PKG_LIST" | xargs -P "$CONCURRENCY" -I {} bash -c 'apply_pkg_xattrs "$@"' _ {} | awk '
     {
         match($0, /.*: ([a-z]+) \(([0-9]+) files\)/, arr)
         if (arr[1] != "") {
