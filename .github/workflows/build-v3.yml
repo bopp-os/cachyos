@@ -23,6 +23,11 @@ on:
         required: false
         type: boolean
         default: false
+      unconfined_build:
+        description: 'Disable seccomp profile (--security-opt seccomp=unconfined)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image"
@@ -31,6 +36,8 @@ env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   FLAVORS: "plasma gnome niri"
   DEFAULT_TAG: "${{ inputs.test_tag && 'v3-test' || 'v3' }}"
+  BASE_TAG: "v3"
+  TARGET_MARCH: "v3"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -110,7 +117,7 @@ jobs:
           tags: |
             type=raw,value=${{ env.DEFAULT_TAG }}
             type=raw,value=${{ env.DEFAULT_TAG }}-{{date 'YYYYMMDD'}}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !inputs.test_tag }}
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
           labels: |
@@ -158,16 +165,29 @@ jobs:
           
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
+      - name: Generate Fastest Mirrors
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          echo "::group::Generating fastest mirrors"
+          mkdir -p ${{ github.workspace }}/mirrors
+          PODMAN_OPTS=""
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
+          sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z docker.io/cachyos/cachyos-v4:latest bash -c "timeout 120 bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null && cachyos-rate-mirrors < /dev/null' || echo 'Mirror rating timed out or failed, falling back to defaults'; cp /etc/pacman.d/cachyos-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v3-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v4-mirrorlist /workspace-mirrors/"
+          echo "::endgroup::"
+
       - name: Build AUR Image
         id: build_aur
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
           set -x
-          MARCH="${{ env.DEFAULT_TAG }}"
+          MARCH="${{ env.TARGET_MARCH }}"
+
+          PODMAN_OPTS=""
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
 
           echo "::group::Building AUR builder"
-          sudo podman build -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
-            --build-arg BASE_IMAGE_TAG=${{ env.DEFAULT_TAG }} \
+          sudo podman build $PODMAN_OPTS -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
+            --build-arg BASE_IMAGE_TAG=${{ env.BASE_TAG }} \
             --build-arg TARGET_CPU_MARCH=$MARCH \
             --network=host \
             --tag "localhost/aur-builder:$MARCH" -f "Containerfile.aur" .
@@ -181,7 +201,7 @@ jobs:
         run: |
           set -x
 
-          MARCH="${{ env.DEFAULT_TAG }}"
+          MARCH="${{ env.TARGET_MARCH }}"
 
           # get labels from metadata action
           while IFS= read -r label; do
@@ -204,10 +224,15 @@ jobs:
             BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
           fi
 
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then
+            echo "Manual unconfined build triggered. Appending --security-opt seccomp=unconfined..."
+            BUILD_ARGS+=("--security-opt" "seccomp=unconfined")
+          fi
+
           echo "::group::Building base"
           CURRENT_IMAGE_NAME="cachyos-base"
           DOCKERFILE="Containerfile.base"
-          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=${{ env.DEFAULT_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
+          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
             --network=host \
@@ -235,11 +260,13 @@ jobs:
           du -sh ${{ env.LOCAL_CACHE_DIR }}
 
           # Determine the correct CachyOS base image to reuse for pruning
-          MARCH="${{ env.DEFAULT_TAG }}"
-          PRUNE_IMAGE="docker.io/cachyos/cachyos-$MARCH"
+          PRUNE_IMAGE="docker.io/cachyos/cachyos-${{ env.BASE_TAG }}"
+
+          PODMAN_OPTS=""
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
 
           # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
-          sudo podman run --rm --network=host -v ${{ env.LOCAL_CACHE_DIR }}:/host-cache:z \
+          sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ env.LOCAL_CACHE_DIR }}:/host-cache:z \
             $PRUNE_IMAGE \
             bash -c "pacman -Sy --noconfirm archlinux-keyring cachyos-keyring && pacman -S --noconfirm pacman-contrib && paccache -c /host-cache -rk1"
             
@@ -310,7 +337,7 @@ jobs:
           tags: |
             type=raw,value=${{ env.DEFAULT_TAG }}
             type=raw,value=${{ env.DEFAULT_TAG }}-{{date 'YYYYMMDD'}}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !inputs.test_tag }}
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
           labels: |
@@ -365,6 +392,7 @@ jobs:
 
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then BUILD_ARGS+=("--no-cache"); fi
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true"); fi
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then BUILD_ARGS+=("--security-opt" "seccomp=unconfined"); fi
           BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
           
           FLAVOR="${{ matrix.flavor }}"
@@ -379,7 +407,10 @@ jobs:
           IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           ARCHIVE_PATH="${{ github.workspace }}/rechunked_${FLAVOR}.tar"
 
-          sudo podman run --rm --network=none --mount=type=image,source=$IMAGE_REF,target=/chunkah -e SOURCE_DATE_EPOCH=0 -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" quay.io/coreos/chunkah build --compressed --compression-level 6 --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
+          PODMAN_OPTS=""
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
+
+          sudo podman run $PODMAN_OPTS --rm --network=none --mount=type=image,source=$IMAGE_REF,target=/chunkah -e SOURCE_DATE_EPOCH=0 -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" quay.io/coreos/chunkah build --compressed --compression-level 6 --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
 
           sudo podman rmi -f "$IMAGE_REF"
           sudo podman system prune -f
@@ -395,7 +426,9 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "Extracting package list from image..."
-          CONTAINER_ID=$(sudo podman create localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
+          PODMAN_OPTS=""
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
+          CONTAINER_ID=$(sudo podman create $PODMAN_OPTS localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
           sudo podman cp ${CONTAINER_ID}:/usr/share/boppos/packages.json packages-${{ matrix.flavor }}-${{ github.sha }}.json
           sudo podman rm ${CONTAINER_ID}
 

@@ -56,7 +56,7 @@ while IFS='|' read -r COMP_TAG INTERVAL PKGS; do
             # Try to refresh mirrors if the command is available to recover from 404s
             if command -v cachyos-rate-mirrors >/dev/null 2>&1; then
                 echo "🌐 Refreshing mirrors with cachyos-rate-mirrors..."
-                cachyos-rate-mirrors || true
+                timeout 120 cachyos-rate-mirrors < /dev/null || true
             fi
         fi
     done
@@ -98,3 +98,9 @@ except Exception as e:
 " "$YAML_FILE")
 
 echo "Installation complete for $YAML_FILE."
+
+# Ensure no background GnuPG daemons are left hanging to prevent podman build freezes
+pkill -9 gpg-agent || true
+pkill -9 dirmngr || true
+pkill -9 keyboxd || true
+pkill -9 scdaemon || true
