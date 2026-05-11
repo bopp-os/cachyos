@@ -29,12 +29,6 @@
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:21.172285+00:00"
   },
-  "accounts-qml-module": {
-    "interval": "yearly",
-    "avg_days": 529.0,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:21.172325+00:00"
-  },
   "accountsservice": {
     "interval": "monthly",
     "avg_days": 22,
@@ -970,18 +964,6 @@
     "avg_days": 82.5,
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:24.768793+00:00"
-  },
-  "criu": {
-    "interval": "quarterly",
-    "avg_days": 72,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:24.833885+00:00"
-  },
-  "crun": {
-    "interval": "biweekly",
-    "avg_days": 18.5,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:24.864411+00:00"
   },
   "cryptsetup": {
     "interval": "monthly",
@@ -2236,12 +2218,6 @@
     "avg_days": 81,
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:29.424616+00:00"
-  },
-  "gnu-free-fonts": {
-    "interval": "yearly",
-    "avg_days": 156.0,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:29.427615+00:00"
   },
   "gnulib-l10n": {
     "interval": "yearly",
@@ -5489,12 +5465,6 @@
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:38.395376+00:00"
   },
-  "libnet": {
-    "interval": "daily",
-    "avg_days": 0,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:38.397782+00:00"
-  },
   "libnetfilter_conntrack": {
     "interval": "yearly",
     "avg_days": 724,
@@ -6581,12 +6551,6 @@
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:40.671235+00:00"
   },
-  "llvm": {
-    "interval": "biweekly",
-    "avg_days": 12,
-    "source": "cachyos_mirror",
-    "fetched_at": "2026-05-11T00:45:40.675995+00:00"
-  },
   "llvm-libs": {
     "interval": "biweekly",
     "avg_days": 12,
@@ -6827,18 +6791,6 @@
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:41.148525+00:00"
   },
-  "mkinitcpio": {
-    "interval": "monthly",
-    "avg_days": 42,
-    "source": "cachyos_mirror",
-    "fetched_at": "2026-05-11T00:45:41.149176+00:00"
-  },
-  "mkinitcpio-busybox": {
-    "interval": "quarterly",
-    "avg_days": 104.0,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:41.149196+00:00"
-  },
   "mobile-broadband-provider-info": {
     "interval": "yearly",
     "avg_days": 208,
@@ -6923,17 +6875,17 @@
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:41.363690+00:00"
   },
-  "mullvad-vpn": {
+  "mullvad-vpn-bin": {
     "interval": "monthly",
-    "avg_days": 39,
-    "source": "cachyos_mirror",
-    "fetched_at": "2026-05-11T00:45:41.378473+00:00"
+    "avg_days": 29,
+    "source": "aur",
+    "fetched_at": "2026-05-11T04:58:45.983939+00:00"
   },
-  "mullvad-vpn-daemon": {
-    "interval": "biweekly",
-    "avg_days": 19.0,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:41.378528+00:00"
+  "mullvad-vpn-daemon-bin": {
+    "interval": "monthly",
+    "avg_days": 29,
+    "source": "aur",
+    "fetched_at": "2026-05-11T04:58:45.984216+00:00"
   },
   "mutter": {
     "interval": "weekly",
@@ -7781,12 +7733,6 @@
     "source": "cachyos_mirror",
     "fetched_at": "2026-05-11T00:45:43.333973+00:00"
   },
-  "pipewire-session-manager": {
-    "interval": "yearly",
-    "avg_days": 330.0,
-    "source": "cachyos_mirror",
-    "fetched_at": "2026-05-11T00:45:43.333985+00:00"
-  },
   "pixman": {
     "interval": "monthly",
     "avg_days": 40.5,
@@ -8452,12 +8398,6 @@
     "avg_days": 22,
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:44.939552+00:00"
-  },
-  "python-protobuf": {
-    "interval": "biweekly",
-    "avg_days": 16.5,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:44.952462+00:00"
   },
   "python-psutil": {
     "interval": "monthly",
@@ -9622,12 +9562,6 @@
     "avg_days": 78.0,
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:48.007424+00:00"
-  },
-  "tesseract-data-afr": {
-    "interval": "yearly",
-    "avg_days": 319,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:48.030420+00:00"
   },
   "tesseract-data-eng": {
     "interval": "yearly",
@@ -10960,12 +10894,6 @@
     "avg_days": 32.5,
     "source": "ala",
     "fetched_at": "2026-05-11T00:45:51.335155+00:00"
-  },
-  "yajl": {
-    "interval": "yearly",
-    "avg_days": 610.0,
-    "source": "ala",
-    "fetched_at": "2026-05-11T00:45:51.348107+00:00"
   },
   "yakuake": {
     "interval": "biweekly",
