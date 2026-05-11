@@ -295,7 +295,7 @@ jobs:
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
           
           # 4. Delete the massive chunkah tarballs
-          sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           
           # 5. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
@@ -457,19 +457,25 @@ jobs:
           PODMAN_OPTS=""
           if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
           
+          export CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)"
+          export PODMAN_OPTS
+          export IMAGE_REF
+          export DEFAULT_DEST
+          
           echo "::group::Rechunking and Pushing $FLAVOR directly to registry"
           SUCCESS=false
           for i in $(seq "${MAX_RETRIES}"); do
-            if sudo podman run $PODMAN_OPTS --rm --network=none \
+            echo "Attempt $i: Building and streaming directly to registry..."
+            if sudo -E bash -c 'podman run $PODMAN_OPTS --rm --network=none \
                 --mount=type=image,source=$IMAGE_REF,target=/chunkah \
                 -e SOURCE_DATE_EPOCH=0 \
-                -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
+                -e CHUNKAH_CONFIG_STR="$CHUNKAH_CONFIG_STR" \
                 quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 400 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | \
-               sudo skopeo copy \
+                skopeo copy \
                 --dest-compress-format zstd:chunked \
                 --dest-compress-level 6 \
                 oci-archive:/dev/stdin \
-                "$DEFAULT_DEST"; then
+                "$DEFAULT_DEST"'; then
               SUCCESS=true
               break
             fi
@@ -531,7 +537,7 @@ jobs:
           sudo podman rm -af || true
           sudo podman system prune --all --force --volumes --build || true
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
-          sudo rm -f /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*.tar
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
             echo "✨ All flavors built successfully. Removing workspace..."
             sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
