@@ -18,7 +18,7 @@ COPY mirrors/cachyos-v4-mirrorlist /etc/pacman.d/cachyos-v4-mirrorlist
 COPY files/keys/ /tmp/keys/
 
 # Minimal setup: just enough to build packages
-RUN pacman -Sy --noconfirm --needed archlinux-keyring cachyos-keyring gnupg curl && \
+RUN pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl && \
     rm -rf /etc/pacman.d/gnupg && \
     pacman-key --init && \
     echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
@@ -42,7 +42,7 @@ RUN sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && 
     ln -sf /dev/null /etc/pacman.d/hooks/udev-hwdb.hook
 
 RUN rm -rf /var/lib/pacman/sync/* && \
-    pacman -Syy --noconfirm --needed cachyos-keyring archlinux-keyring && \
+    pacman -Syy --noconfirm cachyos-keyring archlinux-keyring && \
     pacman -Su --noconfirm && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 

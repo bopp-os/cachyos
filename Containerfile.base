@@ -32,7 +32,7 @@ COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /usr/share/pacman/keyrings
 COPY files/keys/ /tmp/keys/
 
 # Re-initialize and trust keys in the system stage to avoid GPGME environment issues
-RUN pacman -Sy --noconfirm --needed archlinux-keyring cachyos-keyring gnupg curl && \
+RUN pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl && \
     rm -rf /etc/pacman.d/gnupg && \
     pacman-key --init && \
     echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
@@ -54,7 +54,7 @@ RUN mkdir -p /etc/pacman.d/hooks && \
     ln -sf /dev/null /etc/pacman.d/hooks/udev-hwdb.hook
 
 RUN rm -rf /var/lib/pacman/sync/* && \
-    pacman -Syy --noconfirm --needed cachyos-keyring archlinux-keyring && \
+    pacman -Syy --noconfirm cachyos-keyring archlinux-keyring && \
     pacman -Su --noconfirm && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
