@@ -33,7 +33,7 @@ jobs:
           cache: 'pip'
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.5.0
+        uses: sigstore/cosign-installer@v4.1.2
 
       - name: Install Python dependencies
         run: pip install -r scripts/requirements.txt
