@@ -456,23 +456,37 @@ jobs:
           
           echo "::group::Rechunking and Pushing $FLAVOR directly to registry"
           SUCCESS=false
+          
+          FIFO_DIR=$(mktemp -d)
+          FIFO_PATH="$FIFO_DIR/chunkah.tar"
+          mkfifo "$FIFO_PATH"
+          
           for i in $(seq "${MAX_RETRIES}"); do
-            echo "Attempt $i: Building and streaming directly to registry..."
-            if sudo -E bash -c 'podman run $PODMAN_OPTS --rm --network=none \
+            echo "Attempt $i: Building and streaming directly to registry via FIFO..."
+            
+            sudo podman run $PODMAN_OPTS --rm --network=none \
                 --mount=type=image,source=$IMAGE_REF,target=/chunkah \
                 -e SOURCE_DATE_EPOCH=0 \
                 -e CHUNKAH_CONFIG_STR="$CHUNKAH_CONFIG_STR" \
-                quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | \
-                skopeo copy \
+                quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 128 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
+            PODMAN_PID=$!
+            
+            if sudo skopeo copy \
                 --dest-compress-format zstd:chunked \
                 --dest-compress-level 6 \
-                oci-archive:/dev/stdin \
-                "$DEFAULT_DEST"'; then
+                "oci-archive:$FIFO_PATH" \
+                "$DEFAULT_DEST"; then
               SUCCESS=true
+              wait $PODMAN_PID || true
               break
             fi
+            
+            sudo kill $PODMAN_PID 2>/dev/null || true
+            wait $PODMAN_PID 2>/dev/null || true
             echo "Push failed, retrying in $((5 * i)) seconds..."; sleep $((5 * i))
           done
+          
+          rm -rf "$FIFO_DIR"
           
           if [ "$SUCCESS" = "false" ]; then exit 1; fi
           
