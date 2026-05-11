@@ -389,7 +389,7 @@ jobs:
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf "$CACHE_DIR"/*; fi
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
-      - name: Build & Rechunk Flavor Image
+      - name: Build Flavor Image
         env:
           META_LABELS: ${{ steps.metadata.outputs.labels }}
         run: |
@@ -410,24 +410,6 @@ jobs:
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=host --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
-          
-          echo "Rechunking $FLAVOR image..."
-          IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
-          ARCHIVE_PATH="${{ github.workspace }}/rechunked_${FLAVOR}.tar"
-
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-
-          sudo podman run $PODMAN_OPTS --rm --network=none --mount=type=image,source=$IMAGE_REF,target=/chunkah -e SOURCE_DATE_EPOCH=0 -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" quay.io/coreos/chunkah build --compressed --compression-level 6 --label containers.bootc=1 --max-layers 400 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$ARCHIVE_PATH"
-
-          sudo podman rmi -f "$IMAGE_REF"
-          sudo podman system prune -f
-          sudo podman load -i "$ARCHIVE_PATH" > /tmp/podman_load_output.txt
-
-          IMAGE_ID=$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $3}')
-          sudo podman tag "$IMAGE_ID" "$IMAGE_REF"
-          
-          sudo rm -f "$ARCHIVE_PATH"
           echo "::endgroup::"
 
       - name: Extract Package List
@@ -440,7 +422,25 @@ jobs:
           sudo podman cp ${CONTAINER_ID}:/usr/share/boppos/packages.json packages-${{ matrix.flavor }}-${{ github.sha }}.json
           sudo podman rm ${CONTAINER_ID}
 
-      - name: Push Flavor Image to GHCR
+      - name: Rechunk Flavor Image (PR Dry Run)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -ex
+          FLAVOR="${{ matrix.flavor }}"
+          CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
+          IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
+          
+          PODMAN_OPTS=""
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
+          
+          echo "Rechunking $FLAVOR (PR Dry Run)..."
+          sudo podman run $PODMAN_OPTS --rm --network=none \
+            --mount=type=image,source=$IMAGE_REF,target=/chunkah \
+            -e SOURCE_DATE_EPOCH=0 \
+            -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
+            quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 400 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
+
+      - name: Rechunk & Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'
         env:
           IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
@@ -451,25 +451,41 @@ jobs:
           set -ex
           FLAVOR="${{ matrix.flavor }}"
           CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
-          SOURCE_IMAGE="containers-storage:localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
+          IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
+          DEFAULT_DEST="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           
-          for tag in $IMAGE_TAGS; do
-            DEST_IMAGE="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"
-            SUCCESS=false
-            for i in $(seq "${MAX_RETRIES}"); do
-              # Use skopeo to copy with zstd compression for smaller images
-              if sudo skopeo copy \
-                  --dest-compress-format zstd:chunked \
-                  --dest-compress-level 6 \
-                  "$SOURCE_IMAGE" "$DEST_IMAGE"; then
-                SUCCESS=true
-                break
-              fi
-              echo "Push failed, retrying in $((5 * i)) seconds..."; sleep $((5 * i))
-            done
-            if [ "$SUCCESS" = "false" ]; then exit 1; fi
+          PODMAN_OPTS=""
+          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
+          
+          echo "::group::Rechunking and Pushing $FLAVOR directly to registry"
+          SUCCESS=false
+          for i in $(seq "${MAX_RETRIES}"); do
+            if sudo podman run $PODMAN_OPTS --rm --network=none \
+                --mount=type=image,source=$IMAGE_REF,target=/chunkah \
+                -e SOURCE_DATE_EPOCH=0 \
+                -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
+                quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 400 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | \
+               sudo skopeo copy \
+                --dest-compress-format zstd:chunked \
+                --dest-compress-level 6 \
+                docker-archive:/dev/stdin \
+                "$DEFAULT_DEST"; then
+              SUCCESS=true
+              break
+            fi
+            echo "Push failed, retrying in $((5 * i)) seconds..."; sleep $((5 * i))
           done
           
+          if [ "$SUCCESS" = "false" ]; then exit 1; fi
+          
+          for tag in $IMAGE_TAGS; do
+            if [ "$tag" != "${DEFAULT_TAG}" ]; then
+              DEST_IMAGE="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"
+              sudo skopeo copy "$DEFAULT_DEST" "$DEST_IMAGE"
+            fi
+          done
+          echo "::endgroup::"
+
           SUCCESS_DIGEST=false
           for i in $(seq "${MAX_RETRIES}"); do
             if REMOTE_DIGEST=$(skopeo inspect --creds="${{ github.actor }}:${GITHUB_TOKEN}" --format '{{.Digest}}' "docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"); then SUCCESS_DIGEST=true; break; fi
