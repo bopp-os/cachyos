@@ -40,8 +40,8 @@ env:
   TARGET_MARCH: "v3"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
-  cancel-in-progress: true
+  group: boppos-build-queue
+  cancel-in-progress: false
 
 jobs:
   build_base:
@@ -94,6 +94,10 @@ jobs:
             echo "Nuking Podman builder cache mount..."
             sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*
           fi
+          
+          # 5. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
+          echo "Nuking leftover workspace files..."
+          sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           
           echo "📊 Disk space after cleanup:"
           df -h /

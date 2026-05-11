@@ -37,8 +37,8 @@ env:
   TARGET_MARCH: "znver4"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
-  cancel-in-progress: true
+  group: boppos-build-queue
+  cancel-in-progress: false
 
 jobs:
   build_base:
@@ -81,7 +81,7 @@ jobs:
           fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-*
+          sudo rm -rf /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-*
           
           # 3. Prune dangling Podman data AND aggressively wipe the build cache
           sudo podman system prune --all --force --volumes --build
