@@ -55,6 +55,8 @@ env:
   DEFAULT_TAG: "${{ inputs.test_tag && 'v4-test' || 'v4' }}"
   BASE_TAG: "v4"
   TARGET_MARCH: "v4"
+  HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
+  HOST_AUR_CACHE_DIR: "/opt/boppos-aur-cache"
 
 concurrency:
   group: boppos-build-queue
@@ -207,8 +209,8 @@ jobs:
 
       - name: Prepare Local Cache Directory
         run: |
-          CACHE_DIR="/opt/boppos-pkg-cache/${{ env.DEFAULT_TAG }}"
-          AUR_CACHE_DIR="/opt/boppos-aur-cache"
+          CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.DEFAULT_TAG }}"
+          AUR_CACHE_DIR="${{ env.HOST_AUR_CACHE_DIR }}"
           sudo mkdir -p "$CACHE_DIR" "$AUR_CACHE_DIR"
           sudo chown -R $USER:$USER "$CACHE_DIR"
           sudo chmod 777 "$AUR_CACHE_DIR"
@@ -446,7 +448,7 @@ jobs:
 
       - name: Prepare Local Cache Directory
         run: |
-          CACHE_DIR="/opt/boppos-pkg-cache/${{ env.DEFAULT_TAG }}"
+          CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.DEFAULT_TAG }}"
           sudo mkdir -p "$CACHE_DIR"
           sudo chown -R $USER:$USER "$CACHE_DIR"
           sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
