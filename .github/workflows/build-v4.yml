@@ -25,6 +25,21 @@ on:
         required: false
         type: boolean
         default: false
+      build_plasma:
+        description: 'Build Plasma flavor'
+        required: false
+        type: boolean
+        default: true
+      build_gnome:
+        description: 'Build GNOME flavor'
+        required: false
+        type: boolean
+        default: true
+      build_niri:
+        description: 'Build Niri flavor'
+        required: false
+        type: boolean
+        default: true
 
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image (v4)"
@@ -82,6 +97,11 @@ jobs:
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-*
+          
+          # Ensure local base tags are cleared at the very beginning of a new pipeline run
+          sudo podman rmi -f "localhost/aur-builder:${{ env.TARGET_MARCH }}" 2>/dev/null || true
+          sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           
           # 3. Prune dangling Podman data (Preserve recent build cache for speed)
           sudo podman system prune --force
@@ -312,7 +332,12 @@ jobs:
   build_flavors:
     name: Build ${{ matrix.flavor }} (v4)
     needs: build_base
-    if: needs.build_base.outputs.should_skip != 'true'
+    if: >-
+      needs.build_base.outputs.should_skip != 'true' &&
+      (github.event_name != 'workflow_dispatch' ||
+      (matrix.flavor == 'plasma' && inputs.build_plasma == true) ||
+      (matrix.flavor == 'gnome' && inputs.build_gnome == true) ||
+      (matrix.flavor == 'niri' && inputs.build_niri == true))
     runs-on: x86-64-v4
     strategy:
       fail-fast: false
@@ -548,16 +573,16 @@ jobs:
         run: |
           echo "🧹 Sweeping up the heavy Podman assets..."
           sudo podman rm -af || true
-          sudo podman rmi -f "localhost/aur-builder:${{ env.TARGET_MARCH }}" 2>/dev/null || true
-          sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
-          sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           sudo podman system prune --force || true
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
-            echo "✨ All flavors built successfully. Removing workspace..."
+            echo "✨ All flavors built successfully. Removing local base images and workspace..."
+            sudo podman rmi -f "localhost/aur-builder:${{ env.TARGET_MARCH }}" 2>/dev/null || true
+            sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+            sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
             sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
           else
-            echo "⚠️ Some flavors failed. Preserving workspace for debug."
+            echo "⚠️ Some flavors failed. Preserving base image and workspace for partial re-runs."
           fi
           df -h /
