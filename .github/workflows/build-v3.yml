@@ -86,13 +86,15 @@ jobs:
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-*
           
-          # 3. Prune dangling Podman data AND aggressively wipe the build cache
-          sudo podman system prune --all --force --volumes --build
+          # 3. Prune dangling Podman data (Preserve recent build cache for speed)
+          sudo podman system prune --force
+          sudo podman image prune --all --force --filter "until=72h"
           
           # 4. Wipe the Podman package cache if the manual UI toggle was checked
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Nuking Podman builder cache mount..."
             sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*
+            sudo podman system prune --all --force --volumes --build
           fi
           
           # 5. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
@@ -559,7 +561,10 @@ jobs:
         run: |
           echo "🧹 Sweeping up the heavy Podman assets..."
           sudo podman rm -af || true
-          sudo podman system prune --all --force --volumes --build || true
+          sudo podman rmi -f "localhost/aur-builder:${{ env.TARGET_MARCH }}" 2>/dev/null || true
+          sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          sudo podman system prune --force || true
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
