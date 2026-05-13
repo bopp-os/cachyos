@@ -50,8 +50,13 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "⚠️ Package installation failed! (Attempt $RETRY_COUNT of $MAX_RETRIES)"
 
     if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-        echo "🔄 Waiting 5 seconds before retrying..."
-        sleep 5
+        WAIT_TIME=$(( 5 * RETRY_COUNT ))
+        echo "🔄 Waiting ${WAIT_TIME} seconds before retrying..."
+        sleep ${WAIT_TIME}
+
+        # Clean up any partial downloads that might be stuck or corrupted
+        echo "🧹 Cleaning up potentially corrupted partial downloads..."
+        rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.part 2>/dev/null || true
 
         # Try to refresh mirrors if the command is available to recover from 404s
         if command -v cachyos-rate-mirrors >/dev/null 2>&1; then
