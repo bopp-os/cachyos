@@ -171,6 +171,11 @@ hardware-management:
   - mtools
   - chwd
   - hwdetect
+  - colord
+  - bolt
+  - libgusb
+  - libssc
+  - iio-sensor-proxy
 shells:
   - bash
   - zsh
@@ -261,10 +266,14 @@ desktop-integration:
   - poppler-glib
   - espeak-ng
   - orca
+  - exiv2
+  - editorconfig-core-c
+  - libphonenumber
 themes-aesthetics:
   - cachyos-wallpapers
   - cachyos-plymouth-theme
   - cachyos-plymouth-bootanimation
+  - cachyos-nord-gtk-theme-git
 media-video:
   - libdvdcss
   - gst-libav
