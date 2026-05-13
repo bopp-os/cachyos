@@ -58,7 +58,7 @@ RUN if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
     fi
 
 RUN rm -rf /var/lib/pacman/sync/* && \
-    pacman -Syy --noconfirm --needed base-devel git sudo ccache && \
+    pacman -Syy --noconfirm --needed base-devel git sudo ccache sccache && \
     useradd -m builduser && \
     echo "builduser ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
     mkdir -p /home/builduser/packages && \
