@@ -186,7 +186,8 @@ cmd_edit() {
 
     $ACTIVE_EDITOR "$tmp"
 
-    local new_opts=$(cat "$tmp" | tr '\n' ' ' | xargs)
+    # Safely trim whitespace and newlines without stripping quotes like xargs does
+    local new_opts=$(tr '\n' ' ' < "$tmp" | tr -s ' ' | sed 's/^ *//; s/ *$//')
     if [[ ! "$new_opts" =~ ostree= ]]; then
         log_err "CRITICAL: 'ostree=' argument missing! Edit aborted to prevent bricking."
     fi
