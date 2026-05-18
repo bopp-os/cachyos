@@ -84,6 +84,9 @@ COPY files/base/usr/lib /usr/lib
 COPY files/base/usr/libexec /usr/libexec
 RUN chmod -R 0755 /usr/libexec
 
+# Link OS default font configuration
+RUN mkdir -p /etc/fonts/conf.d && ln -sf /usr/share/fontconfig/conf.avail/52-boppos-fonts.conf /etc/fonts/conf.d/52-boppos-fonts.conf
+
 # Generate en_US.UTF-8 locale
 RUN sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
     locale-gen && \

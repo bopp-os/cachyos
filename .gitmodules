@@ -13,3 +13,6 @@
 [submodule "files/aur/pkgbuilds/gnome-shell-extension-clipboard-indicator"]
 	path = files/aur/pkgbuilds/gnome-shell-extension-clipboard-indicator
 	url = https://aur.archlinux.org/gnome-shell-extension-clipboard-indicator.git
+[submodule "files/aur/pkgbuilds/vulkan-low-latency-layer"]
+	path = files/aur/pkgbuilds/vulkan-low-latency-layer
+	url = https://aur.archlinux.org/vulkan-low-latency-layer.git

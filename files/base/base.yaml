@@ -316,6 +316,7 @@ gaming-core:
   - vkbasalt-cli
   - vkd3d
   - lib32-vkd3d
+  - vulkan-low-latency-layer
   - python-pefile
   - python-pyclip
 web-browsers:
