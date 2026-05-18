@@ -292,7 +292,7 @@ gaming-core:
   - yad
   - mangohud
   - lutris
-  - heroic-games-launcher
+  - heroic-games-launcher-bin
   - steam
   - lib32-glibc
   - lib32-gcc-libs
