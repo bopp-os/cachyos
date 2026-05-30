@@ -34,6 +34,9 @@ RUN systemctl disable sddm.service || true && \
     systemctl enable plasmalogin.service && \
     systemctl enable usr-share-sddm.mount
 
+# Remove PackageKit backend for Discover to prevent crashes on our immutable OS
+RUN rm -f /usr/lib/qt6/plugins/discover/packagekit-backend.so
+
 # Preserve /opt contents for OverlayFS
 RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
         mkdir -p /usr/lib/opt && cp -r /opt/* /usr/lib/opt/ && rm -rf /opt/* ; \
