@@ -6,6 +6,29 @@ user := "ripps818"
 default:
     @just --list
 
+build-mirrorlists arch='v3':
+    @echo "Generating fastest mirror lists"
+    mkdir -p mirrors
+    podman run \
+        --security-opt=seccomp=unconfined \
+        --rm --network=host \
+        -v $(pwd)/mirrors:/workspace-mirrors:z \
+        docker.io/cachyos/cachyos-$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi):latest \
+        bash -c "timeout 120 \
+            bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null \
+                        && cachyos-rate-mirrors < /dev/null'" || \
+    echo 'Mirror rating timed out or failed, falling back to defaults' && \
+    podman run \
+        --security-opt=seccomp=unconfined \
+        --rm --network=host \
+        -v $(pwd)/mirrors:/workspace-mirrors:z \
+        docker.io/cachyos/cachyos-$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi):latest \
+        bash -c "cp /etc/pacman.d/cachyos-mirrorlist /workspace-mirrors/ \
+                && cp /etc/pacman.d/cachyos-v3-mirrorlist /workspace-mirrors/ \
+                &&  if [ \"{{arch}}\" == \"v4\" ] || [ \"{{arch}}\" == \"znver4\" ]; then \
+                        cp /etc/pacman.d/cachyos-v4-mirrorlist /workspace-mirrors/; \
+                    fi"
+
 # Build the prerequisite AUR builder image.
 build-aur arch='v3':
     @echo "Building AUR builder for architecture {{arch}}..."
