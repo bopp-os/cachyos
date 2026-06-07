@@ -6,7 +6,7 @@ user := "ripps818"
 default:
     @just --list
 
-build-mirrorlists arch='v3':
+build-mirrorlist arch='v3':
     @echo "Generating fastest mirror lists"
     mkdir -p mirrors
     podman run \
