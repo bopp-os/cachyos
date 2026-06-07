@@ -117,15 +117,20 @@ CachyOS BoppOS uses `just` as a command runner to simplify the build process. En
 
 The OS is built using a multi-image architecture. You must first build the `base` image, and then build your preferred desktop environment flavor (`plasma`, `gnome`, or `niri`) on top of it.
 
+**You cannot create an image for an architecture your build system doesn't support!**<br\>
+
 ### x86-64-v3 Build (v3 Default)
 
 This build is compatible with most modern x86-64 hardware and is suitable for sharing or for use in CI/CD environments.
 
 ```bash
-# 1. Build the base image
+# 1. Construct the fastest-mirror list
+just build-mirrorlist v3
+
+# 2. Build the base image
 just build v3 base
 
-# 2. Build your preferred flavor (e.g., plasma, gnome, niri)
+# 3. Build your preferred flavor (e.g., plasma, gnome, niri)
 just build v3 plasma
 ```
 
@@ -134,10 +139,13 @@ just build v3 plasma
 This enables optimizations for a wide range of modern CPUs (e.g., Intel Haswell and newer, AMD Excavator and newer) that support the x86-64-v4 microarchitecture level.
 
 ```bash
-# 1. Build the base image
+# 1. Construct the fastest-mirror list
+just build-mirrorlist v4
+
+# 2. Build the base image
 just build v4 base
 
-# 2. Build your preferred flavor (e.g., plasma, gnome, niri)
+# 3. Build your preferred flavor (e.g., plasma, gnome, niri)
 just build v4 plasma
 ```
 
@@ -146,10 +154,13 @@ just build v4 plasma
 If you are building on and for a system with an AMD Ryzen 7000 series CPU (or newer), you can enable native `znver4` optimizations for maximum performance.
 
 ```bash
-# 1. Build the base image
+# 1. Construct the fastest-mirror list
+just build-mirrorlist znver4
+
+# 2. Build the base image
 just build znver4 base
 
-# 2. Build your preferred flavor (e.g., plasma, gnome, niri)
+# 3. Build your preferred flavor (e.g., plasma, gnome, niri)
 just build znver4 plasma
 ```
 
@@ -158,13 +169,16 @@ just build znver4 plasma
 If you are building the image locally and want to apply it to your current system without pushing to a registry first, you can use the `just switch` command. This transfers the locally built container from your user environment to the root environment and tells `bootc` to switch to it via local storage.
 
 ```bash
-# 1. Build the image
+# 1. Construct the fastest-mirror list
+just build-mirrorlist
+
+# 2. Build the image
 just build
 
-# 2. Switch to the local v3 build
+# 3. Switch to the local v3 build
 just switch
 
-# (Optional) Switch to a specific architecture tag instead:
+# (Optional) Switch to a specific architecture tag instead (requires having built them separately already):
 just switch v4
 just switch znver4
 ```
