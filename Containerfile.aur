@@ -83,10 +83,11 @@ COPY --chown=builduser:builduser ./files/aur/pkgbuilds/vulkan-low-latency-layer/
 COPY --chown=root:root ./files/aur/bootcrew-shared/ /bootcrew-shared/
 
 # Build AUR packages sequentially to reduce duplicate layers and maintainability overhead
-RUN for pkg in scopebuddy-git autofs sddm-theme-noctalia-git mullvad-vpn-bin gnome-shell-extension-clipboard-indicator vulkan-low-latency-layer; do \
-        cd "/tmp/$pkg" && \
-        build-pkg && \
-        rm -rf "/tmp/$pkg" && \
+RUN set -e; \
+    for pkg in scopebuddy-git autofs sddm-theme-noctalia-git mullvad-vpn-bin gnome-shell-extension-clipboard-indicator vulkan-low-latency-layer; do \
+        cd "/tmp/$pkg"; \
+        build-pkg; \
+        rm -rf "/tmp/$pkg"; \
         pacman -Rns --noconfirm $(pacman -Qtdq) 2>/dev/null || true; \
     done
 
