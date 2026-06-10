@@ -16,3 +16,6 @@
 [submodule "files/aur/pkgbuilds/vulkan-low-latency-layer"]
 	path = files/aur/pkgbuilds/vulkan-low-latency-layer
 	url = https://aur.archlinux.org/vulkan-low-latency-layer.git
+[submodule "files/aur/pkgbuilds/boppos-tools"]
+	path = files/aur/pkgbuilds/boppos-tools
+	url = https://github.com/bopp-os/boppos-tools
