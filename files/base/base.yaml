@@ -188,6 +188,7 @@ shells:
   - starship
   - direnv
 cli-utilities:
+  - boppos-tools
   - zoxide
   - eza
   - ripgrep

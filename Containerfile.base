@@ -81,7 +81,8 @@ RUN grep "= */var" /etc/pacman.conf | grep -v "CacheDir" | sed "/= *\/var/s/.*=/
 COPY files/base/usr/share /usr/share
 COPY files/base/etc /etc
 COPY files/base/usr/lib /usr/lib
-COPY files/base/usr/libexec /usr/libexec
+COPY files/base/usr/libexec /usr/libexec 
+RUN chmod +x /usr/share/boppos/bootc-cleanup.sh
 RUN chmod -R 0755 /usr/libexec
 
 # Link OS default font configuration
@@ -154,7 +155,9 @@ RUN --mount=type=tmpfs,dst=/run \
 # ==========================================
 
 # Master copy of custom executables. Overwrites defaults (like steamos-update).
-COPY files/base/usr/bin /usr/bin
+# This is commented out intentionally. Git does not track empty directories,
+# and including this line causes the build to fail if the dir is empty.
+# COPY files/base/usr/bin /usr/bin
 RUN chmod -R 0755 /usr/bin /usr/share/libalpm/scripts
 
 RUN if [ -e /usr/etc ]; then \
@@ -236,14 +239,10 @@ RUN chmod +x /tmp/apply-update-intervals.sh && \
 RUN sed -i 's|^HOME=.*|HOME=/var/home|' "/etc/default/useradd" && \
     mkdir -p /run /tmp && \
     # Patch the cleanup script to NOT delete our mounted pacman cache
-    sed -i 's|/usr/lib/sysimage/cache/pacman/pkg||g' /bootcrew-shared/bootc-rootfs.sh && \
+    ( [ -f /bootcrew-shared/bootc-rootfs.sh ] && sed -i 's|/usr/lib/sysimage/cache/pacman/pkg||g' /bootcrew-shared/bootc-rootfs.sh || true ) && \
     bash /bootcrew-shared/bootc-rootfs.sh && \
     rm -rf /bootcrew-shared && \
-    # Recreate essential directories for bootc lint to pass, then clean runtime dirs
-    mkdir -p /var /boot /sysroot && \
-    rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true && \
-    # Run lint in the same layer as the cleanup to avoid stale /run /tmp files
-    bootc container lint
+    /usr/share/boppos/bootc-cleanup.sh
 
 RUN ln -sf ../usr/lib/os-release /etc/os-release
 RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime

@@ -49,4 +49,5 @@ RUN chmod +x /tmp/apply-update-intervals.sh && \
     /tmp/apply-update-intervals.sh /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
 
 # Update the SBOM / Package Manifest for the overlay
-RUN /usr/share/boppos/generate-package-list.sh
+RUN /usr/share/boppos/generate-package-list.sh && \
+    /usr/share/boppos/bootc-cleanup.sh

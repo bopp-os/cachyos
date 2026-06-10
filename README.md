@@ -33,49 +33,19 @@ This is all very experimental. So use at your own risk.
 
 - **Desktop First:** Stripped away Steam Deck/handheld-specific UI elements and scaling tweaks in favor of standard desktop environments (with support for KDE Plasma, GNOME, and Niri).
 - **Developer Ready:** Pre-installed essentials like Distrobox, Homebrew (`brew`), Docker, VS Code, Node.js, Rust, and Python.
-- **Streamlined Management:** Integrated `just` for simplified building and introduced custom tools for easy system administration:
-  - **System Update Manager (`boppos-update`):** A comprehensive update script that seamlessly updates your OS (`bootc`), firmware, Flatpaks, Homebrew, and Distroboxes. Includes an interactive package diff preview.
-    ```bash
-    boppos-update
-    ```
-  - **System Update Notifier (`bopp-tray`):** A background tray application that checks for new image updates periodically and notifies you when one is available. By default, it should autostart with your desktop environment. If you need to enable it manually for your user, run:
-    ```bash
-    systemctl --user enable --now bopp-tray.service
-    ```
-  - **Package Diff Tool (`bopp-diff`):** Analyzes the current running system against staged or upstream `bootc` images and provides a clear breakdown of upgraded, downgraded, added, or removed packages.
-    ```bash
-    sudo bopp-diff
-    ```
-  - **Kernel Arguments Manager (`bopp-kargs`):** A utility to easily view, edit, add, remove, and diff Boot Loader Specification (BLS) kernel arguments for your atomic deployments.
-    ```bash
-    sudo bopp-kargs help
-    ```
-  - **TPM Refresh:** Easily re-enroll LUKS/TPM2 decryption keys after system updates.
-    ```bash
-    bopp-tpm-refresh
-    ```
-  - **System Migration:** Transition your system from Fedora-based atomic distributions.
-    ```bash
-    sudo bopp-migrate
-    ```
-- **Optional Flatpaks (`install-optional-flatpaks`):** Includes an interactive script to easily fetch, customize, and install a curated list of essential Flatpak applications (sourced from Bazzite-DX and BoppOS). To use it, simply open your terminal and run:
-  ```bash
-  install-optional-flatpaks
-  ```
-
-## Migration Tool (`bopp-migrate`)
+- **BoppOS Tools:** We have created a suite of custom administration utilities, available in the [boppos-tools repository](https://github.com/bopp-os/boppos-tools).
 
 ⚠️ **WARNING: HIGHLY EXPERIMENTAL AND POTENTIALLY DESTRUCTIVE** ⚠️
+Some of these tools (specifically `bopp-migrate`) manipulate core system and user configurations. **Do NOT run them unless you fully understand what they do.** They are largely untested and could result in a broken system or data loss. Always ensure you have a separate, verified backup of your data before running migration commands.
 
-BoppOS includes an experimental migration script (`bopp-migrate`) designed to help users transition their `/etc` and `$HOME` configurations from a Fedora-based atomic OS (like Bazzite or Bluefin) to this Arch-based BoppOS image. 
-
-**Do NOT run this script unless you fully understand what it does.** It will forcefully manipulate user IDs, group IDs, and move hidden configuration folders in your home directory into a backup "Vault". While it attempts to preserve critical data (like SSH keys, browser profiles, and game data), **it is largely untested and could result in a broken system or data loss.** Always ensure you have a separate, verified backup of your home directory before attempting a migration.
-
-To use the migration tool, run it with `sudo` after booting into BoppOS for the first time:
-
-```bash
-sudo bopp-migrate
-```
+Important commands included in `boppos-tools`:
+- `boppos-update`: A comprehensive update script that seamlessly updates your OS (`bootc`), firmware, Flatpaks, Homebrew, and Distroboxes.
+- `bopp-tray`: A background tray application that checks for new image updates periodically.
+- `bopp-diff`: Analyzes the current running system against staged or upstream `bootc` images to provide a clear package diff.
+- `bopp-kargs`: A utility to manage Boot Loader Specification (BLS) kernel arguments for atomic deployments.
+- `bopp-tpm-refresh`: Re-enroll LUKS/TPM2 decryption keys after system updates.
+- `bopp-migrate`: Transition your `$HOME` and `/etc` configurations from Fedora-based atomic distributions to this Arch-based BoppOS image.
+- `install-optional-flatpaks`: An interactive script to easily fetch, customize, and install a curated list of essential Flatpak applications.
 
 ## Installation & Switching
 

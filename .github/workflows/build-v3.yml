@@ -260,12 +260,31 @@ jobs:
           fi
 
           echo "::group::Building AUR builder"
-          sudo podman build $PODMAN_OPTS "${AUR_BUILD_ARGS[@]}" -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
+          if ! sudo podman build $PODMAN_OPTS "${AUR_BUILD_ARGS[@]}" -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
             -v "${{ env.AUR_CACHE_DIR }}:/var/cache/makepkg:z" \
             --build-arg BASE_IMAGE_TAG=${{ env.BASE_TAG }} \
             --build-arg TARGET_CPU_MARCH=$MARCH \
             --network=host \
-            --tag "localhost/aur-builder:$MARCH" -f "Containerfile.aur" .
+            --tag "localhost/aur-builder:$MARCH" -f "Containerfile.aur" .; then
+            
+            echo "::warning::AUR build failed! Wiping AUR cache, re-fetching submodules, and retrying..."
+            
+            # Wipe the AUR makepkg source cache
+            sudo rm -rf "${{ env.AUR_CACHE_DIR }}"/*
+            
+            # Forcefully re-initialize and update submodules to get fresh PKGBUILDs
+            git submodule deinit -f -- files/aur/pkgbuilds/ || true
+            git submodule update --init --recursive --remote --force -- files/aur/pkgbuilds/ || true
+            
+            # Retry the build with --no-cache to ignore potentially bad intermediate layers
+            sudo podman build $PODMAN_OPTS "${AUR_BUILD_ARGS[@]}" --no-cache \
+              -v "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z" \
+              -v "${{ env.AUR_CACHE_DIR }}:/var/cache/makepkg:z" \
+              --build-arg BASE_IMAGE_TAG=${{ env.BASE_TAG }} \
+              --build-arg TARGET_CPU_MARCH=$MARCH \
+              --network=host \
+              --tag "localhost/aur-builder:$MARCH" -f "Containerfile.aur" .
+          fi
           echo "::endgroup::"
 
       - name: Build Base Image
