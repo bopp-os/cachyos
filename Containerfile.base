@@ -154,7 +154,9 @@ RUN --mount=type=tmpfs,dst=/run \
 # ==========================================
 
 # Master copy of custom executables. Overwrites defaults (like steamos-update).
-COPY files/base/usr/bin /usr/bin
+# This is commented out intentionally. Git does not track empty directories,
+# and including this line causes the build to fail if the dir is empty.
+# COPY files/base/usr/bin /usr/bin
 RUN chmod -R 0755 /usr/bin /usr/share/libalpm/scripts
 
 RUN if [ -e /usr/etc ]; then \
