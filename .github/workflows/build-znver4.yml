@@ -158,6 +158,12 @@ jobs:
         run: |
           git submodule update --remote -- files/aur/pkgbuilds/ || true
 
+      - name: Pre-build AUR Malware Check
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          chmod +x scripts/check-aur-malware.sh
+          ./scripts/check-aur-malware.sh
+
       - name: Ensure Package Intervals JSON exists
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
@@ -502,6 +508,11 @@ jobs:
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=host --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
           echo "::endgroup::"
+
+      - name: Post-build Image IOC Scan
+        run: |
+          chmod +x scripts/scan-image-ioc.sh
+          ./scripts/scan-image-ioc.sh "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
 
       - name: Extract Package List
         if: github.event_name != 'pull_request'
