@@ -527,6 +527,18 @@ jobs:
           chmod +x scripts/scan-image-ioc.sh
           ./scripts/scan-image-ioc.sh "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
 
+      - name: Trivy scan
+        run: |
+          IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+          trivy image \
+            --cache-dir /opt/trivy-cache \
+            --scanners vuln,secret,misconfig \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --format table \
+            "$IMAGE_REF"
+
       - name: Extract Package List
         if: github.event_name != 'pull_request'
         run: |
