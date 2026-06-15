@@ -530,6 +530,8 @@ jobs:
       - name: Trivy scan
         run: |
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+          sudo mkdir -p /opt/trivy-cache
+          sudo chown -R $USER:$USER /opt/trivy-cache
           trivy image \
             --cache-dir /opt/trivy-cache \
             --scanners vuln,secret,misconfig \
