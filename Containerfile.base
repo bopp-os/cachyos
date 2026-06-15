@@ -62,6 +62,7 @@ RUN rm -rf /var/lib/pacman/sync/* && \
 
 RUN pacman -S --noconfirm --needed cachyos-hooks chwd gpgme && \
     pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
+    pacman-key --populate chaotic && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
 # Tag pacman config and mirrorlists as a unique component to avoid ostree layer hash non-determinism

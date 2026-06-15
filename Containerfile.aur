@@ -15,7 +15,8 @@ USER root
 COPY files/keys/ /tmp/keys/
 
 # Minimal setup: just enough to build packages
-RUN pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl && \
+RUN sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf && \
+    pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl && \
     rm -rf /etc/pacman.d/gnupg && \
     pacman-key --init && \
     echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf && \
@@ -47,6 +48,7 @@ RUN rm -rf /var/lib/pacman/sync/* && \
 # chwd and cachyos-hooks are omitted here since AUR packages don't require hardware detection
 RUN pacman -S --noconfirm --needed gpgme && \
     pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
+    pacman-key --populate chaotic && \
     echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
