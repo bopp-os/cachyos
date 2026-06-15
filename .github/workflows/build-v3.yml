@@ -538,7 +538,7 @@ jobs:
       - name: Trivy scan
         run: |
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
-          sudo trivy image \
+          sudo env DOCKER_HOST="unix:///run/podman/podman.sock" trivy image \
             --cache-dir /opt/trivy-cache \
             --scanners vuln,secret,misconfig \
             --severity HIGH,CRITICAL \
