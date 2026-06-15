@@ -11,7 +11,7 @@ CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
 trap "sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
 
 set +e
-BAD_PATHS=$(sudo podman export "$CONTAINER_ID" | tar -t | grep -E "atomic-lockfile|js-digest|lockfile-js|src/hooks/deps|node_modules/\.bun")
+BAD_PATHS=$(sudo podman export "$CONTAINER_ID" | tar -t | grep -E "atomic-lockfile|js-digest|lockfile-js|nextfile-js|src/hooks/deps|node_modules/\.bun")
 GREP_EXIT=$?
 set -e
 

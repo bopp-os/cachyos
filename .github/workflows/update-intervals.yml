@@ -28,8 +28,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          submodules: recursive
+
+      - name: Initialize Submodules
+        run: |
+          for i in 1 2 3 4 5; do
+            git submodule sync --recursive && \
+            git submodule update --init --force --depth=1 --jobs=1 --recursive && break
+            if [ $i -eq 5 ]; then echo "Failed after 5 attempts"; exit 1; fi
+            echo "Attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
 
       - name: Setup Python
         uses: actions/setup-python@v6
