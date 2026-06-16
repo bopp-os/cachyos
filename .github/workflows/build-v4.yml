@@ -526,10 +526,12 @@ jobs:
         run: |
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
           sudo env TMPDIR=/var/tmp DOCKER_HOST="unix:///run/podman/podman.sock" trivy image \
+            --config trivy.yaml \
             --cache-dir /opt/trivy-cache \
             --scanners secret,misconfig \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
+            --parallel 2 \
             --timeout 30m \
             --exit-code 1 \
             --format table \
