@@ -20,6 +20,7 @@ scan:
     - usr/lib/debug          # split debug symbols if present
     - usr/share/wallpapers   # KDE wallpapers
     - usr/share/plasma       # KDE plasma themes/assets
+    - usr/share/nano-syntax-highlighting
 
   # Skip binary and media file extensions - secret scanner can't find
   # anything useful in these and they add significant walk time on a 15GB image
@@ -52,6 +53,7 @@ scan:
     - "*.xz"
     - "*.bz2"
     - "*.zip"
+    - "*/LICENSES.chromium.html"
 
 misconfig:
   include-non-failures: false
