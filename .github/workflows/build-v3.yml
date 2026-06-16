@@ -125,7 +125,7 @@ jobs:
           fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-*
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
           
           # Ensure local base tags are cleared at the very beginning of a new pipeline run
           sudo podman rmi -f "localhost/aur-builder:${{ env.TARGET_MARCH }}" 2>/dev/null || true
@@ -399,7 +399,7 @@ jobs:
           sudo podman system prune --force --volumes || true
           
           # 3. Obliterate orphaned Podman extraction directories (The 128GB Silent Killer)
-          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
+          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
           
           # 4. Delete the massive chunkah tarballs
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
@@ -538,7 +538,7 @@ jobs:
       - name: Trivy scan
         run: |
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
-          sudo env DOCKER_HOST="unix:///run/podman/podman.sock" trivy image \
+          sudo env TMPDIR=/var/tmp DOCKER_HOST="unix:///run/podman/podman.sock" trivy image \
             --cache-dir /opt/trivy-cache \
             --scanners vuln,secret,misconfig \
             --severity HIGH,CRITICAL \
@@ -685,7 +685,7 @@ jobs:
           echo "🧹 Sweeping up the heavy Podman assets..."
           sudo podman rm -af || true
           sudo podman system prune --force || true
-          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
+          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
             echo "✨ All flavors built successfully. Removing local base images and workspace..."
