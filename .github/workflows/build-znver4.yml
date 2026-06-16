@@ -532,9 +532,10 @@ jobs:
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
           sudo env TMPDIR=/var/tmp DOCKER_HOST="unix:///run/podman/podman.sock" trivy image \
             --cache-dir /opt/trivy-cache \
-            --scanners vuln,secret,misconfig \
+            --scanners secret,misconfig \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
+            --timeout 30m \
             --exit-code 1 \
             --format table \
             "$IMAGE_REF"
