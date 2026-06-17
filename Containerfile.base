@@ -46,7 +46,7 @@ RUN pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl && \
 RUN sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf && \
     sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
     sed -i '/^DownloadUser/d' /etc/pacman.conf && \
-    printf "\n[bopp-os]\nSigLevel = Optional TrustAll\nServer = https://bopp-os.github.io/pkgbuilds\n\n" > /tmp/bopp-os.conf && \
+    printf "\n[bopp-os]\nSigLevel = Optional TrustAll\nServer = https://repo.ripps.me\n\n" > /tmp/bopp-os.conf && \
     sed -i '/^\[extra\]/i # bopp-os repo\n' /etc/pacman.conf && \
     awk -v repo_file="/tmp/bopp-os.conf" '/^# bopp-os repo/ { system("cat " repo_file); next } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
     mv /etc/pacman.conf.tmp /etc/pacman.conf && \
