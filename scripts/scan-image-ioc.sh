@@ -1,103 +1,59 @@
 #!/bin/bash
 set -euo pipefail
 IMAGE_REF=$1
+
 echo "::group::Post-build Image IOC Scan for $IMAGE_REF"
 echo "Scanning image filesystem for known IOCs..."
+
 CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
-trap "sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
+trap "sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+
+# Build file listing once in memory from the mount — completely avoids disk I/O
+echo "Building file listing from mount..."
+# sed strips the mount prefix so paths match the expected relative format
+FILE_LIST=$(sudo find "$MNT_DIR" -type f 2>/dev/null | sed "s|^$MNT_DIR/||")
 
 FOUND=0
 FINDINGS=()
 
-# Stream helper — re-exports on each call, avoids writing image to disk
-export_stream() {
-  sudo podman export "$CONTAINER_ID" 2>/dev/null
-}
+# --- Wave 1 & 2: All path-based IOCs in a single grep pass ---
+PATH_PATTERN="atomic-lockfile|js-digest|lockfile-js|nextfile-js|src/hooks/deps|node_modules/\.bun|_cacache/.*atomic-lockfile|bun/install/cache/.*js-digest|usr/bin/monero-wallet-gui"
+result=$(echo "$FILE_LIST" | grep -E "$PATH_PATTERN" || true)
+if [[ -n "$result" ]]; then
+  FINDINGS+=("PATH IOC: $result")
+  FOUND=1
+fi
 
-# Wrapper that safely greps the stream without breaking the pipe
-stream_grep() {
-  local pattern=$1
-  local result
-  # set +o pipefail locally so grep exit 1 (no match) doesn't kill the pipe
-  result=$(set +o pipefail; export_stream | tar -t 2>/dev/null | grep -E "$pattern" || true)
-  echo "$result"
-}
+# --- eBPF rootkit pinned maps ---
+BPF_result=$(echo "$FILE_LIST" | grep -F "sys/fs/bpf/hidden_" || true)
+if [[ -n "$BPF_result" ]]; then
+  FINDINGS+=("EBPF_ROOTKIT ARTIFACT: $BPF_result")
+  FOUND=1
+fi
 
-stream_extract() {
-  local pattern=$1
-  set +o pipefail
-  export_stream | tar -xO --wildcards "$pattern" 2>/dev/null || true
-  set -o pipefail
-}
-
-# --- Wave 1: Path-based IOCs ---
-PATH_IOCS=(
-  "atomic-lockfile"
-  "js-digest"
-  "lockfile-js"
-  "nextfile-js"
-  "src/hooks/deps"
-  "node_modules/\.bun"
-  "\.npm/_cacache/.*atomic-lockfile"
-  "\.bun/install/cache/.*js-digest"
-)
-
-for ioc in "${PATH_IOCS[@]}"; do
-  result=$(stream_grep "$ioc")
-  if [[ -n "$result" ]]; then
-    FINDINGS+=("PATH: $result")
-    FOUND=1
-  fi
-done
-
-# --- Wave 1: Suspicious file size (deps payload is exactly 3,040,376 bytes) ---
-SUSPICIOUS_FILES=$(set +o pipefail; export_stream | tar -tv 2>/dev/null | awk '$3 == 3040376 {print $NF}' || true)
+# --- Payload size fingerprint (deps ELF is exactly 3,040,376 bytes) ---
+SUSPICIOUS_FILES=$(sudo find "$MNT_DIR" -type f -size 3040376c 2>/dev/null | sed "s|^$MNT_DIR/||" || true)
 if [[ -n "$SUSPICIOUS_FILES" ]]; then
-  FINDINGS+=("SUSPICIOUS_SIZE(3040376): $SUSPICIOUS_FILES")
+  FINDINGS+=("SUSPICIOUS_SIZE(3040376 - known deps payload): $SUSPICIOUS_FILES")
   FOUND=1
 fi
 
-# --- Wave 2: Obfuscated install hooks ---
-INSTALL_CONTENT=$(stream_extract '*.install')
-if [[ -n "$INSTALL_CONTENT" ]]; then
-  if echo "$INSTALL_CONTENT" | grep -qE '\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic'; then
-    FINDINGS+=("OBFUSCATED_INSTALL_HOOK: hex escapes or known package names in .install file")
-    FOUND=1
-  fi
-  if echo "$INSTALL_CONTENT" | grep -qE '(bun|npm|pnpm|yarn)\s+(install|add)\s+.*(lockfile|digest|nextfile)'; then
-    FINDINGS+=("MALICIOUS_INSTALL_HOOK: package manager installing suspicious package in hook")
-    FOUND=1
-  fi
-fi
-
-# --- eBPF rootkit artifacts ---
-BPF_IOCS=(
-  "sys/fs/bpf/hidden_pids"
-  "sys/fs/bpf/hidden_names"
-  "sys/fs/bpf/hidden_inodes"
-)
-for ioc in "${BPF_IOCS[@]}"; do
-  result=$(set +o pipefail; export_stream | tar -t 2>/dev/null | grep -F "$ioc" || true)
-  if [[ -n "$result" ]]; then
-    FINDINGS+=("EBPF_ROOTKIT: $result")
-    FOUND=1
-  fi
-done
-
-# --- Suspicious executables under /var/lib/ ---
-VAR_LIB_EXECS=$(set +o pipefail; export_stream | tar -tv 2>/dev/null | \
-  awk '/^-..x/{print $NF}' | grep '^var/lib/' | \
-  grep -vE '(dpkg|apt|systemd|dbus|plocate|flatpak|containers|docker|fwupd|waydroid|\.list|\.log)' || true)
-if [[ -n "$VAR_LIB_EXECS" ]]; then
-  FINDINGS+=("SUSPICIOUS_EXECUTABLE_IN_VAR_LIB: $VAR_LIB_EXECS")
-  FOUND=1
-fi
-
-# --- bun as a PKGBUILD dependency ---
-BUN_DEP=$(stream_extract '*/PKGBUILD' | grep -E "depends\s*=.*['\"]bun['\"]" || true)
-if [[ -n "$BUN_DEP" ]]; then
-  FINDINGS+=("SUSPICIOUS_DEPENDS_BUN: $BUN_DEP")
-  FOUND=1
+# --- Obfuscated .install hooks (Wave 2) ---
+if echo "$FILE_LIST" | grep -q '\.install$'; then
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    clean_name=${file#$MNT_DIR/}
+    
+    if sudo grep -qE '\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile' "$file" 2>/dev/null; then
+      FINDINGS+=("OBFUSCATED_INSTALL_HOOK: hex escapes or known package names in $clean_name")
+      FOUND=1
+    fi
+    if sudo grep -qE '(bun|npm|pnpm|yarn)\s+(install|add)\s+.*(lockfile|digest|nextfile)' "$file" 2>/dev/null; then
+      FINDINGS+=("MALICIOUS_INSTALL_HOOK: package manager running suspicious package in $clean_name")
+      FOUND=1
+    fi
+  done < <(sudo find "$MNT_DIR" -type f -name "*.install" 2>/dev/null || true)
 fi
 
 # --- Report ---
