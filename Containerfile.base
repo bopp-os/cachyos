@@ -23,7 +23,7 @@ COPY --from=brew /system_files /
 RUN setfattr -n user.component -v "homebrew" "/usr/share/homebrew.tar.zst"
 
 # Copy the shared directory from the bootcrew/mono repo
-COPY files/aur/bootcrew-shared/ /bootcrew-shared/
+COPY files/base/bootcrew-shared/ /bootcrew-shared/
 
 COPY files/keys/ /tmp/keys/
 
