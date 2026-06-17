@@ -111,32 +111,34 @@ jobs:
         run: |
           echo "🧹 Sweeping the runner for free space..."
           
-          # 1. Clean up package cache (Apt for Debian/Ubuntu, Pacman for Arch/CachyOS)
+          # 1. Clean up package cache (Apt for Debian/Ubuntu, Dnf for RHEL/Fedora, Pacman for Arch/CachyOS)
           if command -v apt-get &> /dev/null; then
             echo "Detected apt. Cleaning cache..."
-            sudo apt-get clean
+            sudo apt-get clean || true
+          elif command -v dnf &> /dev/null; then
+            echo "Detected dnf. Cleaning cache..."
+            sudo dnf clean all || true
           elif command -v pacman &> /dev/null; then
             echo "Detected pacman. Cleaning cache..."
-            sudo pacman -Scc --noconfirm
+            sudo pacman -Scc --noconfirm || true
           fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-* || true
           
           # Ensure local base tags are cleared at the very beginning of a new pipeline run
-          sudo podman rmi -f "localhost/aur-builder:${{ env.TARGET_MARCH }}" 2>/dev/null || true
           sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           
           # 3. Prune dangling Podman data (Preserve recent build cache for speed)
-          sudo podman system prune --force
-          sudo podman image prune --all --force --filter "until=72h"
+          sudo podman system prune --force || true
+          sudo podman image prune --all --force --filter "until=72h" || true
           
           # 4. Wipe the Podman package cache if the manual UI toggle was checked
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Nuking Podman builder cache mount..."
-            sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-*
-            sudo podman system prune --all --force --volumes --build
+            sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-* || true
+            sudo podman system prune --all --force --volumes --build || true
           fi
           
           # 5. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
@@ -150,18 +152,6 @@ jobs:
         if: steps.check_compatibility.outputs.should_skip != 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Initialize and Update Submodules
-        if: steps.check_compatibility.outputs.should_skip != 'true'
-        run: |
-          for i in 1 2 3 4 5; do
-            git submodule sync --recursive && \
-            git submodule update --init --force --depth=1 --jobs=1 --recursive && break
-            if [ $i -eq 5 ]; then echo "Failed after 5 attempts"; exit 1; fi
-            echo "Attempt $i failed, retrying in 30s..."
-            sleep 30
-          done
-
-
       - name: Ensure Package Intervals JSON exists
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
@@ -169,8 +159,12 @@ jobs:
 
       - name: Get current date
         id: date
+        if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
+          # This generates a timestamp like what is defined on the ArtifactHub documentation
           # E.G: 2022-02-08T15:38:15Z'
+          # https://artifacthub.io/docs/topics/repositories/container-images/
+          # https://linux.die.net/man/1/date
           echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> $GITHUB_OUTPUT
 
       - name: Image Metadata
@@ -209,7 +203,7 @@ jobs:
           LOGIN_USER: ${{ github.actor }}
         run: |
           echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
-          echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+          echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
 
       - name: Prepare Local Cache Directory
         run: |
@@ -219,12 +213,12 @@ jobs:
           sudo chmod 777
           
           # Delete problematic lua packages and incomplete downloads before build
-          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
+          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
           
           # If the manual wipe toggle was checked, clear the cache
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Manual wipe triggered. Clearing local pacman and AUR caches..."
-            sudo rm -rf "$CACHE_DIR"/*/*
+            echo "Manual wipe triggered. Clearing local pacman cache..."
+            sudo rm -rf "$CACHE_DIR"/*/* || true
           fi
           
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
@@ -239,32 +233,17 @@ jobs:
           sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z docker.io/cachyos/cachyos-v4:latest bash -c "timeout 120 bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null && cachyos-rate-mirrors < /dev/null' || echo 'Mirror rating timed out or failed, falling back to defaults'; cp /etc/pacman.d/cachyos-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v3-mirrorlist /workspace-mirrors/ && cp /etc/pacman.d/cachyos-v4-mirrorlist /workspace-mirrors/"
           echo "::endgroup::"
 
-      - name: Build AUR Image
-        id: build_aur
-        if: steps.check_compatibility.outputs.should_skip != 'true'
-        run: |
-          set -x
-          MARCH="${{ env.TARGET_MARCH }}"
-
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-
-          AUR_BUILD_ARGS=()
-          if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then
-            AUR_BUILD_ARGS+=("--build-arg" "VERBOSE=true")
-          fi
-
-
       - name: Build Base Image
         id: build_base
+        if: steps.check_compatibility.outputs.should_skip != 'true'
         env:
           META_LABELS: ${{ steps.metadata.outputs.labels }}
-        if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
           set -x
 
           MARCH="${{ env.TARGET_MARCH }}"
 
+          # get labels from metadata action
           while IFS= read -r label; do
             if [[ -n "$label" ]]; then
               BUILD_ARGS+=("--label" "$label")
@@ -273,11 +252,13 @@ jobs:
 
           BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
 
+          # Check if the manual 'no_cache' toggle was checked in the GitHub UI
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
             echo "Manual cache bust triggered. Appending --no-cache..."
             BUILD_ARGS+=("--no-cache")
           fi
 
+          # Check if the manual 'wipe_pkg_cache' toggle was checked in the GitHub UI
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Manual wipe package cache triggered. Appending build arg..."
             BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
@@ -316,8 +297,8 @@ jobs:
             echo "Cache size before pruning:"
             du -sh ${{ env.LOCAL_CACHE_DIR }}
 
-            # Determine the correct image to reuse for pruning (aur-builder has updated keyrings)
-            PRUNE_IMAGE="localhost/aur-builder:${{ env.TARGET_MARCH }}"
+            # Determine the correct image to reuse for pruning (cachyos-base has updated keyrings)
+            PRUNE_IMAGE="localhost/cachyos-base:${{ env.DEFAULT_TAG }}"
 
             PODMAN_OPTS=""
             if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
@@ -325,15 +306,14 @@ jobs:
             # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
             sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ env.LOCAL_CACHE_DIR }}:/host-cache:z \
               $PRUNE_IMAGE \
-              bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -c /host-cache -rk1"
+              bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -c /host-cache -rk1" || true
               
             # Ensure problematic packages are purged after pruning too
-            sudo rm -f ${{ env.LOCAL_CACHE_DIR }}/lua* ${{ env.LOCAL_CACHE_DIR }}/*.part
+            sudo rm -f ${{ env.LOCAL_CACHE_DIR }}/lua* ${{ env.LOCAL_CACHE_DIR }}/*.part || true
 
             echo "Pacman cache size after pruning:"
             du -sh ${{ env.LOCAL_CACHE_DIR }}
-          fi
-          
+          fi          
 
       - name: Clean Workspace & Podman Storage
         if: always()
@@ -350,7 +330,7 @@ jobs:
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
           
           # 4. Delete the massive chunkah tarballs
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_* || true
           
           # 5. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
@@ -386,16 +366,6 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Initialize Submodules
-        run: |
-          for i in 1 2 3 4 5; do
-            git submodule sync --recursive && \
-            git submodule update --init --force --depth=1 --jobs=1 --recursive && break
-            if [ $i -eq 5 ]; then echo "Failed after 5 attempts"; exit 1; fi
-            echo "Attempt $i failed, retrying in 30s..."
-            sleep 30
-          done
 
       - name: Ensure Package Intervals JSON exists
         run: |
@@ -637,7 +607,6 @@ jobs:
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
             echo "✨ All flavors built successfully. Removing local base images and workspace..."
-            sudo podman rmi -f "localhost/aur-builder:${{ env.TARGET_MARCH }}" 2>/dev/null || true
             sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
             sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
             sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true

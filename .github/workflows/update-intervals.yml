@@ -29,16 +29,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Initialize Submodules
-        run: |
-          for i in 1 2 3 4 5; do
-            git submodule sync --recursive && \
-            git submodule update --init --force --depth=1 --jobs=1 --recursive && break
-            if [ $i -eq 5 ]; then echo "Failed after 5 attempts"; exit 1; fi
-            echo "Attempt $i failed, retrying in 30s..."
-            sleep 30
-          done
-
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -54,7 +44,7 @@ jobs:
       - name: Generate Package Lists from All Images
         run: |
           mkdir -p build
-          touch build/all-packages-temp.txt build/cachyos-packages-temp.txt build/aur-packages-temp.txt build/boppos-packages-temp.txt
+          touch build/all-packages-temp.txt build/cachyos-packages-temp.txt build/boppos-packages-temp.txt
           
           # Spin up the latest version of every image flavor to build a master superset of packages
           for FLAVOR in plasma gnome niri; do
@@ -72,7 +62,6 @@ jobs:
                   jq -r 'if type=="array" then .[] else .packages[] end | .name' sbom-${FLAVOR}.json >> build/all-packages-temp.txt
                   jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("cachyos"))) | .name' sbom-${FLAVOR}.json >> build/cachyos-packages-temp.txt 2>/dev/null || true
                   jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("bopp-os"))) | .name' sbom-${FLAVOR}.json >> build/boppos-packages-temp.txt 2>/dev/null || true
-                  jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository == "aur" or .repository == "unknown")) | .name' sbom-${FLAVOR}.json >> build/aur-packages-temp.txt 2>/dev/null || true
                 else
                   echo "SBOM format unrecognized or missing package names. Falling back to Podman."
                   USE_PODMAN=true
@@ -89,7 +78,6 @@ jobs:
               cat build/all-packages.txt >> build/all-packages-temp.txt 2>/dev/null || true
               cat build/cachyos-packages.txt >> build/cachyos-packages-temp.txt 2>/dev/null || true
               cat build/boppos-packages.txt >> build/boppos-packages-temp.txt 2>/dev/null || true
-              cat build/aur-packages.txt >> build/aur-packages-temp.txt 2>/dev/null || true
             fi
           done
           
@@ -99,7 +87,6 @@ jobs:
           sort -u build/all-packages-temp.txt > build/all-packages.txt
           sort -u build/cachyos-packages-temp.txt > build/cachyos-packages.txt
           sort -u build/boppos-packages-temp.txt > build/boppos-packages.txt
-          sort -u build/aur-packages-temp.txt > build/aur-packages.txt
 
       - name: Fetch and Calculate Chunkah Intervals
         env:
@@ -112,7 +99,6 @@ jobs:
           
           cat build/all-packages.txt | python scripts/fetch-update-intervals.py \
             --cachyos-packages build/cachyos-packages.txt \
-            --aur-packages build/aur-packages.txt \
             --boppos-packages build/boppos-packages.txt \
             --cache-file scripts/package-intervals.json \
             --max-age-days ${{ github.event.inputs.max_age || '30' }} \
