@@ -9,12 +9,28 @@ trap "sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
 FOUND=0
 FINDINGS=()
 
-# Export filesystem once and work from the tarball
-IMAGE_TAR=$(mktemp)
-trap "sudo podman rm $CONTAINER_ID >/dev/null 2>&1; rm -f $IMAGE_TAR" EXIT
-sudo podman export "$CONTAINER_ID" > "$IMAGE_TAR"
+# Stream helper — re-exports on each call, avoids writing image to disk
+export_stream() {
+  sudo podman export "$CONTAINER_ID" 2>/dev/null
+}
 
-# --- Wave 1: Path-based IOCs (atomic-lockfile / js-digest) ---
+# Wrapper that safely greps the stream without breaking the pipe
+stream_grep() {
+  local pattern=$1
+  local result
+  # set +o pipefail locally so grep exit 1 (no match) doesn't kill the pipe
+  result=$(set +o pipefail; export_stream | tar -t 2>/dev/null | grep -E "$pattern" || true)
+  echo "$result"
+}
+
+stream_extract() {
+  local pattern=$1
+  set +o pipefail
+  export_stream | tar -xO --wildcards "$pattern" 2>/dev/null || true
+  set -o pipefail
+}
+
+# --- Wave 1: Path-based IOCs ---
 PATH_IOCS=(
   "atomic-lockfile"
   "js-digest"
@@ -27,39 +43,27 @@ PATH_IOCS=(
 )
 
 for ioc in "${PATH_IOCS[@]}"; do
-  result=$(tar -t -f "$IMAGE_TAR" 2>/dev/null | grep -E "$ioc" || true)
+  result=$(stream_grep "$ioc")
   if [[ -n "$result" ]]; then
     FINDINGS+=("PATH: $result")
     FOUND=1
   fi
 done
 
-# --- Wave 1: ELF payload hashes ---
-# Extract all files and check SHA256 against known payload hashes
-KNOWN_HASHES=(
-  "6144d433f8a0316869877b5f834c801251bbb936e5f1577c5680878c7443c98b"  # deps (atomic-lockfile)
-  "7883bda1ff15425f2dbe622c45a3ae105ddfa6175009bbf0b0cad9bf5c79b316"  # deps (js-digest)
-  "47893d9badc38c54b71321263ce8178c1abb10396e0aadf9793e61ec8829e204"  # cryptominer variant
-)
-
-# Check for the exact payload size (3,040,376 bytes) as a fast pre-filter
-SUSPICIOUS_FILES=$(tar -tv -f "$IMAGE_TAR" 2>/dev/null | awk '$3 == 3040376 {print $NF}' || true)
+# --- Wave 1: Suspicious file size (deps payload is exactly 3,040,376 bytes) ---
+SUSPICIOUS_FILES=$(set +o pipefail; export_stream | tar -tv 2>/dev/null | awk '$3 == 3040376 {print $NF}' || true)
 if [[ -n "$SUSPICIOUS_FILES" ]]; then
   FINDINGS+=("SUSPICIOUS_SIZE(3040376): $SUSPICIOUS_FILES")
   FOUND=1
 fi
 
-# --- Wave 2: Obfuscated install hook patterns ---
-# Second wave hides commands via hex escapes, mixed quoting, and string splitting
-# Extract and scan .install files and PKGBUILDs
-INSTALL_CONTENT=$(tar -xOf "$IMAGE_TAR" --wildcards '*.install' 2>/dev/null || true)
+# --- Wave 2: Obfuscated install hooks ---
+INSTALL_CONTENT=$(stream_extract '*.install')
 if [[ -n "$INSTALL_CONTENT" ]]; then
-  # Hex-escaped 'cd' and 'bun' as seen in htbrowser-bin sample
   if echo "$INSTALL_CONTENT" | grep -qE '\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic'; then
     FINDINGS+=("OBFUSCATED_INSTALL_HOOK: hex escapes or known package names in .install file")
     FOUND=1
   fi
-  # Any install hook invoking bun, npm, pnpm, yarn with suspicious packages
   if echo "$INSTALL_CONTENT" | grep -qE '(bun|npm|pnpm|yarn)\s+(install|add)\s+.*(lockfile|digest|nextfile)'; then
     FINDINGS+=("MALICIOUS_INSTALL_HOOK: package manager installing suspicious package in hook")
     FOUND=1
@@ -73,21 +77,15 @@ BPF_IOCS=(
   "sys/fs/bpf/hidden_inodes"
 )
 for ioc in "${BPF_IOCS[@]}"; do
-  result=$(tar -t -f "$IMAGE_TAR" 2>/dev/null | grep -F "$ioc" || true)
+  result=$(set +o pipefail; export_stream | tar -t 2>/dev/null | grep -F "$ioc" || true)
   if [[ -n "$result" ]]; then
     FINDINGS+=("EBPF_ROOTKIT: $result")
     FOUND=1
   fi
 done
 
-# --- Persistence artifacts ---
-PERSISTENCE_IOCS=(
-  "usr/bin/monero-wallet-gui"             # cryptominer staging target
-  "etc/systemd/system/.*Restart=always"  # suspicious systemd unit (checked below)
-)
-
-# Check for unexpected executables under /var/lib/ (malware persistence path)
-VAR_LIB_EXECS=$(tar -tv -f "$IMAGE_TAR" 2>/dev/null | \
+# --- Suspicious executables under /var/lib/ ---
+VAR_LIB_EXECS=$(set +o pipefail; export_stream | tar -tv 2>/dev/null | \
   awk '/^-..x/{print $NF}' | grep '^var/lib/' | \
   grep -vE '(dpkg|apt|systemd|dbus|\.list|\.log)' || true)
 if [[ -n "$VAR_LIB_EXECS" ]]; then
@@ -95,10 +93,8 @@ if [[ -n "$VAR_LIB_EXECS" ]]; then
   FOUND=1
 fi
 
-# --- Suspicious dependency additions (bun as a PKGBUILD depends) ---
-# bun has no business being a dependency of most packages
-BUN_DEP=$(tar -xOf "$IMAGE_TAR" --wildcards '*/PKGBUILD' 2>/dev/null | \
-  grep -E "depends\s*=.*['\"]bun['\"]" || true)
+# --- bun as a PKGBUILD dependency ---
+BUN_DEP=$(stream_extract '*/PKGBUILD' | grep -E "depends\s*=.*['\"]bun['\"]" || true)
 if [[ -n "$BUN_DEP" ]]; then
   FINDINGS+=("SUSPICIOUS_DEPENDS_BUN: $BUN_DEP")
   FOUND=1
@@ -111,7 +107,6 @@ if [[ $FOUND -eq 1 ]]; then
   for f in "${FINDINGS[@]}"; do
     echo "  - $f"
   done
-  echo "Failing the build to prevent pushing malware."
   exit 1
 fi
 
