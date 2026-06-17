@@ -87,7 +87,7 @@ done
 # --- Suspicious executables under /var/lib/ ---
 VAR_LIB_EXECS=$(set +o pipefail; export_stream | tar -tv 2>/dev/null | \
   awk '/^-..x/{print $NF}' | grep '^var/lib/' | \
-  grep -vE '(dpkg|apt|systemd|dbus|\.list|\.log)' || true)
+  grep -vE '(dpkg|apt|systemd|dbus|plocate|flatpak|containers|docker|fwupd|waydroid|\.list|\.log)' || true)
 if [[ -n "$VAR_LIB_EXECS" ]]; then
   FINDINGS+=("SUSPICIOUS_EXECUTABLE_IN_VAR_LIB: $VAR_LIB_EXECS")
   FOUND=1
