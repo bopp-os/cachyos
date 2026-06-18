@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 ALA_BASE = "https://archive.archlinux.org/packages"
 CACHY_MIRROR_BASE = "https://mirror.cachyos.org/repo"
 CACHY_ARCHIVE_BASE = "https://archive.cachyos.org/archive"
+BOPPOS_REPO_BASE = "https://repo.ripps.me"
 CACHY_REPOS = [
     ("x86_64_v4", "cachyos-v4"),
     ("x86_64_v4", "cachyos-extra-v4"),
@@ -95,6 +96,40 @@ async def fetch_all_cachyos_data(session):
                     
     return cachy_data
 
+async def fetch_all_boppos_data(session):
+    """Fetch BoppOS repository index."""
+    boppos_data = {}
+    logging.info("Fetching BoppOS directory index...")
+    
+    html = await fetch_with_backoff(session, f"{BOPPOS_REPO_BASE}/")
+    if not html: return boppos_data
+    
+    soup = BeautifulSoup(html, 'html.parser')
+    for tr in soup.find_all('tr', class_='file'):
+        a_tag = tr.find('a')
+        time_tag = tr.find('time')
+        
+        if not a_tag or not time_tag or 'href' not in a_tag.attrs or 'datetime' not in time_tag.attrs:
+            continue
+            
+        filename = unquote(a_tag['href']).split('/')[-1]
+        date_str = time_tag['datetime']
+        
+        m = re.match(r'^(.+)-([^-]+-[^-]+)-(?:x86_64|x86_64_v3|x86_64_v4|znver4|aarch64|any)\.pkg\.tar\.[a-z]+$', filename)
+        if m:
+            pkg_name = m.group(1)
+            pkg_version = m.group(2)
+            try:
+                dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                if pkg_name not in boppos_data:
+                    boppos_data[pkg_name] = {}
+                if pkg_version not in boppos_data[pkg_name] or boppos_data[pkg_name][pkg_version] > dt:
+                    boppos_data[pkg_name][pkg_version] = dt
+            except ValueError:
+                pass
+                
+    return boppos_data
+
 async def analyze_arch_package(session, pkg_name):
     first_letter = pkg_name[0].lower()
     url = f"{ALA_BASE}/{first_letter}/{pkg_name}/"
@@ -124,7 +159,11 @@ async def analyze_cachy_package(session, pkg_name, cachy_bulk_data):
     history = cachy_bulk_data.get(pkg_name, {})
     return history, "cachyos_mirror" if history else "cachyos_not_found"
 
-async def process_package(session, pkg, is_cachyos, cache, max_age, semaphore, cachy_bulk_data):
+async def analyze_boppos_package(session, pkg_name, boppos_bulk_data):
+    history = boppos_bulk_data.get(pkg_name, {})
+    return history, "bopp-os" if history else "boppos_not_found"
+
+async def process_package(session, pkg, is_cachyos, is_boppos, cache, max_age, semaphore, cachy_bulk_data, boppos_bulk_data):
     async with semaphore:
         now = datetime.now(timezone.utc)
         
@@ -156,11 +195,15 @@ async def process_package(session, pkg, is_cachyos, cache, max_age, semaphore, c
         new_history = {}
         source = "database"
         
-        if is_cachyos:
+        if is_boppos:
+            new_history, source = await analyze_boppos_package(session, pkg, boppos_bulk_data)
+        elif is_cachyos:
             new_history, source = await analyze_cachy_package(session, pkg, cachy_bulk_data)
             if len(new_history) < 2: 
                 ala_history, ala_source = await analyze_arch_package(session, pkg)
                 new_history.update(ala_history)
+                if ala_history:
+                    source = ala_source
         else:
             new_history, source = await analyze_arch_package(session, pkg)
                 
@@ -233,6 +276,10 @@ async def main():
     if args.cachyos_packages and args.cachyos_packages.exists():
         cachy_pkgs = {line.strip() for line in args.cachyos_packages.read_text().splitlines() if line.strip()}
         
+    boppos_pkgs = set()
+    if args.boppos_packages and args.boppos_packages.exists():
+        boppos_pkgs = {line.strip() for line in args.boppos_packages.read_text().splitlines() if line.strip()}
+        
     cache = {}
     if args.cache_file.exists():
         try:
@@ -247,11 +294,13 @@ async def main():
     
     async with aiohttp.ClientSession() as session:
         cachy_bulk_data = await fetch_all_cachyos_data(session)
+        boppos_bulk_data = await fetch_all_boppos_data(session)
         
         tasks = []
         for pkg in pkg_list:
             is_cachy = pkg in cachy_pkgs
-            tasks.append(process_package(session, pkg, is_cachy, cache, args.max_age_days, semaphore, cachy_bulk_data))
+            is_boppos = pkg in boppos_pkgs
+            tasks.append(process_package(session, pkg, is_cachy, is_boppos, cache, args.max_age_days, semaphore, cachy_bulk_data, boppos_bulk_data))
             
         results = await asyncio.gather(*tasks)
         
