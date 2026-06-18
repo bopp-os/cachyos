@@ -73,16 +73,18 @@ jobs:
             fi
             
             if [ "$USE_PODMAN" == "true" ]; then
-              echo "Extracting packages using Podman container fallback..."
-              sudo podman run --rm -v ${{ github.workspace }}/scripts:/scripts:ro -v ${{ github.workspace }}/build:/build:rw "$IMAGE_REF" bash /scripts/extract-ci-pkg-lists.sh
-              cat build/all-packages.txt >> build/all-packages-temp.txt 2>/dev/null || true
-              cat build/cachyos-packages.txt >> build/cachyos-packages-temp.txt 2>/dev/null || true
-              cat build/boppos-packages.txt >> build/boppos-packages-temp.txt 2>/dev/null || true
+              echo "Extracting packages using Podman mount fallback..."
+              CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
+              MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
+              
+              sudo cat "$MNT_DIR/usr/share/boppos/packages.json" | jq -r 'if type=="array" then .[] else .packages[] end | .name' >> build/all-packages-temp.txt || true
+              sudo cat "$MNT_DIR/usr/share/boppos/packages.json" | jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("cachyos"))) | .name' >> build/cachyos-packages-temp.txt 2>/dev/null || true
+              sudo cat "$MNT_DIR/usr/share/boppos/packages.json" | jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("bopp-os"))) | .name' >> build/boppos-packages-temp.txt 2>/dev/null || true
+              
+              sudo podman unmount "$CONTAINER_ID" >/dev/null 2>&1 || true
+              sudo podman rm "$CONTAINER_ID" >/dev/null 2>&1 || true
             fi
           done
-          
-          # Fix permissions of files created by root inside the Podman container
-          sudo chown -R $USER:$USER build/
           
           sort -u build/all-packages-temp.txt > build/all-packages.txt
           sort -u build/cachyos-packages-temp.txt > build/cachyos-packages.txt

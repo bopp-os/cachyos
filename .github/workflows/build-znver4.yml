@@ -141,7 +141,13 @@ jobs:
             sudo podman system prune --all --force --volumes --build || true
           fi
           
-          # 5. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
+          # 5. Purge all local podman images if a clean build is requested to fix layer corruption
+          if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
+            echo "Nuking all cached images to enforce a strict clean build..."
+            sudo podman rmi --all --force || true
+          fi
+          
+          # 6. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
           echo "Nuking leftover workspace files..."
           sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           
@@ -452,7 +458,11 @@ jobs:
       - name: Trivy scan
         run: |
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
-          sudo env TMPDIR=/var/tmp DOCKER_HOST="unix:///run/podman/podman.sock" trivy image \
+          CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
+          MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
+          trap "sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+
+          sudo env TMPDIR=/var/tmp trivy rootfs \
             --config trivy.yaml \
             --cache-dir /opt/trivy-cache \
             --scanners secret,misconfig \
@@ -462,7 +472,7 @@ jobs:
             --timeout 30m \
             --exit-code 1 \
             --format table \
-            "$IMAGE_REF"
+            "$MNT_DIR"
 
       - name: Extract Package List
         if: github.event_name != 'pull_request'
