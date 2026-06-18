@@ -23,12 +23,7 @@ COPY --from=brew /system_files /
 RUN setfattr -n user.component -v "homebrew" "/usr/share/homebrew.tar.zst"
 
 # Copy the shared directory from the bootcrew/mono repo
-COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /bootcrew-shared /bootcrew-shared
-
-# Copy configured pacman environment from aur_builder
-COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /etc/pacman.conf /etc/pacman.conf
-COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /etc/pacman.d /etc/pacman.d
-COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /usr/share/pacman/keyrings /usr/share/pacman/keyrings
+COPY files/base/bootcrew-shared/ /bootcrew-shared/
 
 COPY files/keys/ /tmp/keys/
 
@@ -48,6 +43,29 @@ RUN pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl && \
     rm -rf /tmp/keys && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
+RUN sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf && \
+    sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
+    sed -i '/^DownloadUser/d' /etc/pacman.conf && \
+    printf "\n[bopp-os]\nSigLevel = Optional TrustAll\nServer = https://repo.ripps.me\n\n" > /tmp/bopp-os.conf && \
+    sed -i '/^\[extra\]/i # bopp-os repo\n' /etc/pacman.conf && \
+    awk -v repo_file="/tmp/bopp-os.conf" '/^# bopp-os repo/ { system("cat " repo_file); next } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
+    mv /etc/pacman.conf.tmp /etc/pacman.conf && \
+    rm -f /tmp/bopp-os.conf
+
+RUN if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
+        printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
+        awk -v repo_file="/tmp/znver4-repos.conf" '/^#?\[cachyos-v4\]/ && !done { system("cat " repo_file); done=1 } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
+        mv /etc/pacman.conf.tmp /etc/pacman.conf && \
+        rm -f /tmp/znver4-repos.conf ; \
+    fi
+
+RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
+    cp /workspace-mirrors/cachyos-mirrorlist /etc/pacman.d/cachyos-mirrorlist \
+    && cp /workspace-mirrors/cachyos-v3-mirrorlist /etc/pacman.d/cachyos-v3-mirrorlist \
+    && if [ "$TARGET_CPU_MARCH" == "v4" ] || [ "$TARGET_CPU_MARCH" == "znver4" ]; then \
+        cp /workspace-mirrors/cachyos-v4-mirrorlist /etc/pacman.d/cachyos-v4-mirrorlist; \
+    fi
+
 RUN mkdir -p /etc/pacman.d/hooks && \
     ln -sf /dev/null /etc/pacman.d/hooks/90-mkinitcpio-install.hook && \
     ln -sf /dev/null /etc/pacman.d/hooks/90-dracut-install.hook && \
@@ -63,6 +81,7 @@ RUN rm -rf /var/lib/pacman/sync/* && \
 RUN pacman -S --noconfirm --needed cachyos-hooks chwd gpgme && \
     pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
     pacman-key --populate chaotic && \
+    echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
 # Tag pacman config and mirrorlists as a unique component to avoid ostree layer hash non-determinism
@@ -119,12 +138,6 @@ RUN rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
 # ==========================================
 # MASTER PACKAGE INSTALLATION
 # ==========================================
-
-# Setup Local AUR Repository
-COPY --from=localhost/aur-builder:${TARGET_CPU_MARCH} /export-pkgs/ /usr/lib/boppos-aur/
-RUN repo-add /usr/lib/boppos-aur/boppos-aur.db.tar.gz /usr/lib/boppos-aur/*.pkg.tar.zst && \
-    echo -e '\n[boppos-aur]\nSigLevel = Optional TrustAll\nServer = file:///usr/lib/boppos-aur\n' >> /etc/pacman.conf && \
-    pacman -Sy
 
 RUN --mount=type=tmpfs,dst=/run \
     pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth || true

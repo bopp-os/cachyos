@@ -4,6 +4,7 @@ set -euo pipefail
 mkdir -p build/
 ALL_PKGS="build/all-packages.txt"
 CACHY_PKGS="build/cachyos-packages.txt"
+BOPP_PKGS="build/boppos-packages.txt"
 
 echo "Generating package lists..."
 
@@ -15,10 +16,15 @@ pacman -Qq > "$ALL_PKGS"
 # We filter for lines with "[installed]" and where the repo name contains "cachyos"
 pacman -Sl | awk '/\[installed\]/ && $1 ~ /cachyos/ {print $2}' | sort | uniq > "$CACHY_PKGS"
 
+# 3. Find packages sourced from bopp-os repo
+pacman -Sl | awk '/\[installed\]/ && $1 ~ /bopp-os/ {print $2}' | sort | uniq > "$BOPP_PKGS"
+
 ALL_COUNT=$(wc -l < "$ALL_PKGS")
 CACHY_COUNT=$(wc -l < "$CACHY_PKGS")
+BOPP_COUNT=$(wc -l < "$BOPP_PKGS")
 
 echo "Total installed packages: $ALL_COUNT" >&2
 echo "CachyOS specific packages: $CACHY_COUNT" >&2
+echo "Bopp-OS specific packages: $BOPP_COUNT" >&2
 
-echo "Package lists written to $ALL_PKGS and $CACHY_PKGS."
+echo "Package lists written to $ALL_PKGS, $CACHY_PKGS, and $BOPP_PKGS."

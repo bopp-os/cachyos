@@ -124,61 +124,7 @@ async def analyze_cachy_package(session, pkg_name, cachy_bulk_data):
     history = cachy_bulk_data.get(pkg_name, {})
     return history, "cachyos_mirror" if history else "cachyos_not_found"
 
-async def analyze_aur_package(session, pkg_name):
-    history = {}
-    
-    # 1. Resolve PackageBase from AUR RPC
-    rpc_url = f"https://aur.archlinux.org/rpc/v5/info/{pkg_name}"
-    rpc_resp = await fetch_with_backoff(session, rpc_url)
-    if not rpc_resp:
-        return {}, "aur_not_found"
-        
-    try:
-        rpc_data = json.loads(rpc_resp)
-        if rpc_data.get("resultcount", 0) == 0:
-            return {}, "aur_not_found"
-        
-        pkg_info = rpc_data["results"][0]
-        pkgbase = pkg_info.get("PackageBase", pkg_name)
-        
-        # Extract current version and save to our history
-        version = pkg_info.get("Version")
-        last_modified = pkg_info.get("LastModified")
-        if version and last_modified:
-            dt = datetime.fromtimestamp(last_modified, tz=timezone.utc)
-            history[version] = dt
-    except (json.JSONDecodeError, KeyError):
-        pkgbase = pkg_name
-
-    # 2. Fetch history from cgit Atom feed
-    atom_url = f"https://aur.archlinux.org/cgit/aur.git/atom/?h={pkgbase}"
-    xml = await fetch_with_backoff(session, atom_url)
-    if xml:
-        entries = re.findall(r'<entry>.*?</entry>', xml, re.DOTALL)
-        for entry in entries:
-            title_match = re.search(r'<title>(.*?)</title>', entry)
-            updated_match = re.search(r'<updated>(.*?)</updated>', entry)
-            if title_match and updated_match:
-                title = title_match.group(1)
-                date_str = updated_match.group(1)
-                # Extract version from title (usually the last word: "upgpkg: yay 12.1.3-1")
-                words = title.split()
-                if words:
-                    potential_version = words[-1]
-                    if any(c.isdigit() for c in potential_version):
-                        try:
-                            try:
-                                dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-                            except ValueError:
-                                dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                            if potential_version not in history or history[potential_version] > dt:
-                                history[potential_version] = dt
-                        except ValueError:
-                            pass
-    
-    return history, "aur" if history else "aur_not_found"
-
-async def process_package(session, pkg, is_cachyos, is_aur, cache, max_age, semaphore, cachy_bulk_data):
+async def process_package(session, pkg, is_cachyos, cache, max_age, semaphore, cachy_bulk_data):
     async with semaphore:
         now = datetime.now(timezone.utc)
         
@@ -215,12 +161,8 @@ async def process_package(session, pkg, is_cachyos, is_aur, cache, max_age, sema
             if len(new_history) < 2: 
                 ala_history, ala_source = await analyze_arch_package(session, pkg)
                 new_history.update(ala_history)
-        elif is_aur:
-            new_history, source = await analyze_aur_package(session, pkg)
         else:
             new_history, source = await analyze_arch_package(session, pkg)
-            if not new_history and source == "ala_not_found":
-                new_history, source = await analyze_aur_package(session, pkg)
                 
         # Merge new finds into the permanent history database
         for v, dt in new_history.items():
@@ -291,10 +233,6 @@ async def main():
     if args.cachyos_packages and args.cachyos_packages.exists():
         cachy_pkgs = {line.strip() for line in args.cachyos_packages.read_text().splitlines() if line.strip()}
         
-    aur_pkgs = set()
-    if args.aur_packages and args.aur_packages.exists():
-        aur_pkgs = {line.strip() for line in args.aur_packages.read_text().splitlines() if line.strip()}
-
     cache = {}
     if args.cache_file.exists():
         try:
@@ -313,8 +251,7 @@ async def main():
         tasks = []
         for pkg in pkg_list:
             is_cachy = pkg in cachy_pkgs
-            is_aur = pkg in aur_pkgs
-            tasks.append(process_package(session, pkg, is_cachy, is_aur, cache, args.max_age_days, semaphore, cachy_bulk_data))
+            tasks.append(process_package(session, pkg, is_cachy, cache, args.max_age_days, semaphore, cachy_bulk_data))
             
         results = await asyncio.gather(*tasks)
         

@@ -15,16 +15,10 @@ pacman -Qq > "$ALL_PKGS"
 # We filter for lines with "[installed]" and where the repo name contains "cachyos"
 pacman -Sl | awk '/\[installed\]/ && $1 ~ /cachyos/ {print $2}' | sort | uniq > "$CACHY_PKGS" || true
 
-# 3. Find AUR and foreign packages (not in any sync database)
-AUR_PKGS="build/aur-packages.txt"
-pacman -Qm | awk '{print $1}' > "$AUR_PKGS" || true
-
 ALL_COUNT=$(wc -l < "$ALL_PKGS")
 CACHY_COUNT=$(wc -l < "$CACHY_PKGS")
-AUR_COUNT=$(wc -l < "$AUR_PKGS")
 
 echo "Total installed packages: $ALL_COUNT" >&2
 echo "CachyOS specific packages: $CACHY_COUNT" >&2
-echo "AUR/Foreign packages: $AUR_COUNT" >&2
 
-echo "Package lists written to $ALL_PKGS, $CACHY_PKGS, and $AUR_PKGS."
+echo "Package lists written to $ALL_PKGS and $CACHY_PKGS."
