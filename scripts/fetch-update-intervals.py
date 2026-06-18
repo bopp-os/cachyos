@@ -216,7 +216,7 @@ async def main():
     parser = argparse.ArgumentParser(description="Calculate chunkah update intervals for packages.")
     parser.add_argument("packages", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="List of packages (or stdin)")
     parser.add_argument("--cachyos-packages", type=Path, help="File containing list of known CachyOS packages")
-    parser.add_argument("--aur-packages", type=Path, help="File containing list of known AUR packages")
+    parser.add_argument("--boppos-packages", type=Path, help="File containing list of known BoppOS packages")
     parser.add_argument("--cache-file", type=Path, default=Path("tools/package-intervals.json"), help="Output JSON file")
     parser.add_argument("--max-age-days", type=int, default=30, help="Max age for cached entries")
     parser.add_argument("--concurrency", type=int, default=8, help="Concurrent HTTP requests")
