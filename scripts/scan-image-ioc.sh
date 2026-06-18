@@ -14,6 +14,9 @@ echo "Building file listing from mount..."
 # sed strips the mount prefix so paths match the expected relative format
 FILE_LIST=$(sudo find "$MNT_DIR" -type f 2>/dev/null | sed "s|^$MNT_DIR/||")
 
+FILE_COUNT=$(echo "$FILE_LIST" | wc -l)
+echo "Scanning $FILE_COUNT files..."
+
 FOUND=0
 FINDINGS=()
 
