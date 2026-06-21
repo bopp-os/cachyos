@@ -44,6 +44,7 @@ kde-media:
   - kdegraphics-thumbnailers
   - kimageformats
   - qt6-imageformats
+  - libcec
 kde-themes-aesthetics:
   - appmenu-gtk-module
   - cachyos-kde-settings
@@ -73,3 +74,4 @@ kde-git-themes:
   - cachyos-nord-kde-theme-git
   - cachyos-lavender-kde-theme-git
   - cachyos-nord-gtk-theme-git
+
