@@ -313,7 +313,6 @@ gaming-core:
   - udev-joystick-blacklist-git
   - waydroid
   - goverlay
-  - pascube
   - vkbasalt
   - vkbasalt-cli
   - vkd3d
