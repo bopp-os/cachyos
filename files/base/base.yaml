@@ -161,7 +161,6 @@ networking:
   - traceroute
   - whois
   - wireshark-cli
-
 hardware-management:
   - power-profiles-daemon
   - cpupower
@@ -233,6 +232,9 @@ cli-utilities:
   - fsarchiver
   - pv
   - chafa
+  - lsof
+  - strace
+  - ltrace
 text-editors-ides:
   - nano
   - nano-syntax-highlighting
