@@ -152,6 +152,16 @@ networking:
   - bluez-hid2hci
   - mullvad-vpn-bin
   - mullvad-vpn-daemon-bin
+  - arp-scan
+  - bind-tools
+  - iputils
+  - net-tools
+  - nmap
+  - tcpdump
+  - traceroute
+  - whois
+  - wireshark-cli
+
 hardware-management:
   - power-profiles-daemon
   - cpupower
