@@ -15,11 +15,6 @@ system-core:
   - ufw
 system-toolchains:
   - llvm-libs
-  - clang
-dev-languages:
-  - go
-  - python-numpy
-  - python-matplotlib
 gui-frameworks:
   - qt5-base
   - qt6-base
@@ -235,6 +230,8 @@ cli-utilities:
   - procps-ng
   - curl
   - wget
+  - file
+  - patch
   - man-db
   - man-pages
   - openssh
@@ -263,7 +260,6 @@ devel-base:
   - git-lfs
   - tig
   - github-cli
-  - paru
   - just
   - cosign
   - skopeo
@@ -353,15 +349,8 @@ web-browsers:
   - cachyos-firefox-settings
   - firefox
 development-languages:
-  - nodejs
-  - npm
-  - rust
   - python-pip
   - python-pipx
-  - ruby
-  - php
-  - cargo-binstall
-  - cargo-update
   - python-defusedxml
   - python-packaging
 cachyos-settings:
@@ -372,6 +361,5 @@ cachyos-settings:
   - cachyos-fish-config
   - cachyos-samba-settings
 base-meta:
-  - base-devel
   - cachyos-gaming-applications
   - cachyos-gaming-meta
