@@ -22,9 +22,9 @@ This is all very experimental. So use at your own risk.
   - `faugus-launcher`, `umu-launcher`, `winboat`
 - **Developer Focused**: Includes essential development environments and tools out of the box:
   - Homebrew (`brew`) support integrated into the base image
-  - `distrobox`, `docker` & `docker-compose`
-  - `nodejs`, `npm`, `rust`, `python-pip`, `python-pipx`
-  - `visual-studio-code-bin`
+  - `distrobox` container-native environment (run any distro's toolchain natively)
+  - `docker`, `docker-compose`, and `podman`
+  - `python-pip` and `python-pipx` for user-space app installations
 - **Seamless Setup & Migration**: Features custom scripts to transition safely from other atomic distributions (`bopp-migrate`).
 - **Hardware Encryption Utility**: Includes `bopp-tpm-refresh` to automatically re-enroll LUKS TPM2 encryption keys after system updates or migrations.
 - **Enhanced Shell**: A pre-configured shell environment with `starship`, `zoxide`, and `eza` for a modern terminal experience.
@@ -32,7 +32,7 @@ This is all very experimental. So use at your own risk.
 ## Custom Enhancements
 
 - **Desktop First:** Stripped away Steam Deck/handheld-specific UI elements and scaling tweaks in favor of standard desktop environments (with support for KDE Plasma, GNOME, and Niri).
-- **Developer Ready:** Pre-installed essentials like Distrobox, Homebrew (`brew`), Docker, VS Code, Node.js, Rust, and Python.
+- **Developer Ready:** Pre-installed essentials like Distrobox, Homebrew (`brew`), Docker, and Python (with full support for container-native development workloads).
 - **BoppOS Tools:** We have created a suite of custom administration utilities, available in the [boppos-tools repository](https://github.com/bopp-os/boppos-tools).
 
 ⚠️ **WARNING: HIGHLY EXPERIMENTAL AND POTENTIALLY DESTRUCTIVE** ⚠️
@@ -44,6 +44,7 @@ Important commands included in `boppos-tools`:
 - `bopp-diff`: Analyzes the current running system against staged or upstream `bootc` images to provide a clear package diff.
 - `bopp-kargs`: A utility to manage Boot Loader Specification (BLS) kernel arguments for atomic deployments.
 - `bopp-tpm-refresh`: Re-enroll LUKS/TPM2 decryption keys after system updates.
+- `bopp-dev-setup`: Provisions a container-native development environment in a CachyOS-based Distrobox container, optimized for your CPU's microarchitecture.
 - `bopp-migrate`: Transition your `$HOME` and `/etc` configurations from Fedora-based atomic distributions to this Arch-based BoppOS image.
 - `install-optional-flatpaks`: An interactive script to easily fetch, customize, and install a curated list of essential Flatpak applications.
 
