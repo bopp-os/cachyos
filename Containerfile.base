@@ -218,6 +218,7 @@ RUN mkdir -p /etc/containers/containers.conf.d && \
 RUN systemctl enable var-opt.mount && \
     systemctl enable NetworkManager.service && \
     systemctl enable systemd-resolved.service && \
+    systemctl enable avahi-daemon.service && \
     systemctl enable dbus-broker.service && \
     systemctl enable bluetooth.service && \
     systemctl enable ModemManager.service && \

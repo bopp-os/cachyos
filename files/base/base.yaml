@@ -137,6 +137,7 @@ networking:
   - modemmanager
   - usb_modeswitch
   - nss-mdns
+  - avahi
   - bluez
   - bluez-utils
   - bluez-libs
