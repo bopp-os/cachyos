@@ -19,7 +19,6 @@ gui-frameworks:
   - qt5-base
   - qt6-base
   - qt6-declarative
-  - electron39
 update-notifier:
   - python-pystray
   - python-pillow
@@ -251,10 +250,8 @@ text-editors-ides:
   - nano-syntax-highlighting
   - micro
   - vi
-  - visual-studio-code-bin
   - meld
   - vim
-  - antigravity-ide
 devel-base:
   - git
   - git-lfs
