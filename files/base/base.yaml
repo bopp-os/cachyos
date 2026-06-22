@@ -15,10 +15,6 @@ system-core:
   - ufw
 system-toolchains:
   - llvm-libs
-gui-frameworks:
-  - qt5-base
-  - qt6-base
-  - qt6-declarative
 update-notifier:
   - python-pystray
   - python-pillow
