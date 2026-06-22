@@ -243,6 +243,7 @@ text-editors-ides:
   - visual-studio-code-bin
   - meld
   - vim
+  - antigravity-ide
 devel-base:
   - git
   - git-lfs
