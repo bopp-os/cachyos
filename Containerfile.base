@@ -228,7 +228,8 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable power-profiles-daemon.service && \
     systemctl enable fstrim.timer && \
     systemctl enable boppos-update-monitor.timer && \
-    systemctl enable cups.socket
+    systemctl enable cups.socket && \
+    systemctl enable docker.socket
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \

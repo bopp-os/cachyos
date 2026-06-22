@@ -71,9 +71,13 @@ filesystems:
   - gvfs
   - gvfs-mtp
   - gvfs-smb
+  - gvfs-dnssd
   - nfs-utils
   - smartmontools
   - nilfs-utils
+  - f2fs-tools
+  - udftools
+  - hfsprogs
   - dmraid
   - autofs
 archiving:
@@ -107,6 +111,7 @@ printing-scanning:
   - gutenprint
   - splix
   - hplip
+  - brlaser
   - python-pyqt5
   - python-reportlab
   - cups-browsed
@@ -183,9 +188,17 @@ hardware-management:
   - hwdetect
   - colord
   - bolt
+  - pcsclite
+  - ccid
+  - libfido2
+  - android-udev
+  - throttled
+  - ryzenadj-git
+  - opentabletdriver
   - libgusb
   - libssc
   - iio-sensor-proxy
+  - brightnessctl
 shells:
   - bash
   - zsh
@@ -262,6 +275,7 @@ containers:
   - distrobox
   - flatpak
   - ptyxis
+  - libvirt
 schedulers:
   - scx-scheds-git
   - scx-tools-git
