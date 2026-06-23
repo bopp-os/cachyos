@@ -23,7 +23,7 @@ fonts-heavy:
   - noto-fonts-cjk
   - ttf-meslo-nerd
 gaming-runtimes:
-  - proton-cachyos
+  - proton-cachyos-native
   - proton-cachyos-slr
   - wine
   - wine-cachyos-opt
