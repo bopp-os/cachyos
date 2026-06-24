@@ -189,6 +189,8 @@ hardware-management:
   - libssc
   - iio-sensor-proxy
   - brightnessctl
+  - fprintd
+  - howdy-git
 shells:
   - bash
   - zsh
