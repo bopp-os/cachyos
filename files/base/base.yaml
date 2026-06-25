@@ -102,6 +102,9 @@ printing-scanning:
   - splix
   - hplip
   - brlaser
+  - cnrdrvcups-lb
+  - libxml2-legacy
+  - libjpeg6-turbo
   - python-pyqt5
   - python-reportlab
   - cups-browsed
