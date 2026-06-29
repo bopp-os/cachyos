@@ -117,6 +117,7 @@ audio:
   - wireplumber
   - pavucontrol
   - alsa-utils
+  - realtime-privileges
 firmware:
   - amd-ucode
   - intel-ucode

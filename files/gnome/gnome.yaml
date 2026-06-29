@@ -29,7 +29,7 @@ gnome-utilities:
   - malcontent
   - gvfs-afc
   - gvfs-gphoto2
-  - gnome-system-monitor
+  - resources
   - gnome-calendar
   - gnome-weather
   - gnome-software
