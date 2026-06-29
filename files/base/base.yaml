@@ -49,6 +49,7 @@ fonts:
   - awesome-terminal-fonts
   - cantarell-fonts
   - ttf-opensans
+  - ttf-liberation
 filesystems:
   - fuse2
   - fuse3
@@ -118,6 +119,7 @@ audio:
   - pavucontrol
   - alsa-utils
   - realtime-privileges
+  - alsa-plugins
 firmware:
   - amd-ucode
   - intel-ucode
@@ -247,6 +249,8 @@ cli-utilities:
   - lsof
   - strace
   - ltrace
+package-management:
+  - rebuild-detector
 text-editors-ides:
   - nano
   - nano-syntax-highlighting

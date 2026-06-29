@@ -19,6 +19,9 @@ kde-integration:
   - plasma5-integration
   - xsettingsd
   - plymouth-kcm
+  - kde-gtk-config
+  - kwallet-pam
+  - plasma-login-manager
 kde-utilities:
   - dolphin
   - dolphin-plugins
@@ -39,6 +42,8 @@ kde-utilities:
   - phonon-qt6-mpv
   - tesseract
   - tesseract-data-eng
+  - gwenview
+  - kcalc
 kde-media:
   - ffmpegthumbs
   - kdegraphics-thumbnailers
@@ -51,6 +56,7 @@ kde-themes-aesthetics:
   - cachyos-themes-sddm
   - cachyos-iridescent-kde
   - char-white
+  - breeze-gtk
 kde-additions:
   - networkmanager-qt
   - kdepim-addons
@@ -65,6 +71,7 @@ kde-additions:
   - kid3
   - kruler
   - isoimagewriter
+  - plasma-browser-integration
 kde-meta:
   - plasma-desktop
   - plasma-workspace

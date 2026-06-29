@@ -55,6 +55,7 @@ gnome-additions:
   - gnome-remote-desktop
   - snapshot
   - decibels
+  - gvfs-nfs
 gnome-media:
   - sushi
   - showtime
