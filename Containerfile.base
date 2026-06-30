@@ -16,6 +16,7 @@ FROM ghcr.io/ublue-os/brew:latest AS brew
 FROM docker.io/cachyos/cachyos-${BASE_IMAGE_TAG} AS system
 ARG TARGET_CPU_MARCH
 ARG BASE_IMAGE_TAG
+ARG VERBOSE
 ENV LANG=en_US.UTF-8
 
 # Copy Homebrew
