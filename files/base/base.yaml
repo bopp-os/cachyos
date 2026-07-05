@@ -180,7 +180,6 @@ hardware-management:
   - lsscsi
   - sg3_utils
   - mtools
-  - chwd
   - hwdetect
   - colord
   - bolt
