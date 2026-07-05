@@ -54,17 +54,17 @@ RUN sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf && \
     rm -f /tmp/bopp-os.conf
 
 RUN if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
-        printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
-        awk -v repo_file="/tmp/znver4-repos.conf" '/^#?\[cachyos-v4\]/ && !done { system("cat " repo_file); done=1 } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
-        mv /etc/pacman.conf.tmp /etc/pacman.conf && \
-        rm -f /tmp/znver4-repos.conf ; \
+    printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
+    awk -v repo_file="/tmp/znver4-repos.conf" '/^#?\[cachyos-v4\]/ && !done { system("cat " repo_file); done=1 } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
+    mv /etc/pacman.conf.tmp /etc/pacman.conf && \
+    rm -f /tmp/znver4-repos.conf ; \
     fi
 
 RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
     cp /workspace-mirrors/cachyos-mirrorlist /etc/pacman.d/cachyos-mirrorlist \
     && cp /workspace-mirrors/cachyos-v3-mirrorlist /etc/pacman.d/cachyos-v3-mirrorlist \
     && if [ "$TARGET_CPU_MARCH" == "v4" ] || [ "$TARGET_CPU_MARCH" == "znver4" ]; then \
-        cp /workspace-mirrors/cachyos-v4-mirrorlist /etc/pacman.d/cachyos-v4-mirrorlist; \
+    cp /workspace-mirrors/cachyos-v4-mirrorlist /etc/pacman.d/cachyos-v4-mirrorlist; \
     fi
 
 RUN mkdir -p /etc/pacman.d/hooks && \
@@ -81,11 +81,11 @@ RUN rm -rf /var/lib/pacman/sync/* && \
 
 RUN pacman -S --noconfirm --needed cachyos-hooks gpgme && \
     (curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst || \
-     curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst || \
-     curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst) && \
+    curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst || \
+    curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst) && \
     (curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst || \
-     curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst || \
-     curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst) && \
+    curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst || \
+    curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst) && \
     pacman -U --overwrite '*' --noconfirm /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst && \
     rm -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst && \
     pacman-key --populate chaotic && \
@@ -131,16 +131,16 @@ RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
 RUN rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
     rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
     if ! mountpoint -q /usr/lib/sysimage/cache/pacman/pkg; then \
-        pacman -Sc --noconfirm ; \
+    pacman -Sc --noconfirm ; \
     fi && \
     if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
-        echo "Architecture $TARGET_CPU_MARCH detected. Syncing with Zen 4/5 optimized repositories..." && \
-        rm -rf /var/lib/pacman/sync/* && \
-        # Use -Syyuu to allow downgrades, which is necessary when switching from a generic (v4) to a specific (znver4) repo set.
-        pacman -Syyuu --noconfirm && \
-        { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; } ; \
+    echo "Architecture $TARGET_CPU_MARCH detected. Syncing with Zen 4/5 optimized repositories..." && \
+    rm -rf /var/lib/pacman/sync/* && \
+    # Use -Syyuu to allow downgrades, which is necessary when switching from a generic (v4) to a specific (znver4) repo set.
+    pacman -Syyuu --noconfirm && \
+    { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; } ; \
     else \
-        echo "Architecture $TARGET_CPU_MARCH detected. Standard repositories already up to date." ; \
+    echo "Architecture $TARGET_CPU_MARCH detected. Standard repositories already up to date." ; \
     fi
 
 # ==========================================
@@ -188,9 +188,9 @@ RUN mkdir -p /usr/lib/security/howdy && \
 
 
 RUN if [ -e /usr/etc ]; then \
-        echo "Workaround: mitigating rogue /usr/etc to satisfy bootc..." && \
-        if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && \
-        rm -rf /usr/etc; \
+    echo "Workaround: mitigating rogue /usr/etc to satisfy bootc..." && \
+    if [ ! -L /usr/etc ] && [ -n "$(ls -A /usr/etc 2>/dev/null)" ]; then cp -a /usr/etc/* /etc/ 2>/dev/null || true; fi && \
+    rm -rf /usr/etc; \
     fi
 
 # Configure Flatpak
@@ -254,7 +254,7 @@ RUN --mount=type=tmpfs,dst=/run \
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
     if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
-        mv /opt/* /usr/lib/opt/ || true; \
+    mv /opt/* /usr/lib/opt/ || true; \
     fi
 
 # Apply update intervals before bootc cleanup

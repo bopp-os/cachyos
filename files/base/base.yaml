@@ -23,7 +23,6 @@ fonts-heavy:
   - noto-fonts-cjk
   - ttf-meslo-nerd
 gaming-runtimes:
-  - proton-cachyos-native
   - proton-cachyos-slr
   - wine
   - wine-cachyos-opt
@@ -322,10 +321,7 @@ gaming-core:
   - lutris
   - heroic-games-launcher-bin
   - steam
-  - lib32-glibc
-  - lib32-gcc-libs
   - lib32-systemd
-  - lib32-libx11
   - winboat
   - gamescope-session-git
   - sunshine
