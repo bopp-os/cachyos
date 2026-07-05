@@ -80,7 +80,12 @@ RUN rm -rf /var/lib/pacman/sync/* && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
 RUN pacman -S --noconfirm --needed cachyos-hooks chwd gpgme && \
-    pacman -U --overwrite '*' --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' && \
+    (curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst || \
+     curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst) && \
+    (curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst || \
+     curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst) && \
+    pacman -U --overwrite '*' --noconfirm /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst && \
+    rm -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst && \
     pacman-key --populate chaotic && \
     echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
