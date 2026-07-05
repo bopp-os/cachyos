@@ -148,11 +148,11 @@ RUN --mount=type=tmpfs,dst=/run \
     python python-yaml yq
 
 RUN --mount=type=tmpfs,dst=/run \
-    pacman -S --noconfirm --ask 4 --needed \
+    pacman -S --noconfirm --ask 4 --needed --overwrite '*' \
     mesa lib32-mesa mesa-utils intel-media-driver libdisplay-info lib32-libdisplay-info
 
 RUN --mount=type=tmpfs,dst=/run \
-    pacman -S --noconfirm --ask 4 --needed \
+    pacman -S --noconfirm --ask 4 --needed --overwrite '*' \
     vulkan-radeon lib32-vulkan-radeon vulkan-intel lib32-vulkan-intel \
     vulkan-nouveau lib32-vulkan-nouveau vulkan-mesa-layers lib32-vulkan-mesa-layers \
     vulkan-icd-loader lib32-vulkan-icd-loader
