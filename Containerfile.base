@@ -184,8 +184,12 @@ RUN if [ -e /usr/etc ]; then \
     rm -rf /usr/etc; \
     fi
 
-# Configure Flatpak
-RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+# Configure Flatpak with retry logic to handle transient network issues
+RUN for i in {1..5}; do \
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && exit 0 || \
+    echo "Flatpak remote-add failed (attempt $i), retrying in 5 seconds..." && sleep 5; \
+    done; \
+    exit 1
 
 # Fix suid permissions
 RUN for f in \
