@@ -14,7 +14,7 @@ build-mirrorlist arch='v3':
         --rm --network=host \
         -v $(pwd)/mirrors:/workspace-mirrors:z \
         $(if [ "{{arch}}" = "znver4" ]; then echo "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo "docker.io/cachyos/cachyos-{{arch}}:latest"; fi) \
-        bash -c "timeout 120 \
+        bash -c "sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf && timeout 120 \
             bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null \
                         && cachyos-rate-mirrors < /dev/null'" || \
     echo 'Mirror rating timed out or failed, falling back to defaults' && \
