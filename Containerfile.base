@@ -106,15 +106,9 @@ RUN grep "= */var" /etc/pacman.conf | grep -v "CacheDir" | sed "/= *\/var/s/.*=/
 
 # PRE-INSTALL CONFIGURATION & HOOKS
 # Copy hooks and configs EARLY so they fire during the master pacman block.
-COPY files/base/usr/share /usr/share
-COPY files/base/etc /etc
-COPY files/base/usr/lib /usr/lib
-COPY files/base/usr/libexec /usr/libexec 
-RUN chmod +x /usr/share/boppos/bootc-cleanup.sh
-RUN chmod -R 0755 /usr/libexec
-
-# Link OS default font configuration
-RUN mkdir -p /etc/fonts/conf.d && ln -sf /usr/share/fontconfig/conf.avail/52-boppos-fonts.conf /etc/fonts/conf.d/52-boppos-fonts.conf
+COPY files/base/usr/share/libalpm/hooks/assign-usercomponent.hook /usr/share/libalpm/hooks/assign-usercomponent.hook
+COPY files/base/usr/libexec/assign-usercomponent.sh /usr/libexec/assign-usercomponent.sh
+RUN chmod +x /usr/libexec/assign-usercomponent.sh
 
 # Generate en_US.UTF-8 locale
 RUN sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
@@ -175,6 +169,18 @@ RUN --mount=type=tmpfs,dst=/run \
 # ==========================================
 # POST-INSTALL CONFIGURATION
 # ==========================================
+
+# Re-copy configurations and hooks to restore any custom files overwritten by packages
+COPY files/base/usr/share /usr/share
+COPY files/base/etc /etc
+COPY files/base/usr/lib /usr/lib
+COPY files/base/usr/libexec /usr/libexec
+
+RUN chmod +x /usr/share/boppos/bootc-cleanup.sh && \
+    chmod -R 0755 /usr/libexec
+
+# Link OS default font configuration
+RUN mkdir -p /etc/fonts/conf.d && ln -sf /usr/share/fontconfig/conf.avail/52-boppos-fonts.conf /etc/fonts/conf.d/52-boppos-fonts.conf
 
 # Master copy of custom executables. Overwrites defaults (like steamos-update).
 # This is commented out intentionally. Git does not track empty directories,
