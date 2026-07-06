@@ -44,8 +44,7 @@ RUN pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl && \
     rm -rf /tmp/keys && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
-RUN sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf && \
-    sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
+RUN sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && \
     sed -i '/^DownloadUser/d' /etc/pacman.conf && \
     printf "\n[bopp-os]\nSigLevel = Optional TrustAll\nServer = https://repo.ripps.me\n\n" > /tmp/bopp-os.conf && \
     sed -i '/^\[extra\]/i # bopp-os repo\n' /etc/pacman.conf && \
@@ -77,6 +76,7 @@ RUN mkdir -p /etc/pacman.d/hooks && \
 RUN rm -rf /var/lib/pacman/sync/* && \
     pacman -Syy --noconfirm && \
     pacman -Su --noconfirm && \
+    sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
 RUN pacman -S --noconfirm --needed cachyos-hooks gpgme && \
