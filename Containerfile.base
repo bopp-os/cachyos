@@ -6,6 +6,7 @@
 # Global build arguments must be declared before FROM to be used in image tags
 ARG TARGET_CPU_MARCH=v3
 ARG BASE_IMAGE_TAG=v3
+ARG BASE_IMAGE=docker.io/cachyos/cachyos-${BASE_IMAGE_TAG}
 ARG VERBOSE=false
 
 # ==========================================
@@ -13,7 +14,7 @@ ARG VERBOSE=false
 # ==========================================
 FROM ghcr.io/ublue-os/brew:latest AS brew
 
-FROM docker.io/cachyos/cachyos-${BASE_IMAGE_TAG} AS system
+FROM ${BASE_IMAGE} AS system
 ARG TARGET_CPU_MARCH
 ARG BASE_IMAGE_TAG
 ARG VERBOSE
@@ -51,13 +52,6 @@ RUN sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf && 
     awk -v repo_file="/tmp/bopp-os.conf" '/^# bopp-os repo/ { system("cat " repo_file); next } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
     mv /etc/pacman.conf.tmp /etc/pacman.conf && \
     rm -f /tmp/bopp-os.conf
-
-RUN if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
-    printf "[cachyos-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-core-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n[cachyos-extra-znver4]\nInclude = /etc/pacman.d/cachyos-v4-mirrorlist\n\n" > /tmp/znver4-repos.conf && \
-    awk -v repo_file="/tmp/znver4-repos.conf" '/^#?\[cachyos-v4\]/ && !done { system("cat " repo_file); done=1 } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp && \
-    mv /etc/pacman.conf.tmp /etc/pacman.conf && \
-    rm -f /tmp/znver4-repos.conf ; \
-    fi
 
 RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
     cp /workspace-mirrors/cachyos-mirrorlist /etc/pacman.d/cachyos-mirrorlist \
@@ -120,21 +114,12 @@ RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
     echo 'i18n_vars="/usr/share/kbd/consolefonts  /usr/share/kbd/keymaps"' >> /usr/lib/dracut/dracut.conf.d/boppos-cachyos.conf
 
 # ==========================================
-# CPU ARCHITECTURE REPOSITORY SETUP
+# PACMAN CACHE CLEANUP
 # ==========================================
 RUN rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
     rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
     if ! mountpoint -q /usr/lib/sysimage/cache/pacman/pkg; then \
     pacman -Sc --noconfirm ; \
-    fi && \
-    if [ "$TARGET_CPU_MARCH" = "znver4" ]; then \
-    echo "Architecture $TARGET_CPU_MARCH detected. Syncing with Zen 4/5 optimized repositories..." && \
-    rm -rf /var/lib/pacman/sync/* && \
-    # Use -Syyuu to allow downgrades, which is necessary when switching from a generic (v4) to a specific (znver4) repo set.
-    pacman -Syyuu --noconfirm && \
-    { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; } ; \
-    else \
-    echo "Architecture $TARGET_CPU_MARCH detected. Standard repositories already up to date." ; \
     fi
 
 # ==========================================

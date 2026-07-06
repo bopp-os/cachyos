@@ -54,6 +54,7 @@ env:
   FLAVORS: "plasma gnome niri"
   DEFAULT_TAG: "${{ inputs.test_tag && 'v4-test' || 'v4' }}"
   BASE_TAG: "v4"
+  BASE_IMAGE: "docker.io/cachyos/cachyos-v4:latest"
   TARGET_MARCH: "v4"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
 
@@ -236,7 +237,7 @@ jobs:
           mkdir -p ${{ github.workspace }}/mirrors
           PODMAN_OPTS=""
           if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-          sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z docker.io/cachyos/cachyos-v4:latest bash -c "timeout 120 bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null && cachyos-rate-mirrors < /dev/null' || echo 'Mirror rating timed out or failed, falling back to defaults'; cp /etc/pacman.d/cachyos*mirrorlist /workspace-mirrors/"
+          sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z ${{ env.BASE_IMAGE }} bash -c "timeout 120 bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null && cachyos-rate-mirrors < /dev/null' || echo 'Mirror rating timed out or failed, falling back to defaults'; cp /etc/pacman.d/cachyos*mirrorlist /workspace-mirrors/"
           echo "::endgroup::"
 
       - name: Build Base Image
@@ -283,7 +284,7 @@ jobs:
           echo "::group::Building base"
           CURRENT_IMAGE_NAME="cachyos-base"
           DOCKERFILE="Containerfile.base"
-          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
+          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}" "--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
             --network=host \

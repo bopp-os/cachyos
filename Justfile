@@ -13,7 +13,7 @@ build-mirrorlist arch='v3':
         --security-opt=seccomp=unconfined \
         --rm --network=host \
         -v $(pwd)/mirrors:/workspace-mirrors:z \
-        docker.io/cachyos/cachyos-$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi):latest \
+        $(if [ "{{arch}}" = "znver4" ]; then echo "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo "docker.io/cachyos/cachyos-{{arch}}:latest"; fi) \
         bash -c "timeout 120 \
             bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null \
                         && cachyos-rate-mirrors < /dev/null'" || \
@@ -22,7 +22,7 @@ build-mirrorlist arch='v3':
         --security-opt=seccomp=unconfined \
         --rm --network=host \
         -v $(pwd)/mirrors:/workspace-mirrors:z \
-        docker.io/cachyos/cachyos-$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi):latest \
+        $(if [ "{{arch}}" = "znver4" ]; then echo "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo "docker.io/cachyos/cachyos-{{arch}}:latest"; fi) \
         bash -c "cp /etc/pacman.d/cachyos-mirrorlist /workspace-mirrors/ \
                 && cp /etc/pacman.d/cachyos-v3-mirrorlist /workspace-mirrors/ \
                 &&  if [ \"{{arch}}\" == \"v4\" ] || [ \"{{arch}}\" == \"znver4\" ]; then \
@@ -36,6 +36,7 @@ build-aur arch='v3':
         --network=host \
         --build-arg TARGET_CPU_MARCH={{arch}} \
         --build-arg BASE_IMAGE_TAG=$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi) \
+        $(if [ "{{arch}}" = "znver4" ]; then echo "--build-arg BASE_IMAGE=ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo ""; fi) \
         -f Containerfile.aur \
         -t "localhost/aur-builder:{{arch}}" \
         .
@@ -53,6 +54,7 @@ build arch='v3' flavor='base':
             --network=host \
             --build-arg TARGET_CPU_MARCH={{arch}} \
             --build-arg BASE_IMAGE_TAG=$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi) \
+            $(if [ "{{arch}}" = "znver4" ]; then echo "--build-arg BASE_IMAGE=ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo ""; fi) \
             -f Containerfile.base \
             -t "{{registry}}/{{user}}/cachyos-boppos-base:{{arch}}" \
             .; \
