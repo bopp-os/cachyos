@@ -54,12 +54,12 @@ SUCCESS=false
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     if [ "$VERBOSE" -eq 1 ]; then
-        if pacman -Sy --noconfirm --ask 4 --needed --overwrite '*' $PKGS; then
+        if pacman -Syu --noconfirm --ask 4 --needed --overwrite '*' $PKGS; then
             SUCCESS=true
             break
         fi
     else
-        if pacman -Sy --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman.log 2>&1; then
+        if pacman -Syu --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman.log 2>&1; then
             SUCCESS=true
             break
         else
