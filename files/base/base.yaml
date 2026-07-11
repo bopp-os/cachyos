@@ -304,7 +304,7 @@ themes-aesthetics:
 media-video:
   - libdvdcss
   - gst-libav
-  - mpv-git
+  - mpv
   - ffmpeg
   - gpu-screen-recorder-ui
   - ffmpegthumbnailer
