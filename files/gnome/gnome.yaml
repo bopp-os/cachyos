@@ -36,6 +36,7 @@ gnome-utilities:
 gnome-themes:
   - adw-gtk-theme
   - cachyos-nord-gtk-theme-git
+  - cachyos-gnome-settings
 gnome-extensions:
   - gnome-shell-extension-appindicator
   - gnome-shell-extension-gsconnect

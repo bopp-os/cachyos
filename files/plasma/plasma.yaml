@@ -22,6 +22,12 @@ kde-integration:
   - kde-gtk-config
   - kwallet-pam
   - plasma-login-manager
+  - plasma-nm
+  - plasma-pa
+  - plasma-firewall
+  - plasma-systemmonitor
+  - plasma-thunderbolt
+  - bluedevil
 kde-utilities:
   - dolphin
   - dolphin-plugins
