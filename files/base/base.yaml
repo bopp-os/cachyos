@@ -195,6 +195,9 @@ hardware-management:
   - brightnessctl
   - fprintd
   - howdy-git
+  - asusctl
+  - supergfxctl
+  - iptsd
 shells:
   - bash
   - zsh
