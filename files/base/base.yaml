@@ -197,7 +197,6 @@ hardware-management:
   - howdy-git
   - asusctl
   - supergfxctl
-  - iptsd
 shells:
   - bash
   - zsh

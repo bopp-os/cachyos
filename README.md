@@ -25,7 +25,7 @@ This is all very experimental. So use at your own risk.
   - `distrobox` container-native environment (run any distro's toolchain natively)
   - `docker`, `docker-compose`, and `podman`
   - `python-pip` and `python-pipx` for user-space app installations
-- **Laptop Hardware Compatibility**: Pre-installed compatibility and management tools for ASUS (`asusctl`, `supergfxctl`), Microsoft Surface (`iptsd`), Framework and generic laptops (`power-profiles-daemon`, `iio-sensor-proxy`, `bolt`, `fprintd`). Systemd services are kept disabled by default to eliminate background overhead on non-target hardware.
+- **Laptop Hardware Compatibility**: Pre-installed compatibility and management tools for ASUS (`asusctl`, `supergfxctl`), Framework and generic laptops (`power-profiles-daemon`, `iio-sensor-proxy`, `bolt`, `fprintd`). Systemd services are kept disabled by default to eliminate background overhead on non-target hardware.
 - **Seamless Setup & Migration**: Features custom scripts to transition safely from other atomic distributions (`bopp-migrate`).
 - **Hardware Encryption Utility**: Includes `bopp-tpm-refresh` to automatically re-enroll LUKS TPM2 encryption keys after system updates or migrations.
 - **Enhanced Shell**: A pre-configured shell environment with `starship`, `zoxide`, and `eza` for a modern terminal experience.

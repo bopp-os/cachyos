@@ -240,7 +240,7 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable boppos-update-monitor.timer && \
     systemctl enable cups.socket && \
     systemctl enable docker.socket && \
-    systemctl disable asusd.service supergfxd.service iptsd.service || true
+    systemctl disable asusd.service supergfxd.service || true
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
