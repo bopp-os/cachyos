@@ -113,7 +113,7 @@ done
 
 # Sweep for any remaining untagged regular files in /usr or /etc to prevent giant catch-all layers
 echo "Sweeping for remaining untagged regular files in /usr and /etc..."
-find "${ROOTFS%/}/usr" "${ROOTFS%/}/etc" -type f ! -L -exec sh -c '
+find "${ROOTFS%/}/usr" "${ROOTFS%/}/etc" -type f -exec sh -c '
   for f; do
     if ! getfattr -h -n user.component "$f" &>/dev/null; then
       setfattr -h -n user.component -v "image-generated" "$f" 2>/dev/null || true

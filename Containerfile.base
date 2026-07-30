@@ -164,7 +164,7 @@ COPY files/base/usr/libexec /usr/libexec
 
 RUN chmod +x /usr/share/boppos/bootc-cleanup.sh && \
     chmod -R 0755 /usr/libexec && \
-    find /etc /usr/share/boppos /usr/libexec -type f ! -L \
+    find /etc /usr/share/boppos /usr/libexec -type f \
         -exec sh -c 'for f; do getfattr -h -n user.component "$f" &>/dev/null || setfattr -h -n user.component -v "boppos-custom" "$f"; done' sh {} +
 
 # Link OS default font configuration
@@ -192,7 +192,7 @@ RUN for i in {1..5}; do \
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && break || \
     echo "Flatpak remote-add failed (attempt $i), retrying in 5 seconds..." && sleep 5; \
     done && \
-    find /var/lib/flatpak /etc/flatpak -type f ! -L 2>/dev/null | xargs -r sh -c \
+    find /var/lib/flatpak /etc/flatpak -type f 2>/dev/null | xargs -r sh -c \
     'for f; do getfattr -h -n user.component "$f" &>/dev/null || setfattr -h -n user.component -v "flatpak-config" "$f"; done' sh
 
 # Fix suid permissions
@@ -252,7 +252,7 @@ RUN --mount=type=tmpfs,dst=/run \
     printf "systemdsystemconfdir=/etc/systemd/system\nsystemdsystemunitdir=/usr/lib/systemd/system\n" | tee /usr/lib/dracut/dracut.conf.d/30-bootcrew-fix-bootc-module.conf && \
     printf 'reproducible="yes"\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc "' | tee "/usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf" && \
     SOURCE_DATE_EPOCH=0 dracut --force --reproducible "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)/initramfs.img" && \
-    find /usr/lib/modules -type f ! -L -exec setfattr -h -n user.component -v "kernel-initramfs" {} +
+    find /usr/lib/modules -type f -exec setfattr -h -n user.component -v "kernel-initramfs" {} +
 
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
