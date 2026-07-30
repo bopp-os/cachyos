@@ -19,6 +19,7 @@ ARG TARGET_CPU_MARCH
 ARG BASE_IMAGE_TAG
 ARG VERBOSE
 ENV LANG=en_US.UTF-8
+ENV PYTHONHASHSEED=0
 
 # Copy Homebrew
 COPY --from=brew /system_files /
@@ -86,8 +87,9 @@ RUN pacman -S --noconfirm --needed cachyos-hooks gpgme && \
     echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
-# Tag pacman config and mirrorlists as a unique component to avoid ostree layer hash non-determinism
-RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings ! -type l -exec setfattr -n user.component -v "pacman-config" {} +
+# Tag pacman config, mirrorlists, and sysimage database to avoid ostree layer hash non-determinism
+RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings ! -type l -exec setfattr -n user.component -v "pacman-config" {} + && \
+    if [ -d /usr/lib/sysimage ]; then find /usr/lib/sysimage ! -type l -exec setfattr -n user.component -v "pacman-db" {} +; fi
 
 # Ensure the log file exists
 RUN touch /var/log/pacman.log
@@ -162,7 +164,9 @@ COPY files/base/usr/lib /usr/lib
 COPY files/base/usr/libexec /usr/libexec
 
 RUN chmod +x /usr/share/boppos/bootc-cleanup.sh && \
-    chmod -R 0755 /usr/libexec
+    chmod -R 0755 /usr/libexec && \
+    find /etc /usr/share/boppos /usr/libexec -type f ! -L \
+        -exec sh -c 'for f; do getfattr -h -n user.component "$f" &>/dev/null || setfattr -h -n user.component -v "boppos-custom" "$f"; done' sh {} +
 
 # Link OS default font configuration
 RUN mkdir -p /etc/fonts/conf.d && ln -sf /usr/share/fontconfig/conf.avail/52-boppos-fonts.conf /etc/fonts/conf.d/52-boppos-fonts.conf
@@ -186,10 +190,11 @@ RUN if [ -e /usr/etc ]; then \
 
 # Configure Flatpak with retry logic to handle transient network issues
 RUN for i in {1..5}; do \
-    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && exit 0 || \
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && break || \
     echo "Flatpak remote-add failed (attempt $i), retrying in 5 seconds..." && sleep 5; \
-    done; \
-    exit 1
+    done && \
+    find /var/lib/flatpak /etc/flatpak -type f ! -L 2>/dev/null | xargs -r sh -c \
+    'for f; do getfattr -h -n user.component "$f" &>/dev/null || setfattr -h -n user.component -v "flatpak-config" "$f"; done' sh
 
 # Fix suid permissions
 RUN for f in \
@@ -246,8 +251,9 @@ RUN systemctl enable var-opt.mount && \
 RUN --mount=type=tmpfs,dst=/run \
     mkdir -p /usr/lib/dracut/dracut.conf.d/ && \
     printf "systemdsystemconfdir=/etc/systemd/system\nsystemdsystemunitdir=/usr/lib/systemd/system\n" | tee /usr/lib/dracut/dracut.conf.d/30-bootcrew-fix-bootc-module.conf && \
-    printf 'reproducible=yes\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc "' | tee "/usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf" && \
-    dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)/initramfs.img"
+    printf 'reproducible="yes"\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc "' | tee "/usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf" && \
+    SOURCE_DATE_EPOCH=0 dracut --force --reproducible "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)/initramfs.img" && \
+    find /usr/lib/modules -type f ! -L -exec setfattr -h -n user.component -v "kernel-initramfs" {} +
 
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
@@ -282,4 +288,8 @@ COPY cosign.pub /etc/pki/containers/bopp-os.pub
 RUN chmod +x /usr/share/boppos/generate-package-list.sh
 
 RUN rm -f /README.md
+
+# Reset Python hashseed to default random for runtime security
+ENV PYTHONHASHSEED=""
+
 LABEL containers.bootc=1

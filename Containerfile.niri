@@ -27,6 +27,9 @@ RUN pacman -Q | sort > /tmp/base_pkgs.txt && \
 COPY files/niri/etc /etc/
 COPY files/niri/usr /usr/
 
+RUN find /etc /usr -type f ! -L -exec sh -c \
+    'for f; do getfattr -h -n user.component "$f" &>/dev/null || setfattr -h -n user.component -v "de-niri" "$f"; done' sh {} +
+
 # ==========================================
 # COMPILE SCHEMAS & CACHE ICONS
 # ==========================================

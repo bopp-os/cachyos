@@ -30,6 +30,13 @@ done
 echo "Recreating essential directories for bootc..."
 mkdir -p /var /boot /sysroot
 
+echo "Cleaning machine-id and build-time state..."
+truncate -s 0 /etc/machine-id
+rm -f /var/lib/dbus/machine-id /etc/random-seed
+
+echo "Purging transient pacman databases and logs..."
+rm -rf /var/lib/pacman/sync/* /usr/lib/sysimage/sync/* /var/log/pacman.log 2>/dev/null || true
+
 echo "Cleaning /run and /tmp..."
 rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true
 
