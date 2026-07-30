@@ -71,7 +71,6 @@ RUN mkdir -p /etc/pacman.d/hooks && \
 RUN rm -rf /var/lib/pacman/sync/* && \
     pacman -Syy --noconfirm && \
     pacman -Su --noconfirm && \
-    sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
 RUN pacman -S --noconfirm --needed cachyos-hooks gpgme && \
