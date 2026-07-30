@@ -508,7 +508,7 @@ jobs:
             --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e SOURCE_DATE_EPOCH=0 \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-            quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 512 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
+            quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
 
       - name: Rechunk & Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'
@@ -546,7 +546,7 @@ jobs:
                 --mount=type=image,source=$IMAGE_REF,target=/chunkah \
                 -e SOURCE_DATE_EPOCH=0 \
                 -e CHUNKAH_CONFIG_STR="$CHUNKAH_CONFIG_STR" \
-                quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 512 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
+                quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
             PODMAN_PID=$!
             
             if sudo skopeo copy \

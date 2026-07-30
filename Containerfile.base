@@ -88,8 +88,8 @@ RUN pacman -S --noconfirm --needed cachyos-hooks gpgme && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
 # Tag pacman config, mirrorlists, and sysimage database to avoid ostree layer hash non-determinism
-RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings ! -type l -exec setfattr -n user.component -v "pacman-config" {} + && \
-    if [ -d /usr/lib/sysimage ]; then find /usr/lib/sysimage ! -type l -exec setfattr -n user.component -v "pacman-db" {} +; fi
+RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings ! -type l -exec setfattr -n user.component -v "pacman-config" {} + -exec setfattr -n user.update-interval -v "weekly" {} + && \
+    if [ -d /usr/lib/sysimage ]; then find /usr/lib/sysimage ! -type l -exec setfattr -n user.component -v "pacman-db" {} + -exec setfattr -n user.update-interval -v "daily" {} +; fi
 
 # Ensure the log file exists
 RUN touch /var/log/pacman.log
@@ -166,7 +166,7 @@ COPY files/base/usr/libexec /usr/libexec
 RUN chmod +x /usr/share/boppos/bootc-cleanup.sh && \
     chmod -R 0755 /usr/libexec && \
     find /etc /usr/share/boppos /usr/libexec -type f \
-        -exec sh -c 'for f; do getfattr -h -n user.component "$f" &>/dev/null || setfattr -h -n user.component -v "boppos-custom" "$f"; done' sh {} +
+        -exec sh -c 'for f; do getfattr -h -n user.component "$f" &>/dev/null || { setfattr -h -n user.component -v "boppos-custom" "$f" && setfattr -h -n user.update-interval -v "daily" "$f"; }; done' sh {} +
 
 # Link OS default font configuration
 RUN mkdir -p /etc/fonts/conf.d && ln -sf /usr/share/fontconfig/conf.avail/52-boppos-fonts.conf /etc/fonts/conf.d/52-boppos-fonts.conf
@@ -194,7 +194,7 @@ RUN for i in {1..5}; do \
     echo "Flatpak remote-add failed (attempt $i), retrying in 5 seconds..." && sleep 5; \
     done && \
     find /var/lib/flatpak /etc/flatpak -type f 2>/dev/null | xargs -r sh -c \
-    'for f; do getfattr -h -n user.component "$f" &>/dev/null || setfattr -h -n user.component -v "flatpak-config" "$f"; done' sh
+    'for f; do getfattr -h -n user.component "$f" &>/dev/null || { setfattr -h -n user.component -v "flatpak-config" "$f" && setfattr -h -n user.update-interval -v "weekly" "$f"; }; done' sh
 
 # Fix suid permissions
 RUN for f in \
@@ -256,7 +256,7 @@ RUN --mount=type=tmpfs,dst=/run \
     KERNEL_VER="$(basename "$KERNEL_DIR")" && \
     depmod -a "$KERNEL_VER" && \
     SOURCE_DATE_EPOCH=0 dracut --force --reproducible "$KERNEL_DIR/initramfs.img" "$KERNEL_VER" && \
-    find /usr/lib/modules -type f -exec setfattr -h -n user.component -v "kernel-initramfs" {} +
+    find /usr/lib/modules -type f -exec setfattr -h -n user.component -v "kernel-initramfs" {} + -exec setfattr -h -n user.update-interval -v "daily" {} +
 
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \

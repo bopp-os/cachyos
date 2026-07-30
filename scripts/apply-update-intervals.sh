@@ -109,6 +109,7 @@ echo "$PKG_LIST" | xargs -P "$CONCURRENCY" -I {} bash -c 'apply_pkg_xattrs "$@"'
 echo "Tagging compiled system caches as user.component=system-cache..."
 find "${ROOTFS%/}/usr/share/glib-2.0/schemas" "${ROOTFS%/}/usr/share/icons" "${ROOTFS%/}/etc" -type f \( -name "gschemas.compiled" -o -name "icon-theme.cache" -o -name "ld.so.cache" \) 2>/dev/null | while read -r cachefile; do
     setfattr -h -n user.component -v "system-cache" "$cachefile" 2>/dev/null || true
+    setfattr -h -n user.update-interval -v "daily" "$cachefile" 2>/dev/null || true
 done
 
 # Sweep for any remaining untagged regular files in /usr or /etc to prevent giant catch-all layers
@@ -117,6 +118,7 @@ find "${ROOTFS%/}/usr" "${ROOTFS%/}/etc" -type f -exec sh -c '
   for f; do
     if ! getfattr -h -n user.component "$f" &>/dev/null; then
       setfattr -h -n user.component -v "image-generated" "$f" 2>/dev/null || true
+      setfattr -h -n user.update-interval -v "weekly" "$f" 2>/dev/null || true
     fi
   done
 ' sh {} +
