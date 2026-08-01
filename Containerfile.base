@@ -251,7 +251,7 @@ RUN systemctl enable var-opt.mount && \
 RUN --mount=type=tmpfs,dst=/run \
     mkdir -p /usr/lib/dracut/dracut.conf.d/ && \
     printf "systemdsystemconfdir=/etc/systemd/system\nsystemdsystemunitdir=/usr/lib/systemd/system\n" | tee /usr/lib/dracut/dracut.conf.d/30-boppos-fix-bootc-module.conf && \
-    printf 'reproducible="yes"\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc crypt systemd-cryptsetup systemd-tpm2 drm plymouth btrfs i18n "' | tee "/usr/lib/dracut/dracut.conf.d/30-boppos-dracut-container-build.conf" && \
+    printf 'reproducible="yes"\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc crypt systemd-cryptsetup tpm2-tss drm plymouth btrfs i18n "' | tee "/usr/lib/dracut/dracut.conf.d/30-boppos-dracut-container-build.conf" && \
     KERNEL_DIR="$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)" && \
     KERNEL_VER="$(basename "$KERNEL_DIR")" && \
     depmod -a "$KERNEL_VER" && \

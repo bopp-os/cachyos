@@ -59,6 +59,7 @@ filesystems:
   - mdadm
   - cryptsetup
   - tpm2-tss
+  - tpm2-tools
   - gvfs
   - gvfs-mtp
   - gvfs-smb
