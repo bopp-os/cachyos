@@ -44,6 +44,7 @@ RUN glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
 # ==========================================
 
 RUN systemctl enable sddm.service && \
+    systemctl enable usr-share-sddm.mount && \
     systemctl disable plasmalogin.service || true && \
     systemctl disable greetd.service || true && \
     systemctl --global enable noctalia-sddm-init.service

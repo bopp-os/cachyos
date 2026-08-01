@@ -1,7 +1,10 @@
 niri-core:
   - xwayland-satellite
   - xdg-desktop-portal
+  - xdg-desktop-portal-gnome
+  - xdg-desktop-portal-gtk
   - sddm
+  - weston
   - waybar
   - fuzzel
   - polkit-gnome
@@ -27,6 +30,9 @@ niri-themes-aesthetics:
   - hicolor-icon-theme
   - nwg-look
   - sddm-theme-noctalia-git
+  - qt5-declarative
+  - qt5-quickcontrols2
+  - qt5-graphicaleffects
 niri-shell-optionals:
   - cliphist
   - wlsunset
@@ -45,6 +51,9 @@ niri-display:
   - wl-mirror
   - qt5-wayland
   - qt6-wayland
+  - qt6-declarative
+  - qt6-5compat
+  - layer-shell-qt
 niri-color-theming:
   - hyprpicker
   - gammastep
