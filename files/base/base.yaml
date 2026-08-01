@@ -58,6 +58,7 @@ filesystems:
   - lvm2
   - mdadm
   - cryptsetup
+  - tpm2-tss
   - gvfs
   - gvfs-mtp
   - gvfs-smb
