@@ -24,7 +24,7 @@ RUN pacman -Q | sort > /tmp/base_pkgs.txt && \
     comm -13 /tmp/base_pkgs.txt /tmp/all_pkgs.txt | awk '{print $1}' > /tmp/modified_pkgs.txt
 
 # Copy Niri-specific configuration files
-COPY files/niri/etc /etc/
+#COPY files/niri/etc /etc/
 COPY files/niri/usr /usr/
 
 RUN find /etc /usr -type f -exec sh -c \
