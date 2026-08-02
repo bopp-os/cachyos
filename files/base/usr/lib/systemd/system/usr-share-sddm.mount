@@ -3,13 +3,13 @@ Description=OverlayFS for SDDM
 DefaultDependencies=no
 After=systemd-tmpfiles-setup.service
 Conflicts=umount.target
-Before=umount.target sddm.service plasmalogin.service
+Before=sddm.service plasmalogin.service umount.target
 
 [Mount]
 What=overlay
 Where=/usr/share/sddm
 Type=overlay
-Options=lowerdir=/usr/share/sddm,upperdir=/var/sddm_themes/upper,workdir=/var/sddm_themes/work,index=off,metacopy=off,uuid=off
+Options=lowerdir=/usr/lib/sddm_dist,upperdir=/var/sddm_overlay/upper,workdir=/var/sddm_overlay/work,index=off,metacopy=off,uuid=off
 
 [Install]
 WantedBy=multi-user.target

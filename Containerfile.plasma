@@ -32,8 +32,7 @@ RUN pacman -Q | sort > /tmp/base_pkgs.txt && \
 # Enable DE services
 RUN systemctl disable sddm.service || true && \
     systemctl disable gdm.service || true && \
-    systemctl enable plasmalogin.service && \
-    systemctl enable usr-share-sddm.mount
+    systemctl enable plasmalogin.service
 
 # Remove PackageKit backend for Discover to prevent crashes on our immutable OS
 RUN rm -f /usr/lib/qt6/plugins/discover/packagekit-backend.so

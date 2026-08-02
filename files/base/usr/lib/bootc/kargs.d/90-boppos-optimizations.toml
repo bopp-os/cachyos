@@ -12,6 +12,5 @@ kargs = [
     "amdgpu.gpu_recovery=1",
     "transparent_hugepage=madvise",
     "transparent_hugepage.defrag=defer+madvise",
-    "rd.luks.options=tpm2-device=auto",
-    "nvidia-drm.modeset=1"
+    "rd.luks.options=tpm2-device=auto"
 ]
