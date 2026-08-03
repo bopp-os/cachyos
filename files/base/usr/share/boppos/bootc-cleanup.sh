@@ -30,6 +30,14 @@ done
 echo "Recreating essential directories for bootc..."
 mkdir -p /var /boot /sysroot
 
+echo "Setting up SDDM themes directory..."
+mkdir -p /usr/share/sddm/themes-default
+if [ -d /usr/share/sddm/themes ] && [ ! -L /usr/share/sddm/themes ]; then
+    cp -a /usr/share/sddm/themes/* /usr/share/sddm/themes-default/ 2>/dev/null || true
+    rm -rf /usr/share/sddm/themes
+fi
+ln -sf /var/lib/sddm/themes /usr/share/sddm/themes
+
 echo "Cleaning machine-id and build-time state..."
 truncate -s 0 /etc/machine-id
 rm -f /var/lib/dbus/machine-id /etc/random-seed

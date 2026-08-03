@@ -29,8 +29,9 @@ RUN pacman -Q | sort > /tmp/base_pkgs.txt && \
 #COPY files/plasma/etc /etc/
 #COPY files/plasma/usr /usr/
 
-# Enable DE services
-RUN systemctl disable sddm.service || true && \
+# Enable DE services & remove SDDM components from Plasma
+RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
+    systemctl disable sddm.service || true && \
     systemctl disable gdm.service || true && \
     systemctl enable plasmalogin.service
 

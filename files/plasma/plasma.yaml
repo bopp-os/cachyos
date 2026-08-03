@@ -59,7 +59,6 @@ kde-media:
 kde-themes-aesthetics:
   - appmenu-gtk-module
   - cachyos-kde-settings
-  - cachyos-themes-sddm
   - cachyos-iridescent-kde
   - char-white
   - breeze-gtk
