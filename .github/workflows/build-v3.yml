@@ -434,6 +434,11 @@ jobs:
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf "$CACHE_DIR"/*; fi
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
+      - name: Pre-build Package Cache Security Scan
+        run: |
+          chmod +x scripts/scan-pkg-cache.sh
+          ./scripts/scan-pkg-cache.sh "${{ env.LOCAL_CACHE_DIR }}"
+
       - name: Build Flavor Image
         env:
           META_LABELS: ${{ steps.metadata.outputs.labels }}

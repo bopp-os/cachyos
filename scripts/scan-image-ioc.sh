@@ -42,21 +42,62 @@ if [[ -n "$SUSPICIOUS_FILES" ]]; then
   FOUND=1
 fi
 
-# --- Obfuscated .install hooks (Wave 2) ---
-if echo "$FILE_LIST" | grep -q '\.install$'; then
+# --- Package .install & ALPM Scriptlet Heuristics ---
+echo "Auditing pacman package .install scriptlets for heuristics..."
+INSTALL_HOOKS=$(sudo find "$MNT_DIR/var/lib/pacman/local" "$MNT_DIR" -type f \( -name "install" -o -name "*.install" \) 2>/dev/null || true)
+
+if [[ -n "$INSTALL_HOOKS" ]]; then
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     clean_name=${file#$MNT_DIR/}
-    
-    if sudo grep -qE '\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile' "$file" 2>/dev/null; then
-      FINDINGS+=("OBFUSCATED_INSTALL_HOOK: hex escapes or known package names in $clean_name")
+    pkg_name=$(echo "$clean_name" | cut -d'/' -f5 || echo "$clean_name")
+
+    # 1. Obfuscation & Dynamic Evaluation
+    if sudo grep -qE '(base64\s+(-d|--decode)|eval\s*\$|openssl\s+enc|xxd\s+-r|\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile)' "$file" 2>/dev/null; then
+      FINDINGS+=("OBFUSCATED_INSTALL_HOOK: obfuscation, hex escapes, or eval in $clean_name")
       FOUND=1
     fi
+
+    # 2. Network Egress / Webhooks in Install Script
+    if sudo grep -qE '(curl|wget|fetch|ncat|nc\s|/dev/tcp/|discord\.com/api/webhooks|api\.telegram\.org)' "$file" 2>/dev/null; then
+      FINDINGS+=("SUSPICIOUS_HOOK_NETWORK_CALL: outbound network or webhook in $clean_name")
+      FOUND=1
+    fi
+
+    # 3. Sensitive Path / Credential Targeting
+    if sudo grep -qE '(/etc/shadow|\.ssh/|\.aws/|\.config/(BraveSoftware|google-chrome|chromium))' "$file" 2>/dev/null; then
+      FINDINGS+=("SUSPICIOUS_HOOK_SENSITIVE_ACCESS: target sensitive path in $clean_name")
+      FOUND=1
+    fi
+
+    # 4. Package Manager Invocation
     if sudo grep -qE '(bun|npm|pnpm|yarn)\s+(install|add)\s+.*(lockfile|digest|nextfile)' "$file" 2>/dev/null; then
       FINDINGS+=("MALICIOUS_INSTALL_HOOK: package manager running suspicious package in $clean_name")
       FOUND=1
     fi
-  done < <(sudo find "$MNT_DIR" -type f -name "*.install" 2>/dev/null || true)
+  done <<< "$INSTALL_HOOKS"
+fi
+
+# --- Leftover / Drop Directory Check ---
+echo "Auditing temp drop directories (/tmp, /var/tmp, /dev/shm)..."
+SUSPICIOUS_DROPS=$(sudo find "$MNT_DIR/tmp" "$MNT_DIR/var/tmp" "$MNT_DIR/dev/shm" -type f 2>/dev/null | sed "s|^$MNT_DIR||" || true)
+if [[ -n "$SUSPICIOUS_DROPS" ]]; then
+  FINDINGS+=("UNEXPECTED_TEMP_DROPS found in built image: $SUSPICIOUS_DROPS")
+  FOUND=1
+fi
+
+# --- Systemd Service Persistence Audit ---
+echo "Auditing systemd service units for suspicious execution..."
+SVC_UNITS=$(sudo find "$MNT_DIR/etc/systemd/system" "$MNT_DIR/usr/lib/systemd/system" -type f -name "*.service" 2>/dev/null || true)
+if [[ -n "$SVC_UNITS" ]]; then
+  while IFS= read -r svc; do
+    [[ -z "$svc" ]] && continue
+    clean_svc=${svc#$MNT_DIR/}
+    if sudo grep -qE 'ExecStart.*(/tmp/|/var/tmp/|/dev/shm/|curl|wget|sh\s+-c\s+.*http)' "$svc" 2>/dev/null; then
+      FINDINGS+=("SUSPICIOUS_SYSTEMD_SERVICE: suspicious ExecStart path or network call in $clean_svc")
+      FOUND=1
+    fi
+  done <<< "$SVC_UNITS"
 fi
 
 # --- Report ---

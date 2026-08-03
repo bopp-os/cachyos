@@ -47,26 +47,43 @@ else
     echo "Installing $PKG_COUNT packages from $YAML_FILE..."
 fi
 
-# Execute pacman installation with a retry loop
+# Decouple download phase (network active, NO scriptlets run) from installation phase (offline/network-isolated)
 MAX_RETRIES=3
 RETRY_COUNT=0
 SUCCESS=false
 
+# Determine network-isolated execution wrapper if unshare is available
+ISOLATE_CMD=""
+if command -v unshare >/dev/null 2>&1 && unshare -n true 2>/dev/null; then
+    ISOLATE_CMD="unshare -n"
+fi
+
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if [ "$VERBOSE" -eq 1 ]; then
-        if pacman -Syu --noconfirm --ask 4 --needed --overwrite '*' $PKGS; then
-            SUCCESS=true
-            break
+    echo "📦 Phase 1: Downloading packages safely (no scriptlets executed)..."
+    if pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman-download.log 2>&1; then
+        echo "✅ Download phase complete. Beginning network-isolated installation..."
+        echo "🔒 Phase 2: Installing packages with network isolation..."
+        
+        INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --offline --overwrite '*' $PKGS"
+        if [ "$VERBOSE" -eq 1 ]; then
+            if $INSTALL_EXEC; then
+                SUCCESS=true
+                break
+            fi
+        else
+            if $INSTALL_EXEC > /tmp/pacman.log 2>&1; then
+                SUCCESS=true
+                break
+            else
+                echo -e "\n================ PACMAN LOG ================"
+                cat /tmp/pacman.log || true
+                echo -e "============================================\n"
+            fi
         fi
     else
-        if pacman -Syu --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman.log 2>&1; then
-            SUCCESS=true
-            break
-        else
-            echo -e "\n================ PACMAN LOG ================"
-            cat /tmp/pacman.log || true
-            echo -e "============================================\n"
-        fi
+        echo -e "\n================ PACMAN DOWNLOAD LOG ================"
+        cat /tmp/pacman-download.log || true
+        echo -e "=====================================================\n"
     fi
 
     RETRY_COUNT=$((RETRY_COUNT+1))
