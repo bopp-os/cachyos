@@ -73,8 +73,20 @@ ALL_PKGS=$(echo "$SECTIONS_OUTPUT" | sed 's/SECTION::[^:]*:://' | tr '\n' ' ')
 
 # Determine network-isolated execution wrapper if unshare is available
 ISOLATE_CMD=""
-if command -v unshare >/dev/null 2>&1 && unshare -n true 2>/dev/null; then
-    ISOLATE_CMD="unshare -n"
+if command -v unshare >/dev/null 2>&1; then
+    if unshare -n true 2>/dev/null; then
+        ISOLATE_CMD="unshare -n"
+    elif unshare -r -n true 2>/dev/null; then
+        ISOLATE_CMD="unshare -r -n"
+    elif unshare -U -n true 2>/dev/null; then
+        ISOLATE_CMD="unshare -U -n"
+    fi
+fi
+
+if [ -n "$ISOLATE_CMD" ]; then
+    echo "🔒 Network isolation wrapper active: $ISOLATE_CMD"
+else
+    echo "⚠️ Network isolation wrapper unshare unavailable in current container environment."
 fi
 
 # Phase 1: Download all packages at once

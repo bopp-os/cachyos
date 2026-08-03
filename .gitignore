@@ -3,3 +3,4 @@ bootable.img
 cosign.key
 .venv/
 test.yaml
+job-logs.txt
