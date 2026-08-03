@@ -87,7 +87,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 
         echo "🔒 Phase 2: Installing packages with network isolation..."
         
-        INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --offline --overwrite '*' $PKGS"
+        INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --overwrite '*' $PKGS"
         if [ "$VERBOSE" -eq 1 ]; then
             if $INSTALL_EXEC; then
                 SUCCESS=true
