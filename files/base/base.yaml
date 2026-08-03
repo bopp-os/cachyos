@@ -46,6 +46,8 @@ gaming-runtimes:
 bootc:
   - bootc
   - dracut
+  - mkinitcpio
+  - mkinitcpio-busybox
   - ostree
   - skopeo
   - btrfs-progs
@@ -96,7 +98,7 @@ archiving:
   - unzip
   - zip
   - bzip2
-  - p7zip
+  - 7zip
   - unace
   - cpio
   - sharutils
