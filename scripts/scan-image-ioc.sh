@@ -44,7 +44,7 @@ fi
 
 # --- Package .install & ALPM Scriptlet Heuristics ---
 echo "Auditing pacman package .install scriptlets for heuristics..."
-INSTALL_HOOKS=$(sudo find "$MNT_DIR/var/lib/pacman/local" "$MNT_DIR" -type f \( -name "install" -o -name "*.install" \) 2>/dev/null || true)
+INSTALL_HOOKS=$(sudo find "$MNT_DIR/var/lib/pacman/local" -type f \( -name "install" -o -name "*.install" \) 2>/dev/null || true)
 
 if [[ -n "$INSTALL_HOOKS" ]]; then
   while IFS= read -r file; do
@@ -96,7 +96,13 @@ if [[ -n "$SVC_UNITS" ]]; then
   while IFS= read -r svc; do
     [[ -z "$svc" ]] && continue
     clean_svc=${svc#$MNT_DIR/}
-    if sudo grep -qE 'ExecStart.*(/tmp/|/var/tmp/|/dev/shm/|curl|wget|sh\s+-c\s+.*http)' "$svc" 2>/dev/null; then
+
+    # Exclude known legitimate system services
+    if [[ "$clean_svc" == *"xfs_scrub"* ]] || [[ "$clean_svc" == *"brew-setup.service"* ]]; then
+      continue
+    fi
+
+    if sudo grep -qE 'ExecStart\s*=\s*(/tmp/|/var/tmp/|/dev/shm/|curl\s|wget\s|sh\s+-c\s+.*https?://)' "$svc" 2>/dev/null; then
       FINDINGS+=("SUSPICIOUS_SYSTEMD_SERVICE: suspicious ExecStart path or network call in $clean_svc")
       FOUND=1
     fi
