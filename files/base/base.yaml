@@ -15,6 +15,23 @@ system-core:
   - ufw
 system-toolchains:
   - llvm-libs
+graphics-drivers:
+  - mesa
+  - lib32-mesa
+  - mesa-utils
+  - intel-media-driver
+  - libdisplay-info
+  - lib32-libdisplay-info
+  - vulkan-radeon
+  - lib32-vulkan-radeon
+  - vulkan-intel
+  - lib32-vulkan-intel
+  - vulkan-nouveau
+  - lib32-vulkan-nouveau
+  - vulkan-mesa-layers
+  - lib32-vulkan-mesa-layers
+  - vulkan-icd-loader
+  - lib32-vulkan-icd-loader
 update-notifier:
   - python-pystray
   - python-pillow

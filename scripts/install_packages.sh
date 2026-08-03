@@ -20,55 +20,56 @@ if [ -z "$YAML_FILE" ] || [ ! -f "$YAML_FILE" ]; then
     exit 1
 fi
 
-echo "Reading packages from: $YAML_FILE"
+echo "Reading package sections from: $YAML_FILE"
 
-# Extract and flatten all packages from the YAML file
-PKGS=$(python3 -c "
-import sys
+# Extract block sections from YAML file
+SECTIONS_OUTPUT=$(python3 -c "
+import sys, re
 try:
     import yaml
-except ImportError:
-    import re
-    # Fallback basic YAML list/key extractor if PyYAML is not installed
-    pkgs = []
-    with open(sys.argv[1]) as f:
-        for line in f:
-            match = re.match(r'^\s*-\s+([a-zA-Z0-9_\-\.\+]+)', line)
-            if match:
-                pkgs.append(match.group(1))
-    print(' '.join(pkgs))
-    sys.exit(0)
-
-def extract_pkgs(data):
-    if isinstance(data, list): return [str(x) for x in data]
-    if isinstance(data, dict): return [p for val in data.values() for p in extract_pkgs(val)]
-    return []
-
-try:
     with open(sys.argv[1]) as f:
         data = yaml.safe_load(f) or {}
-    print(' '.join(extract_pkgs(data)))
-except Exception as e:
-    print(f'Error parsing YAML: {e}', file=sys.stderr)
-    sys.exit(1)
+except Exception:
+    data = {}
+
+if isinstance(data, dict) and data:
+    for block_name, val in data.items():
+        pkgs = []
+        if isinstance(val, list):
+            pkgs = [str(x) for x in val]
+        elif isinstance(val, dict):
+            def extract(d):
+                res = []
+                if isinstance(d, list): return [str(x) for x in d]
+                if isinstance(d, dict):
+                    for v in d.values(): res.extend(extract(v))
+                return res
+            pkgs = extract(val)
+        if pkgs:
+            print(f'SECTION::{block_name}::' + ' '.join(pkgs))
+else:
+    current_block = 'default'
+    block_pkgs = {}
+    with open(sys.argv[1]) as f:
+        for line in f:
+            m_block = re.match(r'^([a-zA-Z0-9_\-]+):', line)
+            if m_block:
+                current_block = m_block.group(1)
+            m_item = re.match(r'^\s*-\s+([a-zA-Z0-9_\-\.\+]+)', line)
+            if m_item:
+                block_pkgs.setdefault(current_block, []).append(m_item.group(1))
+    for b_name, pkgs in block_pkgs.items():
+        if pkgs:
+            print(f'SECTION::{b_name}::' + ' '.join(pkgs))
 " "$YAML_FILE")
 
-if [ -z "$PKGS" ]; then
-    echo "No packages found in $YAML_FILE"
+if [ -z "$SECTIONS_OUTPUT" ]; then
+    echo "No package sections found in $YAML_FILE"
     exit 0
 fi
 
-if [ "$VERBOSE" -eq 1 ]; then
-    echo "Processing packages: $PKGS"
-else
-    PKG_COUNT=$(echo "$PKGS" | wc -w)
-    echo "Processing $PKG_COUNT packages from $YAML_FILE..."
-fi
-
-# Decouple download phase (network active, NO scriptlets run) from installation phase (offline/network-isolated)
-MAX_RETRIES=3
-RETRY_COUNT=0
-SUCCESS=false
+# Flatten all packages for Phase 1 Download
+ALL_PKGS=$(echo "$SECTIONS_OUTPUT" | sed 's/SECTION::[^:]*:://' | tr '\n' ' ')
 
 # Determine network-isolated execution wrapper if unshare is available
 ISOLATE_CMD=""
@@ -76,70 +77,101 @@ if command -v unshare >/dev/null 2>&1 && unshare -n true 2>/dev/null; then
     ISOLATE_CMD="unshare -n"
 fi
 
+# Phase 1: Download all packages at once
+MAX_RETRIES=3
+RETRY_COUNT=0
+DOWNLOAD_SUCCESS=false
+
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    echo "📦 Phase 1: Downloading packages safely (no scriptlets executed)..."
+    echo "📦 Phase 1: Pre-fetching package archives for $YAML_FILE..."
     if [ "$VERBOSE" -eq 1 ]; then
         DOWNLOAD_STATUS=0
-        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $PKGS 2>&1 | tee /tmp/pacman-download.log || DOWNLOAD_STATUS=$?
+        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS 2>&1 | tee /tmp/pacman-download.log || DOWNLOAD_STATUS=$?
         [ $DOWNLOAD_STATUS -eq 0 ]
     else
-        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman-download.log 2>&1
+        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS > /tmp/pacman-download.log 2>&1
     fi
-    if [ $? -eq 0 ]; then
-        echo "✅ Download phase complete for $YAML_FILE."
-        if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
-            echo "::notice::--download-only mode active. Skipping installation phase."
-            exit 0
-        fi
 
-        echo "🔒 Phase 2: Installing packages with network isolation..."
-        
-        INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --overwrite '*' $PKGS"
-        if [ "$VERBOSE" -eq 1 ]; then
-            if $INSTALL_EXEC; then
-                SUCCESS=true
-                break
-            fi
-        else
-            if $INSTALL_EXEC > /tmp/pacman.log 2>&1; then
-                SUCCESS=true
-                break
-            else
-                echo -e "\n================ PACMAN LOG ================"
-                cat /tmp/pacman.log || true
-                echo -e "============================================\n"
-            fi
-        fi
+    if [ $? -eq 0 ]; then
+        DOWNLOAD_SUCCESS=true
+        echo "✅ Download phase complete for $YAML_FILE."
+        break
     else
         echo -e "\n================ PACMAN DOWNLOAD LOG ================"
         cat /tmp/pacman-download.log || true
         echo -e "=====================================================\n"
-    fi
-
-    RETRY_COUNT=$((RETRY_COUNT+1))
-    echo "::warning title=Pacman Install Attempt Failed::Package installation failed! (Attempt $RETRY_COUNT of $MAX_RETRIES)"
-
-    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-        WAIT_TIME=$(( 5 * RETRY_COUNT ))
-        echo "🔄 Waiting ${WAIT_TIME} seconds before retrying..."
-        sleep ${WAIT_TIME}
-
-        # Clean up any partial downloads that might be stuck or corrupted
-        echo "🧹 Cleaning up potentially corrupted partial downloads..."
-        rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.part 2>/dev/null || true
-
-        # Try to refresh mirrors if the command is available to recover from 404s
-        if command -v cachyos-rate-mirrors >/dev/null 2>&1; then
-            echo "🌐 Refreshing mirrors with cachyos-rate-mirrors..."
-            timeout 120 cachyos-rate-mirrors < /dev/null || true
-        fi
+        RETRY_COUNT=$((RETRY_COUNT+1))
+        echo "::warning title=Download Attempt Failed::Package download attempt $RETRY_COUNT of $MAX_RETRIES failed!"
+        [ $RETRY_COUNT -lt $MAX_RETRIES ] && sleep $(( 5 * RETRY_COUNT ))
     fi
 done
 
-if [ "$SUCCESS" = "false" ]; then
-    echo "::error title=Installation Aborted::Failed to install packages after $MAX_RETRIES attempts from $YAML_FILE."
+if [ "$DOWNLOAD_SUCCESS" = "false" ]; then
+    echo "::error title=Download Aborted::Failed to download packages from $YAML_FILE."
     exit 1
 fi
+
+if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
+    echo "::notice::--download-only mode active. Skipping installation phase."
+    exit 0
+fi
+
+# Phase 2: Install each section block separately with network isolation
+TOTAL_SECTIONS=$(echo "$SECTIONS_OUTPUT" | grep -c "^SECTION::" || true)
+CURRENT_SEC=0
+
+echo "🔒 Phase 2: Installing $TOTAL_SECTIONS package blocks with network isolation..."
+
+while IFS= read -r sec_line; do
+    [[ -z "$sec_line" ]] && continue
+    CURRENT_SEC=$((CURRENT_SEC + 1))
+    
+    SEC_NAME=$(echo "$sec_line" | cut -d':' -f3)
+    SEC_PKGS=$(echo "$sec_line" | cut -d':' -f5)
+    SEC_COUNT=$(echo "$SEC_PKGS" | wc -w)
+
+    echo ""
+    echo "======================================================================"
+    echo "📦 Block [$CURRENT_SEC/$TOTAL_SECTIONS]: $SEC_NAME ($SEC_COUNT packages)"
+    echo "======================================================================"
+    
+    if [ "$VERBOSE" -eq 1 ]; then
+        echo "Packages in $SEC_NAME: $SEC_PKGS"
+    fi
+
+    SEC_RETRY=0
+    SEC_SUCCESS=false
+    INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --overwrite '*' $SEC_PKGS"
+
+    while [ $SEC_RETRY -lt $MAX_RETRIES ]; do
+        if [ "$VERBOSE" -eq 1 ]; then
+            if $INSTALL_EXEC; then
+                SEC_SUCCESS=true
+                break
+            fi
+        else
+            if $INSTALL_EXEC > /tmp/pacman-block.log 2>&1; then
+                SEC_SUCCESS=true
+                break
+            else
+                echo -e "\n================ PACMAN LOG [$SEC_NAME] ================"
+                cat /tmp/pacman-block.log || true
+                echo -e "========================================================\n"
+            fi
+        fi
+
+        SEC_RETRY=$((SEC_RETRY + 1))
+        echo "::warning::Block $SEC_NAME installation attempt $SEC_RETRY failed! Retrying..."
+        [ $SEC_RETRY -lt $MAX_RETRIES ] && sleep 3
+    done
+
+    if [ "$SEC_SUCCESS" = "false" ]; then
+        echo "::error::Failed to install package block $SEC_NAME from $YAML_FILE."
+        exit 1
+    fi
+    echo "✅ Block [$CURRENT_SEC/$TOTAL_SECTIONS] ($SEC_NAME) installed successfully."
+
+done <<< "$SECTIONS_OUTPUT"
 
 # Cleanup container package cache to keep layers small
 if [ -d "/usr/lib/sysimage/cache/pacman/pkg/" ]; then
@@ -158,9 +190,9 @@ if [ -e /usr/etc ]; then
     rm -rf /usr/etc
 fi
 
-echo "Installation complete for $YAML_FILE."
+echo "All $TOTAL_SECTIONS package blocks from $YAML_FILE installed successfully."
 
-# Ensure no background GnuPG daemons are left hanging to prevent podman build freezes
+# Ensure no background daemons are left hanging
 pkill -9 gpg-agent || true
 pkill -9 dirmngr || true
 pkill -9 keyboxd || true
