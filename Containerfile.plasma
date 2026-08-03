@@ -29,8 +29,11 @@ RUN pacman -Q | sort > /tmp/base_pkgs.txt && \
 #COPY files/plasma/etc /etc/
 #COPY files/plasma/usr /usr/
 
-# Enable DE services & remove SDDM components from Plasma
+# Enable DE services & remove SDDM components/KCM from Plasma
 RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
+    rm -f /usr/lib/qt6/plugins/plasma/kcms/systemsettings/kcm_sddm.so \
+          /usr/share/applications/kcm_sddm.desktop \
+          /usr/share/kservices6/kcm_sddm.desktop 2>/dev/null || true && \
     systemctl disable sddm.service || true && \
     systemctl disable gdm.service || true && \
     systemctl enable plasmalogin.service
