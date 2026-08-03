@@ -40,20 +40,23 @@ if [ "$PKG_COUNT" -gt 0 ]; then
     fi
 
     if [[ -n "$INSTALL_CONTENT" ]]; then
-      # 1. Obfuscation & Dynamic Evaluation
-      if echo "$INSTALL_CONTENT" | grep -qE '(base64\s+(-d|--decode)|eval\s*\$|openssl\s+enc|xxd\s+-r|\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile)'; then
+      # Strip comment lines to prevent false positives on documentation or echo URLs
+      CLEAN_CONTENT=$(echo "$INSTALL_CONTENT" | grep -vE '^\s*#' || true)
+
+      # 1. Obfuscation & Dynamic Evaluation (detecting active execution)
+      if echo "$CLEAN_CONTENT" | grep -qE '(base64\s+(-d|--decode)|eval\s+(\$|`)|openssl\s+enc|xxd\s+-r|\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile)'; then
         FINDINGS+=("OBFUSCATED_SCRIPTLET in package archive: $pkg_name")
         FOUND=1
       fi
 
-      # 2. Suspicious Network Egress / Webhooks
-      if echo "$INSTALL_CONTENT" | grep -qE '(curl|wget|fetch|ncat|nc\s|/dev/tcp/|discord\.com/api/webhooks|api\.telegram\.org)'; then
+      # 2. Suspicious Outbound Execution & Webhooks (distinguishing active commands from echo text)
+      if echo "$CLEAN_CONTENT" | grep -qE '((curl|wget|fetch)\s+.*(\||>|\$\()|ncat\s|nc\s+-e|/dev/tcp/|discord\.com/api/webhooks|api\.telegram\.org)'; then
         FINDINGS+=("NETWORK_EGRESS_CALL in scriptlet: $pkg_name")
         FOUND=1
       fi
 
       # 3. Sensitive Path / Credential Access
-      if echo "$INSTALL_CONTENT" | grep -qE '(/etc/shadow|\.ssh/|\.aws/|\.config/(BraveSoftware|google-chrome|chromium))'; then
+      if echo "$CLEAN_CONTENT" | grep -qE '(/etc/shadow|\.ssh/id_|\.aws/credentials|\.config/(BraveSoftware|google-chrome|chromium)/.*Default)'; then
         FINDINGS+=("CREDENTIAL_ACCESS_TARGET in scriptlet: $pkg_name")
         FOUND=1
       fi

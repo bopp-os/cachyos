@@ -52,26 +52,29 @@ if [[ -n "$INSTALL_HOOKS" ]]; then
     clean_name=${file#$MNT_DIR/}
     pkg_name=$(echo "$clean_name" | cut -d'/' -f5 || echo "$clean_name")
 
+    # Read content stripping comment lines
+    HOOK_CONTENT=$(sudo grep -vE '^\s*#' "$file" 2>/dev/null || true)
+
     # 1. Obfuscation & Dynamic Evaluation
-    if sudo grep -qE '(base64\s+(-d|--decode)|eval\s*\$|openssl\s+enc|xxd\s+-r|\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile)' "$file" 2>/dev/null; then
+    if echo "$HOOK_CONTENT" | grep -qE '(base64\s+(-d|--decode)|eval\s+(\$|`)|openssl\s+enc|xxd\s+-r|\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile)'; then
       FINDINGS+=("OBFUSCATED_INSTALL_HOOK: obfuscation, hex escapes, or eval in $clean_name")
       FOUND=1
     fi
 
     # 2. Network Egress / Webhooks in Install Script
-    if sudo grep -qE '(curl|wget|fetch|ncat|nc\s|/dev/tcp/|discord\.com/api/webhooks|api\.telegram\.org)' "$file" 2>/dev/null; then
+    if echo "$HOOK_CONTENT" | grep -qE '((curl|wget|fetch)\s+.*(\||>|\$\()|ncat\s|nc\s+-e|/dev/tcp/|discord\.com/api/webhooks|api\.telegram\.org)'; then
       FINDINGS+=("SUSPICIOUS_HOOK_NETWORK_CALL: outbound network or webhook in $clean_name")
       FOUND=1
     fi
 
     # 3. Sensitive Path / Credential Targeting
-    if sudo grep -qE '(/etc/shadow|\.ssh/|\.aws/|\.config/(BraveSoftware|google-chrome|chromium))' "$file" 2>/dev/null; then
+    if echo "$HOOK_CONTENT" | grep -qE '(/etc/shadow|\.ssh/id_|\.aws/credentials|\.config/(BraveSoftware|google-chrome|chromium)/.*Default)'; then
       FINDINGS+=("SUSPICIOUS_HOOK_SENSITIVE_ACCESS: target sensitive path in $clean_name")
       FOUND=1
     fi
 
     # 4. Package Manager Invocation
-    if sudo grep -qE '(bun|npm|pnpm|yarn)\s+(install|add)\s+.*(lockfile|digest|nextfile)' "$file" 2>/dev/null; then
+    if echo "$HOOK_CONTENT" | grep -qE '(bun|npm|pnpm|yarn)\s+(install|add)\s+.*(lockfile|digest|nextfile)'; then
       FINDINGS+=("MALICIOUS_INSTALL_HOOK: package manager running suspicious package in $clean_name")
       FOUND=1
     fi
