@@ -17,6 +17,9 @@ ARG BUILD_NIRI=true
 
 ENV LANG=en_US.UTF-8
 
+# Disable pacman network sandbox to allow ALPM hooks to complete cleanly inside container build
+RUN sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
+
 # Copy workspace mirrors if available
 RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
     if [ -d "/workspace-mirrors" ] && [ -f "/workspace-mirrors/cachyos-mirrorlist" ]; then \
@@ -31,8 +34,8 @@ COPY files/ /tmp/files/
 
 RUN chmod +x /tmp/scripts/*.sh
 
-# Install yara from official extra repository, sync pacman databases, pre-fetch packages, and scan package cache
-RUN pacman -Sy --noconfirm yara && \
+# Install yara and python-yaml from official extra repository, pre-fetch packages, and scan package cache
+RUN pacman -Sy --noconfirm yara python-yaml && \
     echo "::group::Pre-fetching base packages..." && \
     /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml && \
     if [ "$BUILD_PLASMA" == "true" ] && [ -f "/tmp/files/plasma/plasma.yaml" ]; then \

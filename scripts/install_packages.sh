@@ -24,11 +24,26 @@ echo "Reading packages from: $YAML_FILE"
 
 # Extract and flatten all packages from the YAML file
 PKGS=$(python3 -c "
-import yaml, sys
+import sys
+try:
+    import yaml
+except ImportError:
+    import re
+    # Fallback basic YAML list/key extractor if PyYAML is not installed
+    pkgs = []
+    with open(sys.argv[1]) as f:
+        for line in f:
+            match = re.match(r'^\s*-\s+([a-zA-Z0-9_\-\.\+]+)', line)
+            if match:
+                pkgs.append(match.group(1))
+    print(' '.join(pkgs))
+    sys.exit(0)
+
 def extract_pkgs(data):
     if isinstance(data, list): return [str(x) for x in data]
     if isinstance(data, dict): return [p for val in data.values() for p in extract_pkgs(val)]
     return []
+
 try:
     with open(sys.argv[1]) as f:
         data = yaml.safe_load(f) or {}
