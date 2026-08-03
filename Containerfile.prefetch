@@ -1,0 +1,52 @@
+# BoppOS Containerfile.prefetch
+#
+# Dedicated package pre-fetch and security audit layer.
+# Fetches package archives for selected flavors without installing them,
+# then performs static scriptlet security scanning on all downloaded tarballs.
+
+ARG TARGET_CPU_MARCH=v3
+ARG BASE_IMAGE_TAG=v3
+ARG BASE_IMAGE=docker.io/cachyos/cachyos-${BASE_IMAGE_TAG}
+
+FROM ${BASE_IMAGE} AS prefetch
+
+ARG TARGET_CPU_MARCH
+ARG BUILD_PLASMA=true
+ARG BUILD_GNOME=true
+ARG BUILD_NIRI=true
+
+ENV LANG=en_US.UTF-8
+
+# Copy workspace mirrors if available
+RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
+    if [ -d "/workspace-mirrors" ] && [ -f "/workspace-mirrors/cachyos-mirrorlist" ]; then \
+        cp /workspace-mirrors/cachyos-mirrorlist /etc/pacman.d/cachyos-mirrorlist && \
+        if [ -f "/workspace-mirrors/cachyos-v3-mirrorlist" ]; then cp /workspace-mirrors/cachyos-v3-mirrorlist /etc/pacman.d/cachyos-v3-mirrorlist; fi && \
+        if [ -f "/workspace-mirrors/cachyos-v4-mirrorlist" ]; then cp /workspace-mirrors/cachyos-v4-mirrorlist /etc/pacman.d/cachyos-v4-mirrorlist; fi; \
+    fi
+
+# Copy scripts and package manifests
+COPY scripts/ /tmp/scripts/
+COPY files/ /tmp/files/
+
+RUN chmod +x /tmp/scripts/*.sh
+
+# Install yara from official extra repository, sync pacman databases, pre-fetch packages, and scan package cache
+RUN pacman -Sy --noconfirm yara && \
+    echo "::group::Pre-fetching base packages..." && \
+    /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml && \
+    if [ "$BUILD_PLASMA" == "true" ] && [ -f "/tmp/files/plasma/plasma.yaml" ]; then \
+        echo "::group::Pre-fetching plasma packages..."; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/plasma/plasma.yaml; \
+    fi && \
+    if [ "$BUILD_GNOME" == "true" ] && [ -f "/tmp/files/gnome/gnome.yaml" ]; then \
+        echo "::group::Pre-fetching gnome packages..."; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/gnome/gnome.yaml; \
+    fi && \
+    if [ "$BUILD_NIRI" == "true" ] && [ -f "/tmp/files/niri/niri.yaml" ]; then \
+        echo "::group::Pre-fetching niri packages..."; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/niri/niri.yaml; \
+    fi && \
+    echo "::group::Running package cache security scan..." && \
+    /tmp/scripts/scan-pkg-cache.sh /var/cache/pacman/pkg && \
+    /tmp/scripts/scan-pkg-cache.sh /usr/lib/sysimage/cache/pacman/pkg

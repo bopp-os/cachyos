@@ -60,6 +60,25 @@ if [ "$PKG_COUNT" -gt 0 ]; then
         FINDINGS+=("CREDENTIAL_ACCESS_TARGET in scriptlet: $pkg_name")
         FOUND=1
       fi
+
+      # 4. YARA Threat Signature Scan (if YARA is available)
+      if command -v yara >/dev/null 2>&1; then
+        YARA_RULES_DIR="/tmp/yara-rules"
+        if [ ! -d "$YARA_RULES_DIR" ]; then
+          mkdir -p "$YARA_RULES_DIR"
+          curl -sSfL --retry 3 --max-time 15 "https://raw.githubusercontent.com/Neo23x0/signature-base/master/yara/gen_malicious_command_lines.yar" -o "$YARA_RULES_DIR/cmdline.yar" || true
+        fi
+        if [ -f "$YARA_RULES_DIR/cmdline.yar" ]; then
+          TMP_SCRIPT_FILE=$(mktemp /tmp/scriptlet.XXXXXX)
+          echo "$CLEAN_CONTENT" > "$TMP_SCRIPT_FILE"
+          YARA_RES=$(yara "$YARA_RULES_DIR/cmdline.yar" "$TMP_SCRIPT_FILE" 2>/dev/null || true)
+          rm -f "$TMP_SCRIPT_FILE"
+          if [[ -n "$YARA_RES" ]]; then
+            FINDINGS+=("YARA_SIGNATURE_MATCH ($YARA_RES) in scriptlet: $pkg_name")
+            FOUND=1
+          fi
+        fi
+      fi
     fi
   done <<< "$PKG_FILES"
 fi

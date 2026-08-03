@@ -29,6 +29,20 @@ build-mirrorlist arch='v3':
                         cp /etc/pacman.d/cachyos-v4-mirrorlist /workspace-mirrors/; \
                     fi"
 
+# Pre-fetch and security audit package archives for selected flavors.
+prefetch arch='v3' plasma='true' gnome='true' niri='true':
+    @echo "Pre-fetching and security scanning package archives for {{arch}}..."
+    podman build \
+        --network=host \
+        --build-arg TARGET_CPU_MARCH={{arch}} \
+        --build-arg BASE_IMAGE_TAG=$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi) \
+        $(if [ "{{arch}}" = "znver4" ]; then echo "--build-arg BASE_IMAGE=ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo ""; fi) \
+        --build-arg BUILD_PLASMA={{plasma}} \
+        --build-arg BUILD_GNOME={{gnome}} \
+        --build-arg BUILD_NIRI={{niri}} \
+        -f Containerfile.prefetch \
+        .
+
 # Build the prerequisite AUR builder image.
 build-aur arch='v3':
     @echo "Building AUR builder for architecture {{arch}}..."

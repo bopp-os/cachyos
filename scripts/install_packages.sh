@@ -2,18 +2,21 @@
 set -eo pipefail
 
 VERBOSE=0
+DOWNLOAD_ONLY=0
 YAML_FILE=""
 for arg in "$@"; do
     if [[ "$arg" == "--verbose" || "$arg" == "-v" ]]; then
         VERBOSE=1
+    elif [[ "$arg" == "--download-only" || "$arg" == "--download" ]]; then
+        DOWNLOAD_ONLY=1
     else
         YAML_FILE="$arg"
     fi
 done
 
 if [ -z "$YAML_FILE" ] || [ ! -f "$YAML_FILE" ]; then
-    echo "Usage: $0 <path-to.yml>"
-    echo "Example: $0 ./files/base/base.yaml"
+    echo "Usage: $0 [--verbose|-v] [--download-only] <path-to.yml>"
+    echo "Example: $0 --download-only ./files/base/base.yaml"
     exit 1
 fi
 
@@ -41,10 +44,10 @@ if [ -z "$PKGS" ]; then
 fi
 
 if [ "$VERBOSE" -eq 1 ]; then
-    echo "Installing packages: $PKGS"
+    echo "Processing packages: $PKGS"
 else
     PKG_COUNT=$(echo "$PKGS" | wc -w)
-    echo "Installing $PKG_COUNT packages from $YAML_FILE..."
+    echo "Processing $PKG_COUNT packages from $YAML_FILE..."
 fi
 
 # Decouple download phase (network active, NO scriptlets run) from installation phase (offline/network-isolated)
@@ -61,7 +64,12 @@ fi
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Downloading packages safely (no scriptlets executed)..."
     if pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman-download.log 2>&1; then
-        echo "✅ Download phase complete. Beginning network-isolated installation..."
+        echo "✅ Download phase complete for $YAML_FILE."
+        if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
+            echo "::notice::--download-only mode active. Skipping installation phase."
+            exit 0
+        fi
+
         echo "🔒 Phase 2: Installing packages with network isolation..."
         
         INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --offline --overwrite '*' $PKGS"

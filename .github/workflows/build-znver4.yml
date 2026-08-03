@@ -240,6 +240,23 @@ jobs:
           sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z ${{ env.BASE_IMAGE }} bash -c "timeout 120 bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null && cachyos-rate-mirrors < /dev/null' || echo 'Mirror rating timed out or failed, falling back to defaults'; cp /etc/pacman.d/cachyos*mirrorlist /workspace-mirrors/"
           echo "::endgroup::"
 
+      - name: Pre-fetch & Audit Package Archives
+        run: |
+          echo "::group::Building Containerfile.prefetch..."
+          PREFETCH_ARGS=()
+          PREFETCH_ARGS+=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}")
+          PREFETCH_ARGS+=("--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}")
+          PREFETCH_ARGS+=("--build-arg" "TARGET_CPU_MARCH=${{ env.TARGET_MARCH }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_PLASMA=${{ github.event.inputs.build_plasma != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_GNOME=${{ github.event.inputs.build_gnome != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_NIRI=${{ github.event.inputs.build_niri != 'false' }}")
+          PREFETCH_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
+
+          sudo podman build "${PREFETCH_ARGS[@]}" \
+            --network=host \
+            -f Containerfile.prefetch .
+          echo "::endgroup::"
+
       - name: Build Base Image
         id: build_base
         if: steps.check_compatibility.outputs.should_skip != 'true'
