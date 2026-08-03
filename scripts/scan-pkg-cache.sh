@@ -83,12 +83,24 @@ if [ "$PKG_COUNT" -gt 0 ]; then
         YARA_RULES_DIR="/tmp/yara-rules"
         if [ ! -d "$YARA_RULES_DIR" ]; then
           mkdir -p "$YARA_RULES_DIR"
-          curl -sSfL --retry 3 --max-time 15 "https://raw.githubusercontent.com/Neo23x0/signature-base/master/yara/gen_malicious_command_lines.yar" -o "$YARA_RULES_DIR/cmdline.yar" || true
+          # Quietly fetch remote rules without spilling 404 errors
+          curl -sSL --retry 2 --max-time 10 "https://raw.githubusercontent.com/Neo23x0/signature-base/master/yara/gen_webshells.yar" -o "$YARA_RULES_DIR/remote.yar" 2>/dev/null || true
+          
+          # Combine with local committed YARA rules if present
+          if [ -f "/tmp/files/security/yara_rules.yar" ]; then
+            cat "/tmp/files/security/yara_rules.yar" >> "$YARA_RULES_DIR/combined.yar"
+          elif [ -f "files/security/yara_rules.yar" ]; then
+            cat "files/security/yara_rules.yar" >> "$YARA_RULES_DIR/combined.yar"
+          fi
+          if [ -f "$YARA_RULES_DIR/remote.yar" ]; then
+            cat "$YARA_RULES_DIR/remote.yar" >> "$YARA_RULES_DIR/combined.yar" 2>/dev/null || true
+          fi
         fi
-        if [ -f "$YARA_RULES_DIR/cmdline.yar" ]; then
+
+        if [ -f "$YARA_RULES_DIR/combined.yar" ]; then
           TMP_SCRIPT_FILE=$(mktemp /tmp/scriptlet.XXXXXX)
           echo "$CLEAN_CONTENT" > "$TMP_SCRIPT_FILE"
-          YARA_RES=$(yara "$YARA_RULES_DIR/cmdline.yar" "$TMP_SCRIPT_FILE" 2>/dev/null || true)
+          YARA_RES=$(yara "$YARA_RULES_DIR/combined.yar" "$TMP_SCRIPT_FILE" 2>/dev/null || true)
           rm -f "$TMP_SCRIPT_FILE"
           if [[ -n "$YARA_RES" ]]; then
             FINDINGS+=("YARA_SIGNATURE_MATCH ($YARA_RES) in scriptlet: $pkg_name")
