@@ -17,9 +17,6 @@ ARG BUILD_NIRI=true
 
 ENV LANG=en_US.UTF-8
 
-# Disable pacman network sandbox to allow ALPM hooks to complete cleanly inside container build
-RUN sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
-
 # Copy workspace mirrors if available
 RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
     if [ -d "/workspace-mirrors" ] && [ -f "/workspace-mirrors/cachyos-mirrorlist" ]; then \
@@ -28,13 +25,14 @@ RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
         if [ -f "/workspace-mirrors/cachyos-v4-mirrorlist" ]; then cp /workspace-mirrors/cachyos-v4-mirrorlist /etc/pacman.d/cachyos-v4-mirrorlist; fi; \
     fi
 
-# Copy scripts and package manifests
+# Copy scripts, manifests, and GPG keys
 COPY scripts/ /tmp/scripts/
 COPY files/ /tmp/files/
 
-RUN chmod +x /tmp/scripts/*.sh
+RUN chmod +x /tmp/scripts/*.sh && \
+    /tmp/scripts/setup_pacman_repos.sh
 
-# Install yara and python-yaml from official extra repository, pre-fetch packages, and scan package cache
+# Install yara and python-yaml from extra repository, pre-fetch packages, and scan package cache
 RUN pacman -Sy --noconfirm yara python-yaml && \
     echo "::group::Pre-fetching base packages..." && \
     /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml && \
