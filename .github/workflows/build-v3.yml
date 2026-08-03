@@ -468,24 +468,29 @@ jobs:
           chmod +x scripts/scan-image-ioc.sh
           ./scripts/scan-image-ioc.sh "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
 
-      - name: Trivy scan
+      - name: Install Syft and Grype
+        run: |
+          if ! command -v syft >/dev/null 2>&1; then
+            curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+          fi
+          if ! command -v grype >/dev/null 2>&1; then
+            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b /usr/local/bin
+          fi
+
+      - name: Syft & Grype Vulnerability Scan
         run: |
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
           CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
           MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
           trap "sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
 
-          sudo env TMPDIR=/var/tmp trivy rootfs \
-            --config trivy.yaml \
-            --cache-dir /opt/trivy-cache \
-            --scanners secret,misconfig \
-            --severity HIGH,CRITICAL \
-            --ignore-unfixed \
-            --parallel 2 \
-            --timeout 30m \
-            --exit-code 1 \
-            --format table \
-            "$MNT_DIR"
+          echo "::group::Generating SBOM with Syft from podman mount"
+          sudo syft dir:"$MNT_DIR" -o json > /tmp/sbom.json
+          echo "::endgroup::"
+
+          echo "::group::Scanning SBOM with Grype"
+          sudo grype sbom:/tmp/sbom.json --config .grype.yaml
+          echo "::endgroup::"
 
       - name: Extract Package List
         if: github.event_name != 'pull_request'

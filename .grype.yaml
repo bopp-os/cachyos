@@ -1,0 +1,20 @@
+# Grype vulnerability scanner configuration for bopp-os/cachyos bootc images
+# See: https://github.com/anchore/grype#configuration
+
+# Minimum severity to fail the build (options: negligible, low, medium, high, critical)
+fail-on-severity: high
+
+# Only report vulnerabilities that have an available fix upstream
+only-fixed: true
+
+# Output format (options: table, json, cyclonedx, sarif)
+output: table
+
+# Ignore rules for false positive suppressions
+# You can add specific CVEs or packages here if encountered
+ignore:
+  # Example suppression format:
+  # - vulnerability: CVE-2023-12345
+  #   package:
+  #     name: example-package
+  #     version: 1.0.0
