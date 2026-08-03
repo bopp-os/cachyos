@@ -78,7 +78,14 @@ fi
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Downloading packages safely (no scriptlets executed)..."
-    if pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman-download.log 2>&1; then
+    if [ "$VERBOSE" -eq 1 ]; then
+        DOWNLOAD_STATUS=0
+        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $PKGS 2>&1 | tee /tmp/pacman-download.log || DOWNLOAD_STATUS=$?
+        [ $DOWNLOAD_STATUS -eq 0 ]
+    else
+        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $PKGS > /tmp/pacman-download.log 2>&1
+    fi
+    if [ $? -eq 0 ]; then
         echo "✅ Download phase complete for $YAML_FILE."
         if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
             echo "::notice::--download-only mode active. Skipping installation phase."

@@ -14,6 +14,7 @@ ARG TARGET_CPU_MARCH
 ARG BUILD_PLASMA=true
 ARG BUILD_GNOME=true
 ARG BUILD_NIRI=true
+ARG VERBOSE=false
 
 ENV LANG=en_US.UTF-8
 
@@ -34,20 +35,21 @@ RUN chmod +x /tmp/scripts/*.sh && \
 
 # Install yara and python-yaml from extra repository, pre-fetch packages, and scan package cache
 RUN pacman -Sy --noconfirm yara python-yaml && \
+    if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     echo "::group::Pre-fetching base packages..." && \
-    /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml && \
+    /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml $VERBOSE_ARG && \
     if [ "$BUILD_PLASMA" == "true" ] && [ -f "/tmp/files/plasma/plasma.yaml" ]; then \
         echo "::group::Pre-fetching plasma packages..."; \
-        /tmp/scripts/install_packages.sh --download-only /tmp/files/plasma/plasma.yaml; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/plasma/plasma.yaml $VERBOSE_ARG; \
     fi && \
     if [ "$BUILD_GNOME" == "true" ] && [ -f "/tmp/files/gnome/gnome.yaml" ]; then \
         echo "::group::Pre-fetching gnome packages..."; \
-        /tmp/scripts/install_packages.sh --download-only /tmp/files/gnome/gnome.yaml; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/gnome/gnome.yaml $VERBOSE_ARG; \
     fi && \
     if [ "$BUILD_NIRI" == "true" ] && [ -f "/tmp/files/niri/niri.yaml" ]; then \
         echo "::group::Pre-fetching niri packages..."; \
-        /tmp/scripts/install_packages.sh --download-only /tmp/files/niri/niri.yaml; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/niri/niri.yaml $VERBOSE_ARG; \
     fi && \
     echo "::group::Running package cache security scan..." && \
-    /tmp/scripts/scan-pkg-cache.sh /var/cache/pacman/pkg && \
-    /tmp/scripts/scan-pkg-cache.sh /usr/lib/sysimage/cache/pacman/pkg
+    /tmp/scripts/scan-pkg-cache.sh /var/cache/pacman/pkg $VERBOSE_ARG && \
+    /tmp/scripts/scan-pkg-cache.sh /usr/lib/sysimage/cache/pacman/pkg $VERBOSE_ARG

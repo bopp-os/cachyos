@@ -2,6 +2,13 @@
 set -euo pipefail
 
 CACHE_DIR="${1:-/usr/lib/sysimage/cache/pacman/pkg}"
+VERBOSE=0
+
+for arg in "$@"; do
+  if [ "$arg" = "--verbose" ] || [ "$arg" = "-v" ]; then
+    VERBOSE=1
+  fi
+done
 
 echo "::group::Pre-Build Package Cache Security Scan"
 echo "Scanning package archives in $CACHE_DIR..."
@@ -27,9 +34,11 @@ if [ "$PKG_COUNT" -gt 0 ]; then
     TAR_CMD="bsdtar"
   fi
 
+  CURRENT_IDX=0
   while IFS= read -r pkg_file; do
     [[ -z "$pkg_file" ]] && continue
     pkg_name=$(basename "$pkg_file")
+    CURRENT_IDX=$((CURRENT_IDX + 1))
 
     # Extract .INSTALL scriptlet if present in package archive
     INSTALL_CONTENT=""
@@ -37,6 +46,14 @@ if [ "$PKG_COUNT" -gt 0 ]; then
       INSTALL_CONTENT=$(bsdtar -O -xf "$pkg_file" .INSTALL 2>/dev/null || true)
     else
       INSTALL_CONTENT=$(tar -xOf "$pkg_file" .INSTALL 2>/dev/null || true)
+    fi
+
+    if [ "$VERBOSE" -eq 1 ]; then
+      if [ -n "$INSTALL_CONTENT" ]; then
+        echo "  🔍 [$CURRENT_IDX/$PKG_COUNT] Inspecting $pkg_name (.INSTALL scriptlet found)..."
+      else
+        echo "  🔍 [$CURRENT_IDX/$PKG_COUNT] Inspecting $pkg_name (clean binary archive)..."
+      fi
     fi
 
     if [[ -n "$INSTALL_CONTENT" ]]; then

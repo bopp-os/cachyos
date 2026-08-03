@@ -250,6 +250,7 @@ jobs:
           PREFETCH_ARGS+=("--build-arg" "BUILD_PLASMA=${{ github.event.inputs.build_plasma != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_GNOME=${{ github.event.inputs.build_gnome != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_NIRI=${{ github.event.inputs.build_niri != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "VERBOSE=${{ github.event.inputs.verbose_build == 'true' }}")
           PREFETCH_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
 
           sudo podman build "${PREFETCH_ARGS[@]}" \
