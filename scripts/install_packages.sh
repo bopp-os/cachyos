@@ -98,7 +98,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Pre-fetching package archives for $YAML_FILE..."
     
     # Resolve full transaction package names (including font fallbacks and sub-dependencies)
-    RESOLVED_PKGS=$(pacman -Sp --print-format %n --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS 2>/dev/null | sort -u | tr '\n' ' ' || echo "")
+    RESOLVED_PKGS=$(yes "" | pacman -Sp --print-format %n --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS 2>/dev/null | sort -u | tr '\n' ' ' || echo "")
 
     if [ "$VERBOSE" -eq 1 ]; then
         DOWNLOAD_STATUS=0

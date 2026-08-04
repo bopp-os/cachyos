@@ -96,6 +96,10 @@ filesystems:
   - hfsprogs
   - dmraid
   - autofs
+  - tevent
+  - smbclient
+  - cifs-utils
+  - udisks2
 archiving:
   - unp
   - unarj
