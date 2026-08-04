@@ -41,8 +41,10 @@ find /var -mindepth 1 -type d -not -path "/var/tmp*" -not -path "/var/cache*" -n
     echo "d $dir $mode $owner $group - -" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 done
 
-echo "Recreating essential directories for bootc..."
-mkdir -p /var /boot /sysroot
+echo "Recreating essential directories and pacman symlinks for bootc..."
+mkdir -p /var/lib /usr/lib/sysimage/lib/pacman /usr/lib/sysimage/cache/pacman /boot /sysroot
+ln -sf /usr/lib/sysimage/lib/pacman /var/lib/pacman
+ln -sf /usr/lib/sysimage/cache/pacman/pkg /var/cache/pacman/pkg
 
 echo "Setting up SDDM themes default backup directory..."
 mkdir -p /usr/share/sddm/themes-default

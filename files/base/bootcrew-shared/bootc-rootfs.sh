@@ -15,7 +15,8 @@ if [ -d /var ]; then
     fi
 fi
 
-mkdir -p /sysroot /boot /usr/lib/ostree /var
+mkdir -p /sysroot /boot /usr/lib/ostree /var /var/lib /usr/lib/sysimage/lib/pacman
+ln -sf /usr/lib/sysimage/lib/pacman /var/lib/pacman
 
 ln -sT sysroot/ostree /ostree && ln -sT var/roothome /root && ln -sT var/srv /srv && ln -sT var/opt /opt && ln -sT var/mnt /mnt && ln -sT var/home /home && ln -sT ../var/usrlocal /usr/local
 
