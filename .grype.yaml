@@ -6,3 +6,11 @@ only-fixed: true
 
 # Output format (options: table, json, cyclonedx, sarif)
 output: table
+
+# Ignore rules for false positive suppressions
+ignore:
+  # False Positive: Arch Linux Epoch mismatch (1:2.1.3-3.1 vs old 4.1.3-1 upstream versioning tree).
+  # In Arch package versioning, epoch 1:2.1.3 supersedes legacy 4.x releases.
+  - vulnerability: AVG-848
+    package:
+      name: libmp4v2
