@@ -59,6 +59,7 @@ bootc:
   - xfsprogs
   - dosfstools
 fonts:
+  - gnu-free-fonts
   - ttf-ms-fonts
   - ttf-dejavu
   - ttf-bitstream-vera

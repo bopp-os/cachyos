@@ -89,19 +89,23 @@ else
     echo "⚠️ Network isolation wrapper unshare unavailable in current container environment."
 fi
 
-# Phase 1: Download all packages at once
+# Phase 1: Download all packages and transaction dependencies at once
 MAX_RETRIES=3
 RETRY_COUNT=0
 DOWNLOAD_SUCCESS=false
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Pre-fetching package archives for $YAML_FILE..."
+    
+    # Resolve full transaction package URIs (including font fallbacks and sub-dependencies)
+    RESOLVED_PKGS=$(pacman -Sp --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS 2>/dev/null | grep -v '^file://' || echo "")
+
     if [ "$VERBOSE" -eq 1 ]; then
         DOWNLOAD_STATUS=0
-        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS 2>&1 | tee /tmp/pacman-download.log || DOWNLOAD_STATUS=$?
+        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS $RESOLVED_PKGS 2>&1 | tee /tmp/pacman-download.log || DOWNLOAD_STATUS=$?
         [ $DOWNLOAD_STATUS -eq 0 ]
     else
-        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS > /tmp/pacman-download.log 2>&1
+        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS $RESOLVED_PKGS > /tmp/pacman-download.log 2>&1
     fi
 
     if [ $? -eq 0 ]; then
