@@ -576,6 +576,7 @@ jobs:
             PODMAN_PID=$!
             
             if sudo skopeo copy \
+                --dest-creds="${{ github.actor }}:${GITHUB_TOKEN}" \
                 --dest-compress-format zstd:chunked \
                 --dest-compress-level 6 \
                 "oci-archive:$FIFO_PATH" \
@@ -597,7 +598,7 @@ jobs:
           for tag in $IMAGE_TAGS; do
             if [ "$tag" != "${DEFAULT_TAG}" ]; then
               DEST_IMAGE="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"
-              sudo skopeo copy "$DEFAULT_DEST" "$DEST_IMAGE"
+              sudo skopeo copy --dest-creds="${{ github.actor }}:${GITHUB_TOKEN}" "$DEFAULT_DEST" "$DEST_IMAGE"
             fi
           done
           echo "::endgroup::"
