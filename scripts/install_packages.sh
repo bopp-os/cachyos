@@ -190,11 +190,13 @@ while IFS= read -r sec_line; do
 done <<< "$SECTIONS_OUTPUT"
 
 # Cleanup container package cache to keep layers small
-if [ -d "/usr/lib/sysimage/cache/pacman/pkg/" ]; then
-    if mountpoint -q /usr/lib/sysimage/cache/pacman/pkg; then
-        echo "Cache is externally mounted. Preserving packages on host."
+CACHE_PATH="/var/cache/pacman/pkg"
+if [ -d "$CACHE_PATH" ]; then
+    if mountpoint -q "$CACHE_PATH" || [ -n "$(findmnt -n "$CACHE_PATH" 2>/dev/null)" ] || [ "$DOWNLOAD_ONLY" -eq 1 ]; then
+        echo "Pacman package cache is mounted. Preserving packages on host storage."
     else
-        rm -rf /usr/lib/sysimage/cache/pacman/pkg/*
+        echo "Cleaning unmounted in-container package cache..."
+        rm -rf /var/cache/pacman/pkg/* 2>/dev/null || true
     fi
 fi
 

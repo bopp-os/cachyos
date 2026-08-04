@@ -106,6 +106,7 @@ COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/base/base.yaml /tmp/base.yaml
 
 RUN --mount=type=tmpfs,dst=/run \
+    --mount=type=cache,target=/var/cache/pacman/pkg,sharing=shared \
     chmod +x /tmp/install_packages.sh && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     /tmp/install_packages.sh /tmp/base.yaml $VERBOSE_ARG

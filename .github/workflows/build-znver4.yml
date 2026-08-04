@@ -214,7 +214,7 @@ jobs:
 
       - name: Prepare Local Cache Directory
         run: |
-          CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.DEFAULT_TAG }}"
+          CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
           sudo mkdir -p "$CACHE_DIR"
           sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
           sudo chmod 777 "$CACHE_DIR"
@@ -351,12 +351,6 @@ jobs:
           # 2. Prune dangling (<none>) images but preserve the tagged base image
           sudo podman system prune --force --volumes || true
           
-          # 2b. If tag contains 'test', purge the test package cache folder completely
-          if [[ "${{ env.DEFAULT_TAG }}" == *test* ]]; then
-            echo "🧹 Test build tag detected ('${{ env.DEFAULT_TAG }}'). Purging test package cache..."
-            sudo rm -rf "${{ env.LOCAL_CACHE_DIR }}" || true
-          fi
-          
           # 3. Obliterate orphaned Podman extraction directories (The 128GB Silent Killer)
           sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
           
@@ -444,7 +438,7 @@ jobs:
 
       - name: Prepare Local Cache Directory
         run: |
-          CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.DEFAULT_TAG }}"
+          CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
           sudo mkdir -p "$CACHE_DIR" /opt/trivy-cache
           sudo chown -R $(id -u):$(id -g) "$CACHE_DIR" /opt/trivy-cache
           sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part

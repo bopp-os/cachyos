@@ -16,7 +16,9 @@ COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/niri/niri.yaml /tmp/niri.yaml
 
 # Track package states to apply xattrs only to newly added or upgraded packages
-RUN pacman -Q | sort > /tmp/base_pkgs.txt && \
+RUN --mount=type=tmpfs,dst=/run \
+    --mount=type=cache,target=/var/cache/pacman/pkg,sharing=shared \
+    pacman -Q | sort > /tmp/base_pkgs.txt && \
     chmod +x /tmp/install_packages.sh && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     /tmp/install_packages.sh /tmp/niri.yaml $VERBOSE_ARG && \
