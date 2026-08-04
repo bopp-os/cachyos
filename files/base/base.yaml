@@ -1,6 +1,8 @@
 system-core:
   - linux-cachyos
   - linux-cachyos-headers
+  - zlib-ng-compat
+  - zlib-ng
   - systemd
   - systemd-sysvcompat
   - dbus
@@ -18,6 +20,8 @@ system-toolchains:
 graphics-drivers:
   - mesa
   - lib32-mesa
+  - lib32-zlib-ng-compat
+  - lib32-zlib-ng
   - mesa-utils
   - intel-media-driver
   - libdisplay-info
