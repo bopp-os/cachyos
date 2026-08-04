@@ -496,7 +496,7 @@ jobs:
           trap "sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
 
           echo "::group::Generating SBOM with Syft from podman mount"
-          sudo syft dir:"$MNT_DIR" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
+          sudo syft dir:"$MNT_DIR" --source-name "cachyos-${{ matrix.flavor }}" --source-version "${{ env.DEFAULT_TAG }}" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
           echo "::endgroup::"
 
           echo "::group::Scanning SBOM with Grype"
