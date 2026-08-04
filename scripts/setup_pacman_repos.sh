@@ -28,6 +28,10 @@ sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf
 sed -i '/^DownloadUser/d' /etc/pacman.conf
 grep -q "DisableSandboxNetwork" /etc/pacman.conf || sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
 
+# Ensure pacman cache directory path is consistent and symlinked
+mkdir -p /var/cache/pacman/pkg /usr/lib/sysimage/cache/pacman
+ln -sf /var/cache/pacman/pkg /usr/lib/sysimage/cache/pacman/pkg
+
 if ! grep -q '\[bopp-os\]' /etc/pacman.conf; then
   printf "\n[bopp-os]\nSigLevel = Optional TrustAll\nServer = https://repo.ripps.me\n\n" > /tmp/bopp-os.conf
   sed -i '/^\[extra\]/i # bopp-os repo\n' /etc/pacman.conf

@@ -275,7 +275,7 @@ jobs:
             fi
           done <<< "$META_LABELS"
 
-          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
           
           # Check if the manual 'no_cache' toggle was checked in the GitHub UI
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
@@ -463,7 +463,7 @@ jobs:
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true"); fi
           if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then BUILD_ARGS+=("--security-opt" "seccomp=unconfined"); fi
           if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "VERBOSE=true"); fi
-          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/usr/lib/sysimage/cache/pacman/pkg:z")
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
           
           FLAVOR="${{ matrix.flavor }}"
           echo "::group::Building $FLAVOR"
