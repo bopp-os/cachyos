@@ -17,7 +17,6 @@ COPY files/plasma/plasma.yaml /tmp/plasma.yaml
 
 # Track package states to apply xattrs only to newly added or upgraded packages
 RUN --mount=type=tmpfs,dst=/run \
-    --mount=type=cache,target=/var/cache/pacman/pkg,sharing=shared \
     pacman -Q | sort > /tmp/base_pkgs.txt && \
     chmod +x /tmp/install_packages.sh && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \

@@ -34,8 +34,7 @@ RUN chmod +x /tmp/scripts/*.sh && \
     /tmp/scripts/setup_pacman_repos.sh
 
 # Install yara and python-yaml from extra repository, pre-fetch packages, and scan package cache
-RUN --mount=type=cache,target=/var/cache/pacman/pkg,sharing=shared \
-    pacman -Sy --noconfirm yara python-yaml && \
+RUN pacman -Sy --noconfirm yara python-yaml && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     echo "::group::Pre-fetching base packages..." && \
     /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml $VERBOSE_ARG && \

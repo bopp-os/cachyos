@@ -20,6 +20,24 @@ curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3
 pacman-key --lsign-key F3B607488DB35A47 || true
 pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB || true
 pacman-key --lsign-key 3056513887B78AEB || true
+
+# Add boppos repository GPG key and locally sign it
+KEY_FILE=""
+if [ -f "/tmp/keys/boppos.asc" ]; then
+  KEY_FILE="/tmp/keys/boppos.asc"
+elif curl -fsSL --max-time 10 https://repo.ripps.me/boppos.gpg -o /tmp/boppos.gpg 2>/dev/null; then
+  KEY_FILE="/tmp/boppos.gpg"
+fi
+
+if [ -n "$KEY_FILE" ]; then
+  pacman-key --add "$KEY_FILE" || true
+  BOPPOS_FINGERPRINT=$(gpg --with-colons --show-keys "$KEY_FILE" 2>/dev/null | grep '^pub' | cut -d: -f5 || echo "")
+  if [ -n "$BOPPOS_FINGERPRINT" ]; then
+    pacman-key --lsign-key "$BOPPOS_FINGERPRINT" || true
+  fi
+  rm -f /tmp/boppos.gpg
+fi
+
 rm -rf /tmp/keys
 { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
