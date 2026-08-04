@@ -2,7 +2,18 @@
 
 set -xeuo pipefail
 
-rm -rf /boot /home /root /usr/local /srv /opt /mnt /var /usr/lib/sysimage/log /usr/lib/sysimage/cache/pacman/pkg
+# Safely remove directories without attempting to rm -rf mounted volume paths
+for dir in /boot /home /root /usr/local /srv /opt /mnt /usr/lib/sysimage/log /usr/lib/sysimage/cache/pacman/pkg; do
+    rm -rf "$dir" 2>/dev/null || true
+done
+
+# Clean /var subdirectories excluding mounted pacman cache
+if [ -d /var ]; then
+    find /var -mindepth 1 -maxdepth 1 ! -name 'cache' -exec rm -rf {} + 2>/dev/null || true
+    if [ -d /var/cache ]; then
+        find /var/cache -mindepth 1 -maxdepth 1 ! -name 'pacman' -exec rm -rf {} + 2>/dev/null || true
+    fi
+fi
 
 mkdir -p /sysroot /boot /usr/lib/ostree /var
 
