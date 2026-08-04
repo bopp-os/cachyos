@@ -17,6 +17,16 @@
 
 set -e
 
+echo "Sanitizing unassigned build-time UIDs in /var..."
+find /var -mindepth 1 -exec sh -c '
+  for target; do
+    owner=$(stat -c "%U" "$target" 2>/dev/null || echo "")
+    if [ -n "$owner" ] && ! id -u "$owner" >/dev/null 2>&1; then
+      chown root:root "$target" 2>/dev/null || true
+    fi
+  done
+' sh {} +
+
 echo "Generating tmpfiles for /var..."
 > /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 
@@ -24,7 +34,11 @@ find /var -mindepth 1 -type d -not -path "/var/tmp*" -not -path "/var/cache*" -n
     if [ -L "$dir" ]; then continue; fi
     mode=$(stat -c "%a" "$dir")
     if [ ${#mode} -eq 3 ]; then mode="0$mode"; fi
-    echo "d $dir $mode $(stat -c "%U %G" "$dir") - -" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
+    owner=$(stat -c "%U" "$dir")
+    group=$(stat -c "%G" "$dir")
+    if ! id -u "$owner" >/dev/null 2>&1; then owner="root"; fi
+    if ! getent group "$group" >/dev/null 2>&1; then group="root"; fi
+    echo "d $dir $mode $owner $group - -" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 done
 
 echo "Recreating essential directories for bootc..."
