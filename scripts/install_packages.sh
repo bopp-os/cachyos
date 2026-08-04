@@ -128,7 +128,7 @@ if [ "$DOWNLOAD_SUCCESS" = "false" ]; then
 fi
 
 if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
-    echo "::notice::--download-only mode active. Skipping installation phase."
+    echo "ℹ️ --download-only mode active. Skipping installation phase."
     exit 0
 fi
 

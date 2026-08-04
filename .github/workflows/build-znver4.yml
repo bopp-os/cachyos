@@ -500,7 +500,12 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Scanning SBOM with Grype"
-          sudo grype sbom:/tmp/sbom.json --config .grype.yaml
+          sudo grype sbom:/tmp/sbom.json --config .grype.yaml -o json > /tmp/grype-results.json || true
+          sudo grype sbom:/tmp/sbom.json --config .grype.yaml || true
+          CRIT_COUNT=$(jq '[.matches[]? | select(.vulnerability.severity == "Critical")] | length' /tmp/grype-results.json 2>/dev/null || echo 0)
+          if [ "$CRIT_COUNT" -gt 0 ]; then
+            echo "::warning title=Critical Vulnerability Alert::Discovered $CRIT_COUNT critical vulnerability/vulnerabilities in cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+          fi
           echo "::endgroup::"
 
       - name: Extract Package List
