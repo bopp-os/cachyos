@@ -29,6 +29,20 @@ RUN --mount=type=tmpfs,dst=/run \
 COPY files/niri/etc /etc/
 COPY files/niri/usr /usr/
 
+# Ensure system-wide fallback Niri configuration from CachyOS Noctalia
+RUN mkdir -p /etc/niri /etc/xdg/niri && \
+    if [ -f /etc/skel/.config/niri/config.kdl ]; then \
+        cp -a /etc/skel/.config/niri/config.kdl /etc/niri/config.kdl && \
+        cp -a /etc/skel/.config/niri/config.kdl /etc/xdg/niri/config.kdl ; \
+    fi && \
+    if [ -d /usr/share/cachyos-niri-noctalia ]; then \
+        cp -a /usr/share/cachyos-niri-noctalia/* /etc/niri/ 2>/dev/null || true ; \
+        cp -a /usr/share/cachyos-niri-noctalia/* /etc/xdg/niri/ 2>/dev/null || true ; \
+    elif [ -d /usr/share/cachyos-niri ]; then \
+        cp -a /usr/share/cachyos-niri/* /etc/niri/ 2>/dev/null || true ; \
+        cp -a /usr/share/cachyos-niri/* /etc/xdg/niri/ 2>/dev/null || true ; \
+    fi
+
 RUN find /etc /usr -type f -exec sh -c \
     'for f; do getfattr -h -n user.component "$f" &>/dev/null || { setfattr -h -n user.component -v "de-niri" "$f" && setfattr -h -n user.update-interval -v "weekly" "$f"; }; done' sh {} +
 
