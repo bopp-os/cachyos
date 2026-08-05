@@ -12,6 +12,7 @@ ARG VERBOSE
 # MASTER PACKAGE INSTALLATION
 # ==========================================
 
+COPY scripts/package-intervals.json /tmp/package-intervals.json
 COPY scripts/install_packages.sh /tmp/install_packages.sh
 COPY files/niri/niri.yaml /tmp/niri.yaml
 

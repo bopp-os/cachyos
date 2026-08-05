@@ -11,7 +11,15 @@ for arg in "$@"; do
     fi
 done
 
-JSON_FILE="${ARGS[0]:-scripts/package-intervals.json}"
+JSON_FILE="${ARGS[0]:-}"
+if [[ -z "$JSON_FILE" || ! -f "$JSON_FILE" ]]; then
+    for candidate in /usr/share/boppos/package-intervals.json /tmp/package-intervals.json /tmp/scripts/package-intervals.json scripts/package-intervals.json; do
+        if [[ -f "$candidate" ]]; then
+            JSON_FILE="$candidate"
+            break
+        fi
+    done
+fi
 ROOTFS="${ARGS[1]:-/}"
 PKG_FILE="${ARGS[2]:-}"
 CONCURRENCY=4
@@ -49,6 +57,12 @@ apply_pkg_xattrs() {
         
         # Use -h to avoid dereferencing symlinks, which could traverse out of rootfs or hit RO mounts
         if [[ -e "$full_path" || -L "$full_path" ]]; then
+            # Skip re-tagging files already processed by the real-time ALPM hook
+            if getfattr -h -n user.update-interval "$full_path" &>/dev/null; then
+                ((count++))
+                continue
+            fi
+
             # Check if a component exists and dynamically append the interval to satisfy Chunkah
             local comp
             comp=$(getfattr -h --absolute-names --only-values -n user.component "$full_path" 2>/dev/null || true)

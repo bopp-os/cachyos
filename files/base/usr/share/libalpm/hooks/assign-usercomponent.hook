@@ -5,7 +5,7 @@ Type = Package
 Target = *
 
 [Action]
-Description = Assigning user.component on packages...
+Description = Assigning package xattrs (user.component & user.update-interval)...
 When = PostTransaction
 Exec = /usr/libexec/assign-usercomponent.sh
 NeedsTargets

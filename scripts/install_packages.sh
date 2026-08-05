@@ -155,6 +155,7 @@ while IFS= read -r sec_line; do
         echo "Packages in $SEC_NAME: $SEC_PKGS"
     fi
 
+    export COMPONENT_TAG="$SEC_NAME"
     SEC_RETRY=0
     SEC_SUCCESS=false
     INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --overwrite '*' $SEC_PKGS"

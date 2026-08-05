@@ -45,7 +45,13 @@ RUN mkdir -p /etc/pacman.d/hooks && \
     ln -sf /dev/null /etc/pacman.d/hooks/90-dracut-install.hook && \
     ln -sf /dev/null /etc/pacman.d/hooks/systemd-hwdb.hook && \
     ln -sf /dev/null /etc/pacman.d/hooks/udev-hwdb.hook && \
-    ln -sf /dev/null /etc/pacman.d/hooks/archlinux-keyring-wkd-sync.hook
+# PRE-INSTALL CONFIGURATION, HOOKS & UPDATE INTERVALS
+# Copy hooks, script, and package-intervals database EARLY so ALPM hooks fire during all pacman installations.
+RUN mkdir -p /usr/share/boppos
+COPY scripts/package-intervals.json /usr/share/boppos/package-intervals.json
+COPY files/base/usr/share/libalpm/hooks/assign-usercomponent.hook /usr/share/libalpm/hooks/assign-usercomponent.hook
+COPY files/base/usr/libexec/assign-usercomponent.sh /usr/libexec/assign-usercomponent.sh
+RUN chmod +x /usr/libexec/assign-usercomponent.sh
 
 RUN rm -rf /var/lib/pacman/sync/* && \
     pacman -Syy --noconfirm && \
@@ -69,11 +75,6 @@ RUN grep "= */var" /etc/pacman.conf | grep -v "CacheDir" | sed "/= *\/var/s/.*=/
     ln -sf /usr/lib/sysimage/lib/pacman /var/lib/pacman && \
     sed -i '/^\[options\]/a NoExtract = usr/share/help/* usr/share/gtk-doc/html/* usr/share/doc/*\nNoExtract = usr/share/locale/* usr/share/man/??/* usr/share/man/??_*/*\nNoExtract = !usr/share/locale/en_US/* !usr/share/locale/locale.alias' /etc/pacman.conf
 
-# PRE-INSTALL CONFIGURATION & HOOKS
-# Copy hooks and configs EARLY so they fire during the master pacman block.
-COPY files/base/usr/share/libalpm/hooks/assign-usercomponent.hook /usr/share/libalpm/hooks/assign-usercomponent.hook
-COPY files/base/usr/libexec/assign-usercomponent.sh /usr/libexec/assign-usercomponent.sh
-RUN chmod +x /usr/libexec/assign-usercomponent.sh
 
 # Generate en_US.UTF-8 locale
 RUN sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
