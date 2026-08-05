@@ -44,7 +44,8 @@ RUN mkdir -p /etc/pacman.d/hooks && \
     ln -sf /dev/null /etc/pacman.d/hooks/90-mkinitcpio-install.hook && \
     ln -sf /dev/null /etc/pacman.d/hooks/90-dracut-install.hook && \
     ln -sf /dev/null /etc/pacman.d/hooks/systemd-hwdb.hook && \
-    ln -sf /dev/null /etc/pacman.d/hooks/udev-hwdb.hook && \
+    ln -sf /dev/null /etc/pacman.d/hooks/udev-hwdb.hook
+
 # PRE-INSTALL CONFIGURATION, HOOKS & UPDATE INTERVALS
 # Copy hooks, script, and package-intervals database EARLY so ALPM hooks fire during all pacman installations.
 RUN mkdir -p /usr/share/boppos
