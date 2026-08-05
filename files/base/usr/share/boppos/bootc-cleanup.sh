@@ -4,7 +4,7 @@
 # This script is designed to be run as the final step in a Containerfile
 # for a bootc-based image. It performs two main functions:
 #
-# 1. var-tmpfiles: It scans the /var directory for any directories created
+# 1. var-tmpfiles: It scans the /var directory for any directories and symlinks created
 #    by package installations and dynamically generates a systemd-tmpfiles.d
 #    configuration. This ensures that these stateful directories are correctly
 #    re-created on the first boot of a deployed system, satisfying the
@@ -27,10 +27,23 @@ find /var -mindepth 1 -exec sh -c '
   done
 ' sh {} +
 
-echo "Generating tmpfiles for /var..."
+echo "Cleaning transient cache files and build-time state in /var..."
+rm -rf /var/cache/ldconfig/* /var/cache/man/* /var/cache/fontconfig/* 2>/dev/null || true
+truncate -s 0 /etc/machine-id
+rm -f /var/lib/dbus/machine-id /etc/random-seed
+
+echo "Purging transient pacman sync databases and logs..."
+rm -rf /usr/lib/sysimage/lib/pacman/sync/* /var/lib/pacman/sync/* /var/log/pacman.log 2>/dev/null || true
+
+echo "Recreating essential directories and pacman symlinks for bootc..."
+mkdir -p /var/lib /var/cache/pacman /usr/lib/sysimage/lib/pacman /usr/lib/sysimage/cache/pacman/pkg /boot /sysroot
+ln -sf /usr/lib/sysimage/lib/pacman /var/lib/pacman
+ln -sf /usr/lib/sysimage/cache/pacman/pkg /var/cache/pacman/pkg
+
+echo "Generating tmpfiles for /var directories and symlinks..."
 > /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 
-find /var -mindepth 1 -type d -not -path "/var/tmp*" -not -path "/var/cache*" -not -path "/var/log*" 2>/dev/null | while read -r dir; do
+find /var -mindepth 1 -type d -not -path "/var/tmp*" 2>/dev/null | while read -r dir; do
     if [ -L "$dir" ]; then continue; fi
     mode=$(stat -c "%a" "$dir")
     if [ ${#mode} -eq 3 ]; then mode="0$mode"; fi
@@ -41,23 +54,16 @@ find /var -mindepth 1 -type d -not -path "/var/tmp*" -not -path "/var/cache*" -n
     echo "d $dir $mode $owner $group - -" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 done
 
-echo "Recreating essential directories and pacman symlinks for bootc..."
-mkdir -p /var/lib /usr/lib/sysimage/lib/pacman /usr/lib/sysimage/cache/pacman /boot /sysroot
-ln -sf /usr/lib/sysimage/lib/pacman /var/lib/pacman
-ln -sf /usr/lib/sysimage/cache/pacman/pkg /var/cache/pacman/pkg
+find /var -mindepth 1 -type l -not -path "/var/tmp*" 2>/dev/null | while read -r link; do
+    target=$(readlink "$link")
+    echo "L $link - - - - $target" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
+done
 
 echo "Setting up SDDM themes default backup directory..."
 mkdir -p /usr/share/sddm/themes-default
 if [ -d /usr/share/sddm/themes ] && [ ! -L /usr/share/sddm/themes ]; then
     cp -a /usr/share/sddm/themes/* /usr/share/sddm/themes-default/ 2>/dev/null || true
 fi
-
-echo "Cleaning machine-id and build-time state..."
-truncate -s 0 /etc/machine-id
-rm -f /var/lib/dbus/machine-id /etc/random-seed
-
-echo "Purging transient pacman databases and logs..."
-rm -rf /var/lib/pacman/sync/* /usr/lib/sysimage/sync/* /var/log/pacman.log 2>/dev/null || true
 
 echo "Cleaning /run and /tmp..."
 rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true
