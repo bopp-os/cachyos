@@ -43,27 +43,11 @@ prefetch arch='v3' plasma='true' gnome='true' niri='true':
         -f Containerfile.prefetch \
         .
 
-# Build the prerequisite AUR builder image.
-build-aur arch='v3':
-    @echo "Building AUR builder for architecture {{arch}}..."
-    podman build \
-        --network=host \
-        --build-arg TARGET_CPU_MARCH={{arch}} \
-        --build-arg BASE_IMAGE_TAG=$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi) \
-        $(if [ "{{arch}}" = "znver4" ]; then echo "--build-arg BASE_IMAGE=ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo ""; fi) \
-        -f Containerfile.aur \
-        -t "localhost/aur-builder:{{arch}}" \
-        .
-
 # Build a specific flavor of the container image.
 # Accepts an optional architecture (v3, v4, znver4) and flavor (base, plasma, gnome, niri).
 build arch='v3' flavor='base':
     @echo "Building cachyos-boppos-{{flavor}}:{{arch}}..."
     @if [ "{{flavor}}" = "base" ]; then \
-        if ! podman image exists "localhost/aur-builder:{{arch}}"; then \
-            echo "⚠️ AUR builder image 'localhost/aur-builder:{{arch}}' not found locally. Building it first..."; \
-            just build-aur {{arch}}; \
-        fi; \
         podman build \
             --network=host \
             --build-arg TARGET_CPU_MARCH={{arch}} \

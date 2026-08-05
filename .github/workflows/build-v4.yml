@@ -125,7 +125,7 @@ jobs:
           fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-* || true
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* || true
           
           # Ensure local base tags are cleared at the very beginning of a new pipeline run
           sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
@@ -352,7 +352,7 @@ jobs:
           sudo podman system prune --force --volumes || true
           
           # 3. Obliterate orphaned Podman extraction directories (The 128GB Silent Killer)
-          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
+          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
           
           # 4. Delete the massive chunkah tarballs
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_* || true
@@ -440,8 +440,8 @@ jobs:
       - name: Prepare Local Cache Directory
         run: |
           CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
-          sudo mkdir -p "$CACHE_DIR" /opt/trivy-cache
-          sudo chown -R $(id -u):$(id -g) "$CACHE_DIR" /opt/trivy-cache
+          sudo mkdir -p "$CACHE_DIR"
+          sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
           sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf "$CACHE_DIR"/*; fi
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
@@ -648,7 +648,7 @@ jobs:
           echo "🧹 Sweeping up the heavy Podman assets..."
           sudo podman rm -af || true
           sudo podman system prune --force || true
-          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/trivy-*
+          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-*
           sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
             echo "✨ All flavors built successfully. Removing local base images and workspace..."

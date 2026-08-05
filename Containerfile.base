@@ -25,8 +25,6 @@ ENV PYTHONHASHSEED=0
 COPY --from=brew /system_files /
 RUN setfattr -n user.component -v "homebrew" "/usr/share/homebrew.tar.zst"
 
-# Copy the shared directory from the bootcrew/mono repo
-COPY files/base/bootcrew-shared/ /bootcrew-shared/
 
 COPY files/keys/ /tmp/keys/
 COPY scripts/ /tmp/scripts/
@@ -236,10 +234,9 @@ RUN chmod +x /tmp/apply-update-intervals.sh && \
 # Final system setup and cleanup
 RUN sed -i 's|^HOME=.*|HOME=/var/home|' "/etc/default/useradd" && \
     mkdir -p /run /tmp && \
-    # Patch the cleanup script to NOT delete our mounted pacman cache
-    ( [ -f /bootcrew-shared/bootc-rootfs.sh ] && sed -i 's|/usr/lib/sysimage/cache/pacman/pkg||g' /bootcrew-shared/bootc-rootfs.sh || true ) && \
-    bash /bootcrew-shared/bootc-rootfs.sh && \
-    rm -rf /bootcrew-shared && \
+    # Patch the rootfs script to NOT delete our mounted pacman cache
+    ( [ -f /tmp/scripts/bootc-rootfs.sh ] && sed -i 's|/usr/lib/sysimage/cache/pacman/pkg||g' /tmp/scripts/bootc-rootfs.sh || true ) && \
+    bash /tmp/scripts/bootc-rootfs.sh && \
     /usr/share/boppos/bootc-cleanup.sh
 
 RUN ln -sf ../usr/lib/os-release /etc/os-release
@@ -249,8 +246,10 @@ RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
 RUN mkdir -p /etc/pki/containers
 COPY cosign.pub /etc/pki/containers/bopp-os.pub
 
-# Make the package list generator executable for downstream flavors
-RUN chmod +x /usr/share/boppos/generate-package-list.sh
+# Install and make the package list generator executable for downstream flavors
+RUN mkdir -p /usr/share/boppos && \
+    cp /tmp/scripts/generate-package-list.sh /usr/share/boppos/generate-package-list.sh && \
+    chmod +x /usr/share/boppos/generate-package-list.sh
 
 RUN rm -f /README.md
 
