@@ -28,7 +28,7 @@ RUN --mount=type=tmpfs,dst=/run \
 # These are commented out intentionally. Git does not track empty directories,
 # and including these lines would cause the build to fail if the dirs are empty.
 #COPY files/plasma/etc /etc/
-#COPY files/plasma/usr /usr/
+COPY files/plasma/usr /usr/
 
 # Enable DE services & remove SDDM components/KCM from Plasma
 RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
