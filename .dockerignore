@@ -1,3 +1,11 @@
-# Exclude .git directories from being copied
+# Exclude build context artifacts and secret files from container builds
 .git/
 .gitignore
+.venv/
+cosign.key
+build/
+mirrors/
+job-logs.txt
+*.ociarchive
+*.img
+.github/

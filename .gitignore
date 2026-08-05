@@ -4,3 +4,6 @@ cosign.key
 .venv/
 test.yaml
 job-logs.txt
+build/
+mirrors/
+

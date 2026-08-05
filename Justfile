@@ -141,3 +141,9 @@ apply-local-kargs:
         eval $$CMD; \
         echo "Kernel arguments updated. Please reboot to apply changes."; \
     fi
+
+# Clean up local build artifacts and temporary files
+clean:
+    @echo "Cleaning up local build artifacts..."
+    rm -rf mirrors/ build/ /tmp/podman_push_digest_*.txt /tmp/podman_load_output.txt job-logs.txt
+    @echo "Cleanup complete."
