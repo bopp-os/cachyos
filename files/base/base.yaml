@@ -281,6 +281,12 @@ cli-utilities:
   - lsof
   - strace
   - ltrace
+serial-hardware-debugging:
+  - screen
+  - picocom
+  - minicom
+  - tio
+  - lrzsz
 package-management:
   - rebuild-detector
 text-editors-ides:
