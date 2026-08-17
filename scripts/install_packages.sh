@@ -97,7 +97,7 @@ DOWNLOAD_SUCCESS=false
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Pre-fetching package archives for $YAML_FILE..."
 
-    DOWNLOAD_EXEC="pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS"
+    DOWNLOAD_EXEC="pacman -Sw --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS"
 
     if [ "$VERBOSE" -eq 1 ]; then
         if $DOWNLOAD_EXEC 2>&1 | tee /tmp/pacman-download.log; then
@@ -161,7 +161,7 @@ while IFS= read -r sec_line; do
 
     SEC_RETRY=0
     SEC_SUCCESS=false
-    INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --overwrite '*' $SEC_PKGS"
+    INSTALL_EXEC="$ISOLATE_CMD pacman -S --noconfirm --ask 4 --needed --overwrite '*' $SEC_PKGS"
 
     while [ $SEC_RETRY -lt $MAX_RETRIES ]; do
         if [ "$VERBOSE" -eq 1 ]; then
