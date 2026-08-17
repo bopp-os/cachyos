@@ -47,6 +47,13 @@ sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf
 sed -i '/^DownloadUser/d' /etc/pacman.conf
 grep -q "DisableSandboxNetwork" /etc/pacman.conf || sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
 
+# Ensure multilib repository is enabled
+if grep -q '^#\[multilib\]' /etc/pacman.conf; then
+  sed -i '/^#\[multilib\]/{s/^#//;n;s/^#//}' /etc/pacman.conf
+elif ! grep -q '^\[multilib\]' /etc/pacman.conf; then
+  echo -e '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist' >> /etc/pacman.conf
+fi
+
 # Ensure pacman cache directory path is consistent and symlinked
 mkdir -p /var/cache/pacman/pkg /usr/lib/sysimage/cache/pacman
 ln -sf /var/cache/pacman/pkg /usr/lib/sysimage/cache/pacman/pkg

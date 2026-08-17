@@ -47,6 +47,9 @@ gaming-runtimes:
   - proton-cachyos-slr
   - wine
   - wine-cachyos-opt
+  - umu-launcher
+  - protontricks
+  - winetricks
 bootc:
   - bootc
   - dracut
@@ -163,7 +166,7 @@ networking:
   - wpa_supplicant
   - iwd
   - ethtool
-  - dnsutils
+  - bind
   - modemmanager
   - usb_modeswitch
   - nss-mdns
@@ -184,7 +187,6 @@ networking:
   - mullvad-vpn-bin
   - mullvad-vpn-daemon-bin
   - arp-scan
-  - bind-tools
   - iputils
   - net-tools
   - nmap
@@ -285,7 +287,7 @@ text-editors-ides:
   - nano
   - nano-syntax-highlighting
   - micro
-  - vi
+  - ex-vi-compat
   - meld
   - vim
 devel-base:
@@ -318,7 +320,7 @@ desktop-integration:
   - nss
   - libnotify
   - libxss
-  - libappindicator-gtk3
+  - libayatana-appindicator
   - libsecret
   - libgsf
   - libopenraw
@@ -350,6 +352,7 @@ gaming-core:
   - scopebuddy-git
   - yad
   - mangohud
+  - lib32-mangohud
   - lutris
   - heroic-games-launcher-bin
   - steam
@@ -374,6 +377,21 @@ gaming-core:
   - vulkan-low-latency-layer
   - python-pefile
   - python-pyclip
+  - vulkan-tools
+  - openal
+  - opencl-icd-loader
+  - giflib
+  - glfw
+  - libva
+  - libxslt
+  - mpg123
+  - lib32-alsa-plugins
+  - lib32-gtk3
+  - lib32-libjpeg-turbo
+  - lib32-libva
+  - lib32-mpg123
+  - lib32-ocl-icd
+  - lib32-opencl-icd-loader
 web-browsers:
   - helium-browser-bin
   - cachyos-firefox-settings
@@ -391,5 +409,6 @@ cachyos-settings:
   - cachyos-fish-config
   - cachyos-samba-settings
 base-meta:
-  - cachyos-gaming-applications
-  - cachyos-gaming-meta
+  # Temporarily disabled until CachyOS updates meta package PKGBUILD for Arch multilib removals (lib32-giflib, lib32-openal)
+  # - cachyos-gaming-applications
+  # - cachyos-gaming-meta
