@@ -96,30 +96,34 @@ DOWNLOAD_SUCCESS=false
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Pre-fetching package archives for $YAML_FILE..."
-    
-    # Resolve full transaction package names (including font fallbacks and sub-dependencies)
-    RESOLVED_PKGS=$(yes "" | pacman -Sp --print-format %n --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS 2>/dev/null | sort -u | tr '\n' ' ' || echo "")
+
+    DOWNLOAD_EXEC="pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS"
 
     if [ "$VERBOSE" -eq 1 ]; then
-        DOWNLOAD_STATUS=0
-        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS $RESOLVED_PKGS 2>&1 | tee /tmp/pacman-download.log || DOWNLOAD_STATUS=$?
-        [ $DOWNLOAD_STATUS -eq 0 ]
+        if $DOWNLOAD_EXEC 2>&1 | tee /tmp/pacman-download.log; then
+            DOWNLOAD_SUCCESS=true
+            echo "✅ Download phase complete for $YAML_FILE."
+            break
+        else
+            echo -e "\n================ PACMAN DOWNLOAD LOG ================"
+            cat /tmp/pacman-download.log || true
+            echo -e "=====================================================\n"
+        fi
     else
-        pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS $RESOLVED_PKGS > /tmp/pacman-download.log 2>&1
+        if $DOWNLOAD_EXEC > /tmp/pacman-download.log 2>&1; then
+            DOWNLOAD_SUCCESS=true
+            echo "✅ Download phase complete for $YAML_FILE."
+            break
+        else
+            echo -e "\n================ PACMAN DOWNLOAD LOG ================"
+            cat /tmp/pacman-download.log || true
+            echo -e "=====================================================\n"
+        fi
     fi
 
-    if [ $? -eq 0 ]; then
-        DOWNLOAD_SUCCESS=true
-        echo "✅ Download phase complete for $YAML_FILE."
-        break
-    else
-        echo -e "\n================ PACMAN DOWNLOAD LOG ================"
-        cat /tmp/pacman-download.log || true
-        echo -e "=====================================================\n"
-        RETRY_COUNT=$((RETRY_COUNT+1))
-        echo "::warning title=Download Attempt Failed::Package download attempt $RETRY_COUNT of $MAX_RETRIES failed!"
-        [ $RETRY_COUNT -lt $MAX_RETRIES ] && sleep $(( 5 * RETRY_COUNT ))
-    fi
+    RETRY_COUNT=$((RETRY_COUNT+1))
+    echo "::warning title=Download Attempt Failed::Package download attempt $RETRY_COUNT of $MAX_RETRIES failed!"
+    [ $RETRY_COUNT -lt $MAX_RETRIES ] && sleep $(( 5 * RETRY_COUNT ))
 done
 
 if [ "$DOWNLOAD_SUCCESS" = "false" ]; then
