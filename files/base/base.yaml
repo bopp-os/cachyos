@@ -314,8 +314,8 @@ containers:
   - ptyxis
   - libvirt
 schedulers:
-  - scx-scheds-git
-  - scx-tools-git
+  - scx-scheds
+  - scx-tools
   - scx-manager
 desktop-integration:
   - xorg-xwayland
