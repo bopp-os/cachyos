@@ -18,8 +18,7 @@ cinnamon-core:
   - cinnamon-translations
 
 cinnamon-greeter:
-  - lightdm
-  - lightdm-slick-greeter
+  - gdm
 
 cinnamon-xapps:
   - xed
