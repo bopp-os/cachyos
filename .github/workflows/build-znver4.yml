@@ -40,6 +40,11 @@ on:
         required: false
         type: boolean
         default: true
+      build_cinnamon:
+        description: 'Build Cinnamon flavor'
+        required: false
+        type: boolean
+        default: true
       verbose_build:
         description: 'Enable verbose build output'
         required: false
@@ -52,7 +57,7 @@ env:
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "${{ inputs.test_tag && 'znver4-test' || 'znver4' }}"
-  FLAVORS: "plasma gnome niri"
+  FLAVORS: "plasma gnome niri cinnamon"
   BASE_TAG: "v4"
   BASE_IMAGE: "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"
   TARGET_MARCH: "znver4"
@@ -98,12 +103,13 @@ jobs:
             exit 0
           fi
           if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "flavors=[\"plasma\", \"gnome\", \"niri\"]" >> $GITHUB_OUTPUT
+            echo "flavors=[\"plasma\", \"gnome\", \"niri\", \"cinnamon\"]" >> $GITHUB_OUTPUT
           else
             FLAVORS=()
             [ "${{ inputs.build_plasma }}" == "true" ] && FLAVORS+=('"plasma"')
             [ "${{ inputs.build_gnome }}" == "true" ] && FLAVORS+=('"gnome"')
             [ "${{ inputs.build_niri }}" == "true" ] && FLAVORS+=('"niri"')
+            [ "${{ inputs.build_cinnamon }}" == "true" ] && FLAVORS+=('"cinnamon"')
             JOINED=$(IFS=, ; echo "${FLAVORS[*]}")
             echo "flavors=[$JOINED]" >> $GITHUB_OUTPUT
           fi
@@ -250,6 +256,7 @@ jobs:
           PREFETCH_ARGS+=("--build-arg" "BUILD_PLASMA=${{ github.event.inputs.build_plasma != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_GNOME=${{ github.event.inputs.build_gnome != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_NIRI=${{ github.event.inputs.build_niri != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_CINNAMON=${{ github.event.inputs.build_cinnamon != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "VERBOSE=${{ github.event.inputs.verbose_build == 'true' }}")
           PREFETCH_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
 
