@@ -20,6 +20,7 @@ ARG BASE_IMAGE_TAG
 ARG VERBOSE
 ENV LANG=en_US.UTF-8
 ENV PYTHONHASHSEED=0
+ENV SOURCE_DATE_EPOCH=0
 
 # Copy Homebrew
 COPY --from=brew /system_files /
@@ -63,8 +64,8 @@ RUN rm -rf /var/lib/pacman/sync/* && \
 RUN find /etc/pacman.conf /etc/pacman.d /usr/share/pacman/keyrings ! -type l -exec setfattr -n user.component -v "pacman-config" {} + -exec setfattr -n user.update-interval -v "weekly" {} + && \
     if [ -d /usr/lib/sysimage ]; then find /usr/lib/sysimage ! -type l -exec setfattr -n user.component -v "pacman-db" {} + -exec setfattr -n user.update-interval -v "daily" {} +; fi
 
-# Ensure the log file exists
-RUN touch /var/log/pacman.log
+# Ensure the log file exists with normalized timestamp
+RUN touch -d "@${SOURCE_DATE_EPOCH:-0}" /var/log/pacman.log
 
 # Move pacman directories for bootc/usroverlay compatibility
 # Also add NoExtract rules to strip documentation and non-English locales to save space
@@ -77,9 +78,9 @@ RUN grep "= */var" /etc/pacman.conf | grep -v "CacheDir" | sed "/= *\/var/s/.*=/
     sed -i '/^\[options\]/a NoExtract = usr/share/help/* usr/share/gtk-doc/html/* usr/share/doc/*\nNoExtract = usr/share/locale/* usr/share/man/??/* usr/share/man/??_*/*\nNoExtract = !usr/share/locale/en_US/* !usr/share/locale/locale.alias' /etc/pacman.conf
 
 
-# Generate en_US.UTF-8 locale
+# Generate en_US.UTF-8 locale reproducibly
 RUN sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
-    locale-gen && \
+    SOURCE_DATE_EPOCH=0 locale-gen && \
     echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
 # Dracut i18n fix
@@ -216,6 +217,7 @@ RUN --mount=type=tmpfs,dst=/run \
     KERNEL_DIR="$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)" && \
     KERNEL_VER="$(basename "$KERNEL_DIR")" && \
     depmod -a "$KERNEL_VER" && \
+    find "$KERNEL_DIR" -maxdepth 1 -type f -name "modules.*" -exec touch -d "@${SOURCE_DATE_EPOCH:-0}" {} + && \
     SOURCE_DATE_EPOCH=0 dracut --force --reproducible "$KERNEL_DIR/initramfs.img" "$KERNEL_VER" && \
     find /usr/lib/modules -type f -exec setfattr -h -n user.component -v "kernel-initramfs" {} + -exec setfattr -h -n user.update-interval -v "daily" {} +
 
@@ -254,7 +256,8 @@ RUN chmod +x /usr/share/boppos/generate-package-list.sh
 
 RUN rm -f /README.md
 
-# Reset Python hashseed to default random for runtime security
+# Reset Python hashseed and build timestamps to default for runtime security
 ENV PYTHONHASHSEED=""
+ENV SOURCE_DATE_EPOCH=""
 
 LABEL containers.bootc=1
