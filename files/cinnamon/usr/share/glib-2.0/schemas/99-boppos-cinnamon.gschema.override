@@ -6,14 +6,14 @@ icon-theme='Mint-Y'
 font-name='Noto Sans 10'
 
 [org.cinnamon.theme]
-name='Mint-Y'
+name='Mint-Y-Dark'
 
 [org.cinnamon.desktop.background]
 picture-uri='file:///usr/share/wallpapers/cachyos-wallpapers/Cachy_Topography.jpg'
 picture-options='zoom'
 
 [org.cinnamon.desktop.sound]
-theme-name='freedesktop'
+theme-name='LinuxMint'
 
 [org.gnome.desktop.interface]
 gtk-theme='Mint-Y'
@@ -21,4 +21,4 @@ icon-theme='Mint-Y'
 font-name='Noto Sans 10'
 
 [org.gnome.desktop.sound]
-theme-name='freedesktop'
+theme-name='LinuxMint'

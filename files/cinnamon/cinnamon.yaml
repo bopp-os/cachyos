@@ -18,7 +18,9 @@ cinnamon-core:
   - cinnamon-translations
 
 cinnamon-greeter:
-  - gdm
+  - greetd
+  - greetd-regreet
+  - cage
 
 cinnamon-xapps:
   - xed
@@ -46,11 +48,11 @@ cinnamon-themes:
   - mint-themes
   - mint-y-icons
   - mint-x-icons
+  - cinnamon-styles-artwork
+  - cinnamon-sounds
   - sound-theme-freedesktop
 
 cinnamon-additions:
   - xdg-user-dirs-gtk
 
-# Future / AUR notes (omitted per repository guidelines):
-# - nemo-preview: QuickLook-style file previewer (currently AUR only)
-# - mintbackup / timeshift: Snapshot/backup utilities (handled as separate host/btrfs tooling)
+# Note: timeshift / mintbackup handled via host btrfs snapshot tooling

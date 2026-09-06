@@ -1,0 +1,6 @@
+[terminal]
+vt = 1
+
+[default_session]
+command = "dbus-run-session cage -s -m last -d -- regreet"
+user = "greeter"

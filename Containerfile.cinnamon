@@ -1,6 +1,6 @@
 # BoppOS Containerfile.cinnamon
 #
-# Desktop overlay containing Cinnamon (Pure Wayland), Mint theming, X-Apps, and GDM.
+# Desktop overlay containing Cinnamon (Pure Wayland), Mint theming, X-Apps, and ReGreet/greetd.
 
 ARG IMAGE_REGISTRY=ghcr.io/bopp-os
 ARG BASE_IMAGE_TAG=latest
@@ -39,12 +39,13 @@ RUN glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
     gtk-update-icon-cache -qtf /usr/share/icons/hicolor || true
 
 # Enable DE services
-# Purge X11 sessions to ensure pure Wayland, disable other DMs, and enable GDM
+# Purge X11 sessions to ensure pure Wayland, disable other DMs, and enable greetd
 RUN rm -rf /usr/share/xsessions && \
     systemctl disable sddm.service || true && \
     systemctl disable lightdm.service || true && \
     systemctl disable plasmalogin.service || true && \
-    systemctl enable gdm.service
+    systemctl disable gdm.service || true && \
+    systemctl enable greetd.service
 
 # Preserve /opt contents for OverlayFS
 RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
