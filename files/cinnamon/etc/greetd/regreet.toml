@@ -12,7 +12,7 @@ application_prefer_dark_theme = true
 theme_name = "Mint-Y-Dark"
 icon_theme_name = "Mint-Y"
 cursor_theme_name = "Bibata-Modern-Classic"
-font_name = "Noto Sans 11"
+font_name = "Noto Sans 16"
 
 [appearance]
 greeting_msg = "Welcome to BoppOS"
