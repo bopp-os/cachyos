@@ -507,7 +507,22 @@ jobs:
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
           CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
           MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
-          trap "sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+          trap "sudo umount -l $MNT_DIR/var/opt >/dev/null 2>&1 || true; sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+
+          # Mirror booted system: bind-mount /usr/lib/opt to /var/opt so /opt has its files populated
+          if [ -d "$MNT_DIR/usr/lib/opt" ] && [ -d "$MNT_DIR/var/opt" ]; then
+            sudo mount --bind "$MNT_DIR/usr/lib/opt" "$MNT_DIR/var/opt"
+          fi
+
+          # Defense-in-depth: normalize any symlinks in /usr/bin missing leading slashes before Syft scan
+          for link in "$MNT_DIR"/usr/bin/*; do
+            if [ -L "$link" ]; then
+              target=$(readlink "$link")
+              if [[ "$target" != /* && "$target" != .* ]]; then
+                sudo ln -snf "/$target" "$link"
+              fi
+            fi
+          done
 
           echo "::group::Generating SBOM with Syft from podman mount"
           sudo syft dir:"$MNT_DIR" --source-name "cachyos-${{ matrix.flavor }}" --source-version "${{ env.DEFAULT_TAG }}" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
