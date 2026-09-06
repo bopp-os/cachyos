@@ -66,18 +66,6 @@ if [ -d /usr/share/sddm/themes ] && [ ! -L /usr/share/sddm/themes ]; then
     cp -a /usr/share/sddm/themes/* /usr/share/sddm/themes-default/ 2>/dev/null || true
 fi
 
-echo "Normalizing symlinks in /usr/bin missing leading slashes..."
-for bin in /usr/bin/*; do
-    if [ -L "$bin" ]; then
-        target=$(readlink "$bin")
-        if [[ "$target" != /* && "$target" != .* ]]; then
-            echo "Normalizing relative symlink $bin ($target -> /$target)..."
-            ln -snf "/$target" "$bin"
-            touch -d "@${SOURCE_DATE_EPOCH:-0}" "$bin" 2>/dev/null || true
-        fi
-    fi
-done
-
 echo "Cleaning /run and /tmp..."
 rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true
 
