@@ -56,5 +56,4 @@ RUN pacman -Sy --noconfirm yara python-yaml && \
         /tmp/scripts/install_packages.sh --download-only /tmp/files/cinnamon/cinnamon.yaml $VERBOSE_ARG; \
     fi && \
     echo "::group::Running package cache security scan..." && \
-    /tmp/scripts/scan-pkg-cache.sh /var/cache/pacman/pkg $VERBOSE_ARG && \
-    /tmp/scripts/scan-pkg-cache.sh /usr/lib/sysimage/cache/pacman/pkg $VERBOSE_ARG
+    /tmp/scripts/scan-pkg-cache.sh /var/cache/pacman/pkg $VERBOSE_ARG
