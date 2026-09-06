@@ -91,7 +91,8 @@ def main():
             except Exception:
                 continue
 
-            count = 0
+            applied_count = 0
+            skipped_count = 0
             for rel_file in files:
                 if rel_file.endswith("/"):
                     continue
@@ -110,7 +111,7 @@ def main():
                 # Skip re-tagging files already processed by real-time ALPM hook
                 try:
                     os.getxattr(full_path, "user.update-interval", follow_symlinks=False)
-                    count += 1
+                    skipped_count += 1
                     continue
                 except OSError as e:
                     if e.errno not in (errno.ENODATA, 61):  # 61 is ENOATTR on macOS / Linux fallback
@@ -131,19 +132,22 @@ def main():
 
                 try:
                     os.setxattr(full_path, "user.update-interval", interval.encode(), follow_symlinks=False)
-                    count += 1
+                    applied_count += 1
                 except OSError:
                     pass
 
             stats_intervals[interval] = stats_intervals.get(interval, 0) + 1
-            stats_files[interval] = stats_files.get(interval, 0) + count
+            stats_files[interval] = stats_files.get(interval, 0) + applied_count
             if verbose:
-                print(f"Applied user.update-interval={interval} to {pkg} ({count} files)")
+                if applied_count > 0:
+                    print(f"Applied user.update-interval={interval} to {pkg} ({applied_count} applied, {skipped_count} already tagged)")
+                else:
+                    print(f"Skipped {pkg} (all {skipped_count} files already tagged)")
 
         # Print summary table
         print("\n--- user.update-interval Summary ---")
         for intv in sorted(stats_intervals.keys()):
-            print(f"{intv}: {stats_intervals[intv]} packages, {stats_files.get(intv, 0)} files")
+            print(f"{intv}: {stats_intervals[intv]} packages, {stats_files.get(intv, 0)} files newly tagged")
 
     # Tag compiled system caches and normalize timestamps for layer determinism
     print("Tagging compiled system caches as user.component=system-cache...")
