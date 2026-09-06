@@ -51,12 +51,12 @@ RUN mkdir -p /etc/pacman.d/hooks && \
 RUN mkdir -p /usr/share/boppos
 COPY scripts/package-intervals.json /usr/share/boppos/package-intervals.json
 COPY files/base/usr/share/libalpm/hooks/assign-usercomponent.hook /usr/share/libalpm/hooks/assign-usercomponent.hook
-COPY files/base/usr/libexec/assign-usercomponent.sh /usr/libexec/assign-usercomponent.sh
-RUN chmod +x /usr/libexec/assign-usercomponent.sh
+COPY files/base/usr/libexec/assign-usercomponent.py /usr/libexec/assign-usercomponent.py
+RUN chmod +x /usr/libexec/assign-usercomponent.py
 
 RUN rm -rf /var/lib/pacman/sync/* && \
     pacman -Syy --noconfirm && \
-    pacman -Su --noconfirm && \
+    pacman -Su --noconfirm --needed python && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
 # Tag pacman config, mirrorlists, and sysimage database to avoid ostree layer hash non-determinism
@@ -228,10 +228,10 @@ RUN mkdir -p /usr/lib/opt && \
 
 # Apply update intervals before bootc cleanup
 COPY scripts/package-intervals.json /tmp/package-intervals.json
-COPY scripts/apply-update-intervals.sh /tmp/apply-update-intervals.sh
-RUN chmod +x /tmp/apply-update-intervals.sh && \
+COPY scripts/apply-update-intervals.py /tmp/apply-update-intervals.py
+RUN chmod +x /tmp/apply-update-intervals.py && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
-    /tmp/apply-update-intervals.sh /tmp/package-intervals.json / $VERBOSE_ARG
+    /tmp/apply-update-intervals.py /tmp/package-intervals.json / $VERBOSE_ARG
 
 # Final system setup and cleanup
 RUN sed -i 's|^HOME=.*|HOME=/var/home|' "/etc/default/useradd" && \

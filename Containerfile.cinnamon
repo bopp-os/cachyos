@@ -53,10 +53,10 @@ RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
     fi
 
 COPY scripts/package-intervals.json /tmp/package-intervals.json
-COPY scripts/apply-update-intervals.sh /tmp/apply-update-intervals.sh
-RUN chmod +x /tmp/apply-update-intervals.sh && \
+COPY scripts/apply-update-intervals.py /tmp/apply-update-intervals.py
+RUN chmod +x /tmp/apply-update-intervals.py && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
-    /tmp/apply-update-intervals.sh /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
+    /tmp/apply-update-intervals.py /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
 
 # Update the SBOM / Package Manifest for the overlay
 RUN /usr/share/boppos/generate-package-list.sh && \
