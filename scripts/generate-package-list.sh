@@ -19,6 +19,7 @@ else
     pacman -Q | awk 'NR>1 {print ","} {print "  {\"name\":\"" $1 "\",\"version\":\"" $2 "\"}"}' >> "$JSON_FILE"
     echo "]" >> "$JSON_FILE"
 fi
+touch -d "@${SOURCE_DATE_EPOCH:-0}" "$JSON_FILE" 2>/dev/null || true
 
 # 2. Get all installed packages
 pacman -Qq > "$ALL_PKGS" 2>/dev/null || true
@@ -28,6 +29,8 @@ pacman -Sl 2>/dev/null | awk '/\[installed\]/ && $1 ~ /cachyos/ {print $2}' | so
 
 # 4. Find packages sourced from bopp-os repo
 pacman -Sl 2>/dev/null | awk '/\[installed\]/ && $1 ~ /bopp-os/ {print $2}' | sort | uniq > "$BOPP_PKGS" || true
+
+touch -d "@${SOURCE_DATE_EPOCH:-0}" "$ALL_PKGS" "$CACHY_PKGS" "$BOPP_PKGS" 2>/dev/null || true
 
 ALL_COUNT=$(wc -l < "$ALL_PKGS" 2>/dev/null || echo 0)
 CACHY_COUNT=$(wc -l < "$CACHY_PKGS" 2>/dev/null || echo 0)

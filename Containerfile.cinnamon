@@ -1,6 +1,6 @@
-# BoppOS Containerfile.niri
+# BoppOS Containerfile.cinnamon
 #
-# Desktop overlay containing the Niri Wayland Compositor, gaming utilities, and developer tools.
+# Desktop overlay containing Cinnamon (Pure Wayland), Mint theming, X-Apps, and ReGreet/greetd.
 
 ARG IMAGE_REGISTRY=ghcr.io/bopp-os
 ARG BASE_IMAGE_TAG=latest
@@ -15,51 +15,40 @@ ENV SOURCE_DATE_EPOCH=0
 
 COPY scripts/package-intervals.json /tmp/package-intervals.json
 COPY scripts/install_packages.sh /tmp/install_packages.sh
-COPY files/niri/niri.yaml /tmp/niri.yaml
+COPY files/cinnamon/cinnamon.yaml /tmp/cinnamon.yaml
 
 # Track package states to apply xattrs only to newly added or upgraded packages
 RUN --mount=type=tmpfs,dst=/run \
     pacman -Q | sort > /tmp/base_pkgs.txt && \
     chmod +x /tmp/install_packages.sh && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
-    /tmp/install_packages.sh /tmp/niri.yaml $VERBOSE_ARG && \
+    /tmp/install_packages.sh /tmp/cinnamon.yaml $VERBOSE_ARG && \
     pacman -Q | sort > /tmp/all_pkgs.txt && \
     comm -13 /tmp/base_pkgs.txt /tmp/all_pkgs.txt | awk '{print $1}' > /tmp/modified_pkgs.txt
 
-# Copy Niri-specific configuration files
-COPY files/niri/etc /etc/
-COPY files/niri/usr /usr/
-
-# Ensure system-wide fallback Niri configuration from CachyOS Noctalia (including config.kdl and cfg/ sub-configs)
-RUN mkdir -p /etc/niri /etc/xdg/niri && \
-    if [ -d /etc/skel/.config/niri ]; then \
-        cp -a /etc/skel/.config/niri/* /etc/niri/ 2>/dev/null || true && \
-        cp -a /etc/skel/.config/niri/* /etc/xdg/niri/ 2>/dev/null || true ; \
-    fi
-
-RUN find /etc /usr -type f -exec sh -c \
-    'for f; do getfattr -h -n user.component "$f" &>/dev/null || { setfattr -h -n user.component -v "de-niri" "$f" && setfattr -h -n user.update-interval -v "weekly" "$f"; }; done' sh {} +
+# Copy Cinnamon-specific configuration files
+COPY files/cinnamon/etc /etc/
+COPY files/cinnamon/usr /usr/
 
 # ==========================================
 # COMPILE SCHEMAS & CACHE ICONS
 # ==========================================
 
 RUN glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
-    gtk-update-icon-cache -qtf /usr/share/icons/hicolor && \
-    gtk-update-icon-cache -qtf /usr/share/icons/Adwaita || true && \
-    gtk-update-icon-cache -qtf /usr/share/icons/Papirus || true
+    gtk-update-icon-cache -qtf /usr/share/icons/Mint-Y || true && \
+    gtk-update-icon-cache -qtf /usr/share/icons/Mint-X || true && \
+    gtk-update-icon-cache -qtf /usr/share/icons/hicolor || true
 
-# ==========================================
-# ENABLE SERVICES
-# ==========================================
-
-RUN systemctl enable sddm.service && \
+# Enable DE services
+# Purge X11 sessions to ensure pure Wayland, disable other DMs, and enable greetd
+RUN rm -rf /usr/share/xsessions && \
+    systemctl disable sddm.service || true && \
+    systemctl disable lightdm.service || true && \
     systemctl disable plasmalogin.service || true && \
-    systemctl disable greetd.service || true && \
-    systemctl --global enable noctalia-sddm-init.service
+    systemctl disable gdm.service || true && \
+    systemctl enable greetd.service
 
 # Preserve /opt contents for OverlayFS
-# (visual-studio-code-bin and others install here)
 RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
         mkdir -p /usr/lib/opt && cp -r /opt/* /usr/lib/opt/ && rm -rf /opt/* ; \
     fi

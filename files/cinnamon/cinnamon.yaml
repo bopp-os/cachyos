@@ -1,0 +1,59 @@
+# BoppOS Cinnamon Desktop Flavor
+# Designed for non-technical users migrating from ChromeOS/Windows with Linux Mint Cinnamon parity.
+# Base dependencies (cachyos-wallpapers, fonts, pipewire, networkmanager) are inherited from files/base/base.yaml.
+
+cinnamon-core:
+  - cinnamon
+  - cinnamon-desktop
+  - cinnamon-control-center
+  - cinnamon-session
+  - cinnamon-settings-daemon
+  - cinnamon-screensaver
+  - muffin
+  - nemo
+  - xapp
+  - xdg-desktop-portal
+  - xdg-desktop-portal-gtk
+  - gnome-keyring
+  - cinnamon-translations
+
+cinnamon-greeter:
+  - greetd
+  - greetd-regreet
+  - cage
+
+cinnamon-xapps:
+  - xed
+  - xreader
+  - xviewer
+  - xviewer-plugins
+  - pix
+  - sticky
+  - thingy
+  - bulky
+  - webapp-manager
+  - hypnotix
+  - mintstick
+  - gnome-online-accounts-gtk
+  # Note: warpinator is optional and can be installed via Flatpak (org.x.Warpinator)
+
+cinnamon-utilities:
+  - file-roller
+  - nemo-fileroller
+  - dconf-editor
+  - gnome-disk-utility
+  - blueman
+
+cinnamon-themes:
+  - mint-themes
+  - mint-y-icons
+  - mint-x-icons
+  - bibata-cursor-theme
+  - cinnamon-styles-artwork
+  - cinnamon-sounds
+  - sound-theme-freedesktop
+
+cinnamon-additions:
+  - xdg-user-dirs-gtk
+
+# Note: timeshift / mintbackup handled via host btrfs snapshot tooling

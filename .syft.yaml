@@ -1,0 +1,8 @@
+# Syft SBOM generator configuration for bopp-os/cachyos bootc images
+# See: https://github.com/anchore/syft#configuration
+
+# A list of globs to exclude from scanning
+exclude:
+  # Exclude the broken relative symlink from upstream AUR package (usr/bin/winboat -> opt/winboat/winboat).
+  # The actual application files under /opt remain included and fully scanned for vulnerabilities.
+  - "**/usr/bin/winboat"

@@ -30,7 +30,7 @@ build-mirrorlist arch='v3':
                     fi"
 
 # Pre-fetch and security audit package archives for selected flavors.
-prefetch arch='v3' plasma='true' gnome='true' niri='true':
+prefetch arch='v3' plasma='true' gnome='true' niri='true' cinnamon='true':
     @echo "Pre-fetching and security scanning package archives for {{arch}}..."
     podman build \
         --network=host \
@@ -40,11 +40,12 @@ prefetch arch='v3' plasma='true' gnome='true' niri='true':
         --build-arg BUILD_PLASMA={{plasma}} \
         --build-arg BUILD_GNOME={{gnome}} \
         --build-arg BUILD_NIRI={{niri}} \
+        --build-arg BUILD_CINNAMON={{cinnamon}} \
         -f Containerfile.prefetch \
         .
 
 # Build a specific flavor of the container image.
-# Accepts an optional architecture (v3, v4, znver4) and flavor (base, plasma, gnome, niri).
+# Accepts an optional architecture (v3, v4, znver4) and flavor (base, plasma, gnome, niri, cinnamon).
 build arch='v3' flavor='base':
     @echo "Building cachyos-boppos-{{flavor}}:{{arch}}..."
     @if [ "{{flavor}}" = "base" ]; then \
@@ -103,7 +104,7 @@ verify arch='v3':
     #!/usr/bin/env bash
     set -euo pipefail
     REGISTRY="{{registry}}/{{user}}"
-    FLAVORS=("base" "plasma" "gnome" "niri")
+    FLAVORS=("base" "plasma" "gnome" "niri" "cinnamon")
     
     if [ ! -f "cosign.pub" ]; then
         echo "Error: cosign.pub not found in the current directory."

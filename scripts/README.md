@@ -9,7 +9,7 @@ This directory contains the automation, build, and maintenance scripts for BoppO
 - **`setup_pacman_repos.sh`**: Imports repository signing keys (`/tmp/keys/*.asc`) and configures pacman mirrorlists and repository priorities.
 - **`install_packages.sh`**: YAML-driven package installer that parses package manifests (`base.yaml`, `plasma.yaml`, `gnome.yaml`, `niri.yaml`) and executes optimized pacman installations.
 - **`generate-package-list.sh`**: Queries pacman to generate package manifests (`all-packages.txt`, `cachyos-packages.txt`, `boppos-packages.txt`) for tracking installed packages.
-- **`apply-update-intervals.sh`**: Sets `user.update-interval` and `user.component` xattr tags on filesystem paths based on `package-intervals.json`.
+- **`apply-update-intervals.py`**: High-performance script setting `user.update-interval` and `user.component` xattr tags via direct Linux kernel syscalls and clamping system cache timestamps for layer determinism.
 
 ### Security & Auditing Scripts
 - **`scan-pkg-cache.sh`**: Pre-build security scanner that audits downloaded pacman package `.pkg.tar.zst` archives and `.INSTALL` scriptlets for obfuscation, network calls, or credential harvesting.

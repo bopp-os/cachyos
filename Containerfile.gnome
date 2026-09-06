@@ -7,6 +7,7 @@ ARG BASE_IMAGE_TAG=latest
 ARG VERBOSE=false
 FROM ${IMAGE_REGISTRY}/cachyos-base:${BASE_IMAGE_TAG}
 ARG VERBOSE
+ENV SOURCE_DATE_EPOCH=0
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
@@ -26,10 +27,7 @@ RUN --mount=type=tmpfs,dst=/run \
     comm -13 /tmp/base_pkgs.txt /tmp/all_pkgs.txt | awk '{print $1}' > /tmp/modified_pkgs.txt
 
 # Copy GNOME-specific configuration files
-# These are commented out intentionally. Git does not track empty directories,
-# and including these lines would cause the build to fail if the dirs are empty.
-#COPY files/gnome/etc /etc/
-#COPY files/gnome/usr /usr/
+COPY files/gnome/usr /usr/
 
 # Enable DE services
 # We disable SDDM if it was enabled, and enable GDM
@@ -44,11 +42,13 @@ RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
     fi
 
 COPY scripts/package-intervals.json /tmp/package-intervals.json
-COPY scripts/apply-update-intervals.sh /tmp/apply-update-intervals.sh
-RUN chmod +x /tmp/apply-update-intervals.sh && \
+COPY scripts/apply-update-intervals.py /tmp/apply-update-intervals.py
+RUN chmod +x /tmp/apply-update-intervals.py && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
-    /tmp/apply-update-intervals.sh /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
+    /tmp/apply-update-intervals.py /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
 
 # Update the SBOM / Package Manifest for the overlay
 RUN /usr/share/boppos/generate-package-list.sh && \
     /usr/share/boppos/bootc-cleanup.sh
+
+ENV SOURCE_DATE_EPOCH=""

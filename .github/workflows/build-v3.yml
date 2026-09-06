@@ -43,6 +43,11 @@ on:
         required: false
         type: boolean
         default: true
+      build_cinnamon:
+        description: 'Build Cinnamon flavor'
+        required: false
+        type: boolean
+        default: true
       verbose_build:
         description: 'Enable verbose build output'
         required: false
@@ -54,7 +59,7 @@ env:
   IMAGE_KEYWORDS: "bootc,arch,cachyos"
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
-  FLAVORS: "plasma gnome niri"
+  FLAVORS: "plasma gnome niri cinnamon"
   DEFAULT_TAG: "${{ inputs.test_tag && 'v3-test' || 'v3' }}"
   BASE_TAG: "v3"
   BASE_IMAGE: "docker.io/cachyos/cachyos-v3:latest"
@@ -101,12 +106,13 @@ jobs:
             exit 0
           fi
           if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "flavors=[\"plasma\", \"gnome\", \"niri\"]" >> $GITHUB_OUTPUT
+            echo "flavors=[\"plasma\", \"gnome\", \"niri\", \"cinnamon\"]" >> $GITHUB_OUTPUT
           else
             FLAVORS=()
             [ "${{ inputs.build_plasma }}" == "true" ] && FLAVORS+=('"plasma"')
             [ "${{ inputs.build_gnome }}" == "true" ] && FLAVORS+=('"gnome"')
             [ "${{ inputs.build_niri }}" == "true" ] && FLAVORS+=('"niri"')
+            [ "${{ inputs.build_cinnamon }}" == "true" ] && FLAVORS+=('"cinnamon"')
             JOINED=$(IFS=, ; echo "${FLAVORS[*]}")
             echo "flavors=[$JOINED]" >> $GITHUB_OUTPUT
           fi
@@ -253,6 +259,7 @@ jobs:
           PREFETCH_ARGS+=("--build-arg" "BUILD_PLASMA=${{ github.event.inputs.build_plasma != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_GNOME=${{ github.event.inputs.build_gnome != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_NIRI=${{ github.event.inputs.build_niri != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_CINNAMON=${{ github.event.inputs.build_cinnamon != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "VERBOSE=${{ github.event.inputs.verbose_build == 'true' }}")
           PREFETCH_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
 
@@ -500,10 +507,15 @@ jobs:
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
           CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
           MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
-          trap "sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+          trap "sudo umount -l $MNT_DIR/var/opt >/dev/null 2>&1 || true; sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+
+          # Mirror booted system: bind-mount /usr/lib/opt to /var/opt so /opt has its files populated
+          if [ -d "$MNT_DIR/usr/lib/opt" ] && [ -d "$MNT_DIR/var/opt" ]; then
+            sudo mount --bind "$MNT_DIR/usr/lib/opt" "$MNT_DIR/var/opt"
+          fi
 
           echo "::group::Generating SBOM with Syft from podman mount"
-          sudo syft dir:"$MNT_DIR" --source-name "cachyos-${{ matrix.flavor }}" --source-version "${{ env.DEFAULT_TAG }}" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
+          sudo syft dir:"$MNT_DIR" --config .syft.yaml --source-name "cachyos-${{ matrix.flavor }}" --source-version "${{ env.DEFAULT_TAG }}" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
           echo "::endgroup::"
 
           echo "::group::Scanning SBOM with Grype"

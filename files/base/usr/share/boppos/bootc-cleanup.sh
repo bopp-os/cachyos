@@ -43,7 +43,7 @@ ln -sf /usr/lib/sysimage/cache/pacman/pkg /var/cache/pacman/pkg
 echo "Generating tmpfiles for /var directories and symlinks..."
 > /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 
-find /var -mindepth 1 -type d -not -path "/var/tmp*" 2>/dev/null | while read -r dir; do
+find /var -mindepth 1 -type d -not -path "/var/tmp*" 2>/dev/null | sort | while read -r dir; do
     if [ -L "$dir" ]; then continue; fi
     mode=$(stat -c "%a" "$dir")
     if [ ${#mode} -eq 3 ]; then mode="0$mode"; fi
@@ -54,10 +54,11 @@ find /var -mindepth 1 -type d -not -path "/var/tmp*" 2>/dev/null | while read -r
     echo "d $dir $mode $owner $group - -" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 done
 
-find /var -mindepth 1 -type l -not -path "/var/tmp*" 2>/dev/null | while read -r link; do
+find /var -mindepth 1 -type l -not -path "/var/tmp*" 2>/dev/null | sort | while read -r link; do
     target=$(readlink "$link")
     echo "L $link - - - - $target" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 done
+touch -d "@${SOURCE_DATE_EPOCH:-0}" /usr/lib/tmpfiles.d/99-boppos-var-auto.conf 2>/dev/null || true
 
 echo "Setting up SDDM themes default backup directory..."
 mkdir -p /usr/share/sddm/themes-default

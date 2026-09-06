@@ -6,4 +6,5 @@ test.yaml
 job-logs.txt
 build/
 mirrors/
-
+__pycache__/
+*.pyc

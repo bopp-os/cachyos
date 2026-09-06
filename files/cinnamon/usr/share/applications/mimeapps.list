@@ -1,0 +1,52 @@
+[Default Applications]
+# Text files -> xed
+text/plain=xed.desktop
+text/markdown=xed.desktop
+text/x-python=xed.desktop
+text/x-shellscript=xed.desktop
+application/x-shellscript=xed.desktop
+text/x-c=xed.desktop
+text/x-c++=xed.desktop
+text/csv=xed.desktop
+text/xml=xed.desktop
+application/xml=xed.desktop
+application/json=xed.desktop
+
+# PDF & document formats -> xreader
+application/pdf=xreader.desktop
+application/x-bzpdf=xreader.desktop
+application/x-gzpdf=xreader.desktop
+application/x-xzpdf=xreader.desktop
+application/postscript=xreader.desktop
+image/vnd.djvu=xreader.desktop
+image/tiff=xreader.desktop
+application/x-cbr=xreader.desktop
+application/x-cbz=xreader.desktop
+application/x-cb7=xreader.desktop
+application/oxps=xreader.desktop
+application/vnd.ms-xpsdocument=xreader.desktop
+application/epub+zip=xreader.desktop
+
+# Image formats -> xviewer (and pix)
+image/bmp=xviewer.desktop;pix.desktop;
+image/gif=xviewer.desktop;pix.desktop;
+image/jpeg=xviewer.desktop;pix.desktop;
+image/jpg=xviewer.desktop;pix.desktop;
+image/pjpeg=xviewer.desktop;pix.desktop;
+image/png=xviewer.desktop;pix.desktop;
+image/svg+xml=xviewer.desktop;pix.desktop;
+image/svg+xml-compressed=xviewer.desktop;pix.desktop;
+image/webp=xviewer.desktop;pix.desktop;
+image/x-bmp=xviewer.desktop;pix.desktop;
+image/x-gray=xviewer.desktop;pix.desktop;
+image/x-icb=xviewer.desktop;pix.desktop;
+image/x-ico=xviewer.desktop;pix.desktop;
+image/x-png=xviewer.desktop;pix.desktop;
+image/x-portable-anymap=xviewer.desktop;pix.desktop;
+image/x-portable-bitmap=xviewer.desktop;pix.desktop;
+image/x-portable-graymap=xviewer.desktop;pix.desktop;
+image/x-portable-pixmap=xviewer.desktop;pix.desktop;
+image/x-xbitmap=xviewer.desktop;pix.desktop;
+image/x-xpixmap=xviewer.desktop;pix.desktop;
+image/avif=xviewer.desktop;pix.desktop;
+image/heif=xviewer.desktop;pix.desktop;

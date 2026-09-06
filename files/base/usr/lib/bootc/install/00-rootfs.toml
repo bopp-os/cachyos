@@ -1,0 +1,3 @@
+# BoppOS default root filesystem for bootc install
+[install.filesystem.root]
+type = "btrfs"

@@ -7,5 +7,5 @@ Target = *
 [Action]
 Description = Assigning package xattrs (user.component & user.update-interval)...
 When = PostTransaction
-Exec = /usr/libexec/assign-usercomponent.sh
+Exec = /usr/libexec/assign-usercomponent.py
 NeedsTargets
