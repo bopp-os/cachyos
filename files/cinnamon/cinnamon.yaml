@@ -56,4 +56,22 @@ cinnamon-themes:
 cinnamon-additions:
   - xdg-user-dirs-gtk
 
+cinnamon-xorg:
+  - xorg-server
+  - xorg-xinit
+  - xorg-xrandr
+  - xorg-xset
+  - xorg-xprop
+  - xorg-xkill
+  - xdotool
+
+cinnamon-hardware:
+  - touchegg
+  - switcheroo-control
+
+cinnamon-nemo-extensions:
+  - nemo-image-converter
+  - nemo-media-columns
+  - nemo-audio-tab
+
 # Note: timeshift / mintbackup handled via host btrfs snapshot tooling

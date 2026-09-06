@@ -40,13 +40,14 @@ RUN glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
     gtk-update-icon-cache -qtf /usr/share/icons/hicolor || true
 
 # Enable DE services
-# Purge X11 sessions to ensure pure Wayland, disable other DMs, and enable greetd
-RUN rm -rf /usr/share/xsessions && \
-    systemctl disable sddm.service || true && \
+# Disable other DMs and enable greetd, touchegg, and switcheroo-control
+RUN systemctl disable sddm.service || true && \
     systemctl disable lightdm.service || true && \
     systemctl disable plasmalogin.service || true && \
     systemctl disable gdm.service || true && \
-    systemctl enable greetd.service
+    systemctl enable greetd.service && \
+    systemctl enable touchegg.service || true && \
+    systemctl enable switcheroo-control.service || true
 
 # Preserve /opt contents for OverlayFS
 RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
