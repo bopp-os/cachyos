@@ -205,6 +205,7 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable power-profiles-daemon.service && \
     systemctl enable fstrim.timer && \
     systemctl enable boppos-update-monitor.timer && \
+    systemctl --global enable bopp-tray.service || true && \
     systemctl enable cups.socket && \
     systemctl enable docker.socket && \
     systemctl disable asusd.service supergfxd.service || true

@@ -39,6 +39,8 @@ graphics-drivers:
 update-notifier:
   - python-pystray
   - python-pillow
+  - python-gobject
+  - libappindicator
   - librsvg
 fonts-heavy:
   - noto-fonts-cjk

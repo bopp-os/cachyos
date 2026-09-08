@@ -9,7 +9,6 @@ kde-core:
   - colord-kde
 kde-integration:
   - udisks2
-  - python-gobject
   - kdeplasma-addons
   - kio-extras
   - kio-fuse
