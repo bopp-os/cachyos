@@ -28,6 +28,7 @@ RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
     fi
 
 # Copy scripts, manifests, and GPG keys
+COPY files/keys/ /tmp/keys/
 COPY scripts/ /tmp/scripts/
 COPY files/ /tmp/files/
 

@@ -3,6 +3,9 @@ set -eo pipefail
 
 echo "::group::Configuring Pacman Repositories & Keyrings"
 
+# Ensure DisableSandboxNetwork is enabled early for container builds
+grep -q "DisableSandboxNetwork" /etc/pacman.conf || sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
+
 # 1. Re-initialize and trust keys
 pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl
 rm -rf /etc/pacman.d/gnupg
@@ -10,8 +13,15 @@ pacman-key --init
 echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf
 pacman-key --populate archlinux cachyos
 
+KEYS_DIR=""
 if [ -d "/tmp/keys" ]; then
-  for key in /tmp/keys/*.asc; do [ -f "$key" ] && pacman-key --add "$key" || true; done
+  KEYS_DIR="/tmp/keys"
+elif [ -d "/tmp/files/keys" ]; then
+  KEYS_DIR="/tmp/files/keys"
+fi
+
+if [ -n "$KEYS_DIR" ]; then
+  for key in "$KEYS_DIR"/*.asc; do [ -f "$key" ] && pacman-key --add "$key" || true; done
 fi
 
 curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF3B607488DB35A47" | pacman-key --add - || echo "Key refresh failed, using committed copy"
@@ -24,8 +34,12 @@ pacman-key --lsign-key 3806768589376830FEA123D6CF30985CE903D47C || true
 
 # Add boppos repository GPG key and locally sign it
 KEY_FILE=""
-if [ -f "/tmp/keys/boppos.asc" ]; then
+if [ -n "$KEYS_DIR" ] && [ -f "$KEYS_DIR/boppos.asc" ]; then
+  KEY_FILE="$KEYS_DIR/boppos.asc"
+elif [ -f "/tmp/keys/boppos.asc" ]; then
   KEY_FILE="/tmp/keys/boppos.asc"
+elif [ -f "/tmp/files/keys/boppos.asc" ]; then
+  KEY_FILE="/tmp/files/keys/boppos.asc"
 elif curl -fsSL --max-time 10 https://repo.ripps.me/boppos.gpg -o /tmp/boppos.gpg 2>/dev/null; then
   KEY_FILE="/tmp/boppos.gpg"
 fi
