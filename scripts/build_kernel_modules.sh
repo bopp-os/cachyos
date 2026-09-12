@@ -59,11 +59,7 @@ if [ "$BUILD_NCT6687D" = "true" ]; then
     git clone --depth 1 https://github.com/Fred78290/nct6687d.git "$BUILD_WORK_DIR/nct6687d"
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/nct6687d" $LLVM_FLAGS modules
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/nct6687d" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install
-
-    # Configure auto-load on boot for NCT6687
-    mkdir -p /etc/modules-load.d
-    echo "nct6687" > /etc/modules-load.d/nct6687.conf
-    echo "nct6687d installed and configured for auto-load."
+    echo "nct6687d installed."
 fi
 
 # 5. Build it87 (ITE IT86xx / IT87xx Super I/O for Gigabyte/ASUS)
