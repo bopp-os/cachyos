@@ -6,7 +6,6 @@ echo "::group::Building Out-of-Tree Kernel Modules (DKMS-Free)"
 # Configuration toggles (can be overridden via environment variables)
 BUILD_NCT6687D="${BUILD_NCT6687D:-true}"
 BUILD_IT87="${BUILD_IT87:-true}"
-BUILD_RYZEN_SMU="${BUILD_RYZEN_SMU:-true}"
 BUILD_XPADNEO="${BUILD_XPADNEO:-true}"
 
 # 1. Detect target kernel directory and headers
@@ -71,16 +70,7 @@ if [ "$BUILD_IT87" = "true" ]; then
     echo "it87 installed."
 fi
 
-# 6. Build ryzen_smu (AMD Ryzen SMU telemetry)
-if [ "$BUILD_RYZEN_SMU" = "true" ]; then
-    echo "--- Building ryzen_smu (AMD Ryzen SMU Telemetry) ---"
-    git clone --depth 1 https://github.com/leogx9r/ryzen_smu.git "$BUILD_WORK_DIR/ryzen_smu"
-    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/ryzen_smu" $LLVM_FLAGS modules
-    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/ryzen_smu" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install
-    echo "ryzen_smu installed."
-fi
-
-# 7. Build xpadneo (Xbox One/Series Bluetooth controller driver)
+# 6. Build xpadneo (Xbox One/Series Bluetooth controller driver)
 if [ "$BUILD_XPADNEO" = "true" ]; then
     echo "--- Building xpadneo (Xbox Wireless Bluetooth) ---"
     git clone --depth 1 https://github.com/atar-axis/xpadneo.git "$BUILD_WORK_DIR/xpadneo"
@@ -95,13 +85,13 @@ if [ "$BUILD_XPADNEO" = "true" ]; then
     echo "xpadneo installed."
 fi
 
-# 8. Ensure module compression matches existing kernel modules
+# 7. Ensure module compression matches existing kernel modules
 if find "$KERNEL_DIR" -name "*.ko.zst" 2>/dev/null | grep -q .; then
     echo "Compressing any uncompressed .ko modules in extra/ with zstd..."
     find "$KERNEL_DIR/extra" -type f -name "*.ko" -exec zstd -T0 --rm -f {} + 2>/dev/null || true
 fi
 
-# 9. Clean up workspace and temporary build dependencies
+# 8. Clean up workspace and temporary build dependencies
 rm -rf "$BUILD_WORK_DIR"
 
 if [ ${#BUILD_DEPS[@]} -gt 0 ]; then
