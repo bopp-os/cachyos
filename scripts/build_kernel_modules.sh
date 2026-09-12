@@ -79,8 +79,8 @@ if [ "$BUILD_XPADNEO" = "true" ]; then
     XPADNEO_VER="$(git -C "$BUILD_WORK_DIR/xpadneo" describe --tags 2>/dev/null || echo "v0.10.4")"
     echo "$XPADNEO_VER" > "$BUILD_WORK_DIR/xpadneo/VERSION"
 
-    make -C "$BUILD_WORK_DIR/xpadneo/hid-xpadneo" KERNEL_SOURCE_DIR="$KBUILD_DIR" $LLVM_FLAGS VERSION="$XPADNEO_VER" modules
-    make -C "$BUILD_WORK_DIR/xpadneo/hid-xpadneo" KERNEL_SOURCE_DIR="$KBUILD_DIR" $LLVM_FLAGS VERSION="$XPADNEO_VER" INSTALL_MOD_DIR="extra" modules_install
+    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/xpadneo/hid-xpadneo/src" $LLVM_FLAGS VERSION="$XPADNEO_VER" modules
+    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/xpadneo/hid-xpadneo/src" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install
 
     # Install udev rules for xpadneo
     if [ -d "$BUILD_WORK_DIR/xpadneo/hid-xpadneo/etc-udev-rules.d" ]; then
