@@ -74,21 +74,26 @@ fi
 if [ "$BUILD_XPADNEO" = "true" ]; then
     echo "--- Building xpadneo (Xbox Wireless Bluetooth) ---"
     git clone --depth 1 https://github.com/atar-axis/xpadneo.git "$BUILD_WORK_DIR/xpadneo"
-    make -C "$BUILD_WORK_DIR/xpadneo/hid-xpadneo" KERNEL_SOURCE_DIR="$KBUILD_DIR" $LLVM_FLAGS modules
-    make -C "$BUILD_WORK_DIR/xpadneo/hid-xpadneo" KERNEL_SOURCE_DIR="$KBUILD_DIR" $LLVM_FLAGS modules_install
+    
+    # xpadneo Makefile expects a VERSION file; on shallow clones git describe fails, so provide a fallback
+    XPADNEO_VER="$(git -C "$BUILD_WORK_DIR/xpadneo" describe --tags 2>/dev/null || echo "v0.10.4")"
+    echo "$XPADNEO_VER" > "$BUILD_WORK_DIR/xpadneo/VERSION"
 
-    # Install udev rules for xpadneo permissions
-    if [ -f "$BUILD_WORK_DIR/xpadneo/hid-xpadneo/etc-udev-rules.d/99-xpadneo.rules" ]; then
+    make -C "$BUILD_WORK_DIR/xpadneo/hid-xpadneo" KERNEL_SOURCE_DIR="$KBUILD_DIR" $LLVM_FLAGS VERSION="$XPADNEO_VER" modules
+    make -C "$BUILD_WORK_DIR/xpadneo/hid-xpadneo" KERNEL_SOURCE_DIR="$KBUILD_DIR" $LLVM_FLAGS VERSION="$XPADNEO_VER" INSTALL_MOD_DIR="extra" modules_install
+
+    # Install udev rules for xpadneo
+    if [ -d "$BUILD_WORK_DIR/xpadneo/hid-xpadneo/etc-udev-rules.d" ]; then
         mkdir -p /usr/lib/udev/rules.d
-        cp "$BUILD_WORK_DIR/xpadneo/hid-xpadneo/etc-udev-rules.d/99-xpadneo.rules" /usr/lib/udev/rules.d/99-xpadneo.rules
+        cp "$BUILD_WORK_DIR/xpadneo/hid-xpadneo/etc-udev-rules.d/"*.rules /usr/lib/udev/rules.d/
     fi
     echo "xpadneo installed."
 fi
 
 # 7. Ensure module compression matches existing kernel modules
 if find "$KERNEL_DIR" -name "*.ko.zst" 2>/dev/null | grep -q .; then
-    echo "Compressing any uncompressed .ko modules in extra/ with zstd..."
-    find "$KERNEL_DIR/extra" -type f -name "*.ko" -exec zstd -T0 --rm -f {} + 2>/dev/null || true
+    echo "Compressing any uncompressed .ko modules with zstd..."
+    find "$KERNEL_DIR/extra" "$KERNEL_DIR/kernel/drivers/hid" -type f -name "*.ko" 2>/dev/null -exec zstd -T0 --rm -f {} + 2>/dev/null || true
 fi
 
 # 8. Clean up workspace and temporary build dependencies
