@@ -370,6 +370,7 @@ gaming-core:
   - sunshine
   - lact
   - coolercontrol
+  - liquidctl
   - openrgb
   - openrgb-plugin-effects-git
   - nvtop
