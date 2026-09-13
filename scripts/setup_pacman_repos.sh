@@ -90,16 +90,54 @@ ln -sf /dev/null /etc/pacman.d/hooks/archlinux-keyring-wkd-sync.hook || true
 
 # 4. Install cachyos-hooks and [chaotic-aur] keyring/mirrorlist
 pacman -Sy --noconfirm --needed cachyos-hooks gpgme
-(curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst || \
- curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst || \
- curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-keyring.pkg.tar.zst' -o /tmp/chaotic-keyring.pkg.tar.zst)
-(curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst || \
- curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst || \
- curl -s -S -L --retry 5 --retry-connrefused --max-time 30 'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' -o /tmp/chaotic-mirrorlist.pkg.tar.zst)
+download_pkg() {
+  local target="$1"
+  shift
+  local urls=("$@")
+  rm -f "$target"
+  for url in "${urls[@]}"; do
+    echo "Attempting to download $(basename "$target") from $url..."
+    if curl -f -s -S -L --retry 3 --retry-delay 2 --retry-connrefused --max-time 30 "$url" -o "$target"; then
+      if file "$target" 2>/dev/null | grep -qiE "zstandard|archive|tar" || zstd -t "$target" >/dev/null 2>&1; then
+        echo "Successfully downloaded and verified $(basename "$target")"
+        return 0
+      fi
+      echo "File downloaded from $url is not a valid archive (likely HTML error), trying next mirror..."
+      rm -f "$target"
+    fi
+  done
+  return 1
+}
 
-pacman -U --overwrite '*' --noconfirm /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
-rm -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
-pacman-key --populate chaotic || true
+CHAOTIC_KEYRING_URLS=(
+  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+  'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+  'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+  'https://mirror.albony.in/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+)
+
+CHAOTIC_MIRRORLIST_URLS=(
+  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+  'https://geo-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+  'https://builds.garudalinux.org/repos/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+  'https://mirror.albony.in/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+)
+
+if download_pkg /tmp/chaotic-keyring.pkg.tar.zst "${CHAOTIC_KEYRING_URLS[@]}" && \
+   download_pkg /tmp/chaotic-mirrorlist.pkg.tar.zst "${CHAOTIC_MIRRORLIST_URLS[@]}"; then
+  pacman -U --overwrite '*' --noconfirm /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
+  rm -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
+  pacman-key --populate chaotic || true
+else
+  echo "Warning: Could not download chaotic-aur packages; writing fallback mirrorlist..."
+  mkdir -p /etc/pacman.d
+  cat << 'EOF' > /etc/pacman.d/chaotic-mirrorlist
+Server = https://cdn-mirror.chaotic.cx/chaotic-aur/$arch
+Server = https://geo-mirror.chaotic.cx/chaotic-aur/$arch
+Server = https://builds.garudalinux.org/repos/chaotic-aur/$arch
+Server = https://mirror.albony.in/chaotic-aur/$arch
+EOF
+fi
 
 if ! grep -q '\[chaotic-aur\]' /etc/pacman.conf; then
   echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf

@@ -169,8 +169,6 @@ RUN for f in \
     /usr/bin/chsh \
     /usr/bin/chfn \
     /usr/bin/newgrp \
-    /usr/bin/newuidmap \
-    /usr/bin/newgidmap \
     /usr/bin/mount \
     /usr/bin/umount \
     /usr/bin/fusermount \
