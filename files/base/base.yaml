@@ -97,7 +97,6 @@ filesystems:
   - gvfs-gphoto2
   - gvfs-wsdd
   - gvfs-nfs
-  - gvfs-google
   - gvfs-goa
   - gvfs-onedrive
   - nfs-utils
