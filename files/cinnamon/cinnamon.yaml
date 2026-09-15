@@ -38,6 +38,10 @@ cinnamon-xapps:
   # Note: warpinator is optional and can be installed via Flatpak (org.x.Warpinator)
 
 cinnamon-utilities:
+  - gnome-terminal
+  - gnome-calculator
+  - gnome-screenshot
+  - gnome-system-monitor
   - file-roller
   - nemo-fileroller
   - dconf-editor

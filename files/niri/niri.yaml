@@ -11,6 +11,8 @@ niri-core:
   - mako
   - qt6-svg
 niri-utilities:
+  - alacritty
+  - gnome-calculator
   - nautilus
   - thunar
   - thunar-archive-plugin
