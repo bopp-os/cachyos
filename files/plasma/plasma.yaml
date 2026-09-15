@@ -55,7 +55,6 @@ kde-media:
   - kimageformats
   - qt6-imageformats
   - libcec
-  - vlc-plugins-all
 kde-themes-aesthetics:
   - cachyos-kde-settings
   - cachyos-iridescent-kde
@@ -69,6 +68,7 @@ kde-additions:
   - audiocd-kio
   - print-manager
   - kdenetwork-filesharing
+  - kaccounts-providers
   - kio-gdrive
   - plasmazones
   - kid3

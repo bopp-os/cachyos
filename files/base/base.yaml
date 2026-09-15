@@ -23,6 +23,7 @@ graphics-drivers:
   - lib32-zlib-ng-compat
   - lib32-zlib-ng
   - mesa-utils
+  - libva-utils
   - intel-media-driver
   - libdisplay-info
   - lib32-libdisplay-info
@@ -92,6 +93,13 @@ filesystems:
   - gvfs-mtp
   - gvfs-smb
   - gvfs-dnssd
+  - gvfs-afc
+  - gvfs-gphoto2
+  - gvfs-wsdd
+  - gvfs-nfs
+  - gvfs-google
+  - gvfs-goa
+  - gvfs-onedrive
   - nfs-utils
   - smartmontools
   - nilfs-utils
@@ -328,6 +336,9 @@ desktop-integration:
   - libgsf
   - libopenraw
   - poppler-glib
+  - webp-pixbuf-loader
+  - libheif
+  - libjxl
   - espeak-ng
   - orca
   - exiv2
@@ -346,8 +357,10 @@ media-video:
   - gpu-screen-recorder-ui
   - ffmpegthumbnailer
   - gst-plugin-pipewire
+  - gst-plugin-va
   - gst-plugins-bad
   - gst-plugins-ugly
+  - vlc-plugins-all
   - yt-dlp
 gaming-core:
   - xorg-xwininfo
