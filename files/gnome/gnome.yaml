@@ -1,6 +1,7 @@
 gnome-core:
   - mutter
   - gdm
+  - gnome-shell
   - gnome-session
   - gnome-tweaks
   - gnome-control-center
@@ -33,6 +34,11 @@ gnome-utilities:
   - gnome-calendar
   - gnome-weather
   - gnome-software
+  - gnome-font-viewer
+  - gnome-clocks
+  - baobab
+  - yelp
+  - gst-thumbnailers
 gnome-themes:
   - adw-gtk-theme
   - cachyos-nord-gtk-theme-git
@@ -74,5 +80,3 @@ gnome-webdav-server:
   - apache
   - apr
   - apr-util
-gnome-meta:
-  - gnome
