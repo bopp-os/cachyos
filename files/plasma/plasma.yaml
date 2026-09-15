@@ -49,6 +49,7 @@ kde-utilities:
   - tesseract-data-eng
   - gwenview
   - kcalc
+  - okular
 kde-media:
   - ffmpegthumbs
   - kdegraphics-thumbnailers
@@ -79,7 +80,20 @@ kde-additions:
 kde-meta:
   - plasma-desktop
   - plasma-workspace
-  - plasma
+  - aurorae
+  - breeze
+  - breeze-cursors
+  - ocean-sound-theme
+  - qqc2-breeze-style
+  - union
+  - polkit-kde-agent
+  - kscreen
+  - knighttime
+  - kde-cli-tools
+  - kinfocenter
+  - ksshaskpass
+  - discover
+  - flatpak-kcm
 kde-git-themes:
   - cachyos-emerald-kde-theme-git
   - cachyos-nord-kde-theme-git

@@ -8,3 +8,4 @@ build/
 mirrors/
 __pycache__/
 *.pyc
+.rooignore

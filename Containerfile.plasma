@@ -36,7 +36,9 @@ COPY files/plasma/usr /usr/
 RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
     rm -f /usr/lib/qt6/plugins/plasma/kcms/systemsettings/kcm_sddm.so \
           /usr/share/applications/kcm_sddm.desktop \
-          /usr/share/kservices6/kcm_sddm.desktop 2>/dev/null || true && \
+          /usr/share/kservices6/kcm_sddm.desktop \
+          /usr/share/knsrcfiles/sddmtheme.knsrc \
+          /usr/bin/sddmthemeinstaller 2>/dev/null || true && \
     systemctl disable sddm.service || true && \
     systemctl disable gdm.service || true && \
     systemctl enable plasmalogin.service

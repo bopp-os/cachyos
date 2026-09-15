@@ -18,6 +18,20 @@ text/x-yaml=org.kde.kate.desktop
 application/x-yaml=org.kde.kate.desktop
 text/x-toml=org.kde.kate.desktop
 
+# PDFs & Documents -> Okular
+application/pdf=org.kde.okular.desktop
+application/postscript=org.kde.okular.desktop
+application/x-bzpdf=org.kde.okular.desktop
+application/x-gzpdf=org.kde.okular.desktop
+application/x-xzpdf=org.kde.okular.desktop
+image/vnd.djvu=org.kde.okular.desktop
+application/x-cbr=org.kde.okular.desktop
+application/x-cbz=org.kde.okular.desktop
+application/x-cb7=org.kde.okular.desktop
+application/oxps=org.kde.okular.desktop
+application/vnd.ms-xpsdocument=org.kde.okular.desktop
+application/epub+zip=org.kde.okular.desktop
+
 # Image formats -> Gwenview
 image/bmp=org.kde.gwenview.desktop
 image/gif=org.kde.gwenview.desktop
