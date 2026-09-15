@@ -1,10 +1,8 @@
-# Aliases & Keybindings
-if command -v eza > /dev/null; then
-    alias ls='eza --icons=auto'
-    alias ll='eza -l --icons=auto --group-directories-first'
-    alias la='eza -la --icons=auto --group-directories-first'
-    alias l.='eza -d .*'
-fi
+# CachyOS BoppOS - System-wide shell aliases for interactive sessions
+case "$-" in
+    *i*) ;;
+    *) return ;;
+esac
 
 # Modern networking aliases (iproute2 replacements for legacy net-tools)
 alias ip='ip -color=auto'

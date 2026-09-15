@@ -24,9 +24,6 @@ gnome-utilities:
   - gnome-disk-utility
   - simple-scan
   - gnome-calculator
-  - gnome-power-manager
-  - gnome-nettool
-  - gnome-usage
   - malcontent
   - gvfs-afc
   - gvfs-gphoto2
@@ -76,7 +73,3 @@ gnome-js-engine:
 gnome-static-assets:
   - gnome-backgrounds
   - gnome-user-docs
-gnome-webdav-server:
-  - apache
-  - apr
-  - apr-util

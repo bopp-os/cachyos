@@ -40,7 +40,6 @@ update-notifier:
   - python-pystray
   - python-pillow
   - python-gobject
-  - libappindicator
   - librsvg
 fonts-heavy:
   - noto-fonts-cjk
@@ -99,7 +98,6 @@ filesystems:
   - f2fs-tools
   - udftools
   - hfsprogs
-  - dmraid
   - autofs
   - tevent
   - smbclient
@@ -190,7 +188,7 @@ networking:
   - mullvad-vpn-daemon-bin
   - arp-scan
   - iputils
-  - net-tools
+  - mtr
   - nmap
   - tcpdump
   - traceroute
@@ -204,7 +202,6 @@ hardware-management:
   - rtkit
   - xdg-user-dirs
   - mousetweaks
-  - radeontool
   - fwupd
   - dmemcg-booster
   - hwinfo
@@ -253,7 +250,6 @@ cli-utilities:
   - jq
   - btop
   - iotop-c
-  - konsave
   - conky
   - sysstat
   - htop
@@ -295,7 +291,6 @@ text-editors-ides:
   - nano
   - nano-syntax-highlighting
   - micro
-  - ex-vi-compat
   - meld
   - vim
 devel-base:

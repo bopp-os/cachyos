@@ -15,7 +15,6 @@ kde-integration:
   - kio-admin
   - baloo
   - kwayland-integration
-  - plasma5-integration
   - xsettingsd
   - plymouth-kcm
   - kde-gtk-config
@@ -41,10 +40,10 @@ kde-utilities:
   - yakuake
   - kfind
   - kwalletmanager
-  - sweeper
   - plasma-foreground-booster
+  - konsave
   - haruna
-  - phonon-qt6-mpv
+  - phonon-qt6-vlc
   - tesseract
   - tesseract-data-eng
   - gwenview
@@ -56,8 +55,8 @@ kde-media:
   - kimageformats
   - qt6-imageformats
   - libcec
+  - vlc-plugins-all
 kde-themes-aesthetics:
-  - appmenu-gtk-module
   - cachyos-kde-settings
   - cachyos-iridescent-kde
   - char-white
@@ -71,7 +70,6 @@ kde-additions:
   - print-manager
   - kdenetwork-filesharing
   - kio-gdrive
-  - packagekit-qt6
   - plasmazones
   - kid3
   - kruler

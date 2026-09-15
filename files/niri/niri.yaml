@@ -14,13 +14,11 @@ niri-utilities:
   - alacritty
   - gnome-calculator
   - nautilus
-  - thunar
-  - thunar-archive-plugin
-  - thunar-volman
   - loupe
   - papers
   - file-roller
   - gnome-text-editor
+  - sushi
 niri-applets-integration:
   - network-manager-applet
   - blueman
@@ -41,7 +39,7 @@ niri-shell-optionals:
   - ddcutil
 niri-idle-lock:
   - hypridle
-  - swaylock-effects
+  - hyprlock
 niri-media:
   - playerctl
   - wf-recorder
@@ -58,10 +56,8 @@ niri-display:
   - layer-shell-qt
 niri-color-theming:
   - hyprpicker
-  - gammastep
 niri-integration:
   - snixembed
-  - copyq
 niri-meta:
   - cachyos-niri-noctalia
   - niri
