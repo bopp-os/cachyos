@@ -369,7 +369,7 @@ gaming-core:
   - mangohud
   - lib32-mangohud
   - lutris
-  - heroic-games-launcher-bin
+  - heroic-games-launcher
   - steam
   - lib32-systemd
   - winboat
