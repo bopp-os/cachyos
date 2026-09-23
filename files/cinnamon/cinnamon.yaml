@@ -14,6 +14,7 @@ cinnamon-core:
   - xapp
   - xdg-desktop-portal
   - xdg-desktop-portal-gtk
+  - xdg-desktop-portal-xapp
   - gnome-keyring
   - cinnamon-translations
 
@@ -71,7 +72,6 @@ cinnamon-xorg:
 
 cinnamon-hardware:
   - touchegg
-  - switcheroo-control
 
 cinnamon-nemo-extensions:
   - nemo-image-converter

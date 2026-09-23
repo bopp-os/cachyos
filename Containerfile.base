@@ -201,6 +201,7 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable scx_loader.service && \
     systemctl enable brew-setup.service && \
     systemctl enable power-profiles-daemon.service && \
+    systemctl enable switcheroo-control.service && \
     systemctl enable fstrim.timer && \
     systemctl enable boppos-update-monitor.timer && \
     systemctl --global enable bopp-tray.service || true && \

@@ -10,11 +10,13 @@ system-core:
   - dbus-glib
   - glib2
   - polkit
+  - sudo
   - shadow
   - lua-luv
   - gpgme
   - gnupg
   - ufw
+  - ufw-extras
 system-toolchains:
   - llvm-libs
 graphics-drivers:
@@ -24,6 +26,7 @@ graphics-drivers:
   - lib32-zlib-ng
   - mesa-utils
   - libva-utils
+  - wayland-utils
   - intel-media-driver
   - libdisplay-info
   - lib32-libdisplay-info
@@ -44,6 +47,7 @@ update-notifier:
   - librsvg
 fonts-heavy:
   - noto-fonts-cjk
+  - wqy-zenhei
   - ttf-meslo-nerd
 gaming-runtimes:
   - proton-cachyos-slr
@@ -170,6 +174,10 @@ firmware:
 networking:
   - networkmanager
   - networkmanager-openvpn
+  - networkmanager-l2tp
+  - networkmanager-pptp
+  - networkmanager-openconnect
+  - networkmanager-vpnc
   - wpa_supplicant
   - iwd
   - ethtool
@@ -182,7 +190,6 @@ networking:
   - bluez-utils
   - bluez-libs
   - bluez-obex
-  - bluedevil
   - openvpn
   - wireguard-tools
   - pptpclient
@@ -212,6 +219,9 @@ hardware-management:
   - fwupd
   - dmemcg-booster
   - hwinfo
+  - pciutils
+  - usbutils
+  - lm_sensors
   - dmidecode
   - hdparm
   - lsscsi
@@ -235,6 +245,7 @@ hardware-management:
   - howdy-git
   - asusctl
   - supergfxctl
+  - switcheroo-control
 shells:
   - bash
   - zsh
@@ -343,8 +354,11 @@ desktop-integration:
   - exiv2
   - editorconfig-core-c
   - libphonenumber
+  - hunspell
+  - hunspell-en_us
 themes-aesthetics:
   - cachyos-wallpapers
+  - plymouth
   - cachyos-plymouth-theme
   - cachyos-plymouth-bootanimation
   - cachyos-nord-gtk-theme-git
@@ -357,10 +371,13 @@ media-video:
   - ffmpegthumbnailer
   - gst-plugin-pipewire
   - gst-plugin-va
+  - gst-plugins-good
   - gst-plugins-bad
   - gst-plugins-ugly
   - vlc-plugins-all
   - yt-dlp
+  - pipewire-libcamera
+  - v4l-utils
 gaming-core:
   - xorg-xwininfo
   - xdotool
@@ -373,6 +390,7 @@ gaming-core:
   - steam
   - lib32-systemd
   - winboat
+  - gamescope
   - gamescope-session-git
   - sunshine
   - lact
@@ -388,8 +406,6 @@ gaming-core:
   - goverlay
   - vkbasalt
   - vkbasalt-cli
-  - vkd3d
-  - lib32-vkd3d
   - vulkan-low-latency-layer
   - python-pefile
   - python-pyclip
@@ -406,7 +422,6 @@ gaming-core:
   - lib32-libjpeg-turbo
   - lib32-libva
   - lib32-ocl-icd
-  - lib32-opencl-icd-loader
 web-browsers:
   - helium-browser-bin
   - cachyos-firefox-settings
@@ -419,11 +434,9 @@ development-languages:
 cachyos-settings:
   - cachyos-settings
   - cachyos-micro-settings
+  - ananicy-cpp
   - cachyos-ananicy-rules
+  - zram-generator
   - cachyos-zsh-config
   - cachyos-fish-config
   - cachyos-samba-settings
-base-meta:
-  # Temporarily disabled until CachyOS updates meta package PKGBUILD for Arch multilib removals (lib32-giflib, lib32-openal)
-  # - cachyos-gaming-applications
-  # - cachyos-gaming-meta

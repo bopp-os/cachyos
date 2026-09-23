@@ -40,14 +40,13 @@ RUN glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
     gtk-update-icon-cache -qtf /usr/share/icons/hicolor || true
 
 # Enable DE services
-# Disable other DMs and enable greetd, touchegg, and switcheroo-control
+# Disable other DMs and enable greetd and touchegg
 RUN systemctl disable sddm.service || true && \
     systemctl disable lightdm.service || true && \
     systemctl disable plasmalogin.service || true && \
     systemctl disable gdm.service || true && \
     systemctl enable greetd.service && \
-    systemctl enable touchegg.service || true && \
-    systemctl enable switcheroo-control.service || true
+    systemctl enable touchegg.service || true
 
 # Preserve /opt contents for OverlayFS
 RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \

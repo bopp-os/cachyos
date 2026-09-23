@@ -1,4 +1,6 @@
 niri-core:
+  - niri
+  - noctalia
   - xwayland-satellite
   - xdg-desktop-portal
   - xdg-desktop-portal-gnome
@@ -58,6 +60,5 @@ niri-color-theming:
   - hyprpicker
 niri-integration:
   - snixembed
-niri-meta:
+niri-settings:
   - cachyos-niri-noctalia
-  - niri

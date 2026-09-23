@@ -75,7 +75,10 @@ kde-additions:
   - kruler
   - isoimagewriter
   - plasma-browser-integration
-kde-meta:
+  - plasma-keyboard
+  - clinfo
+  - aha
+kde-desktop:
   - plasma-desktop
   - plasma-workspace
   - aurorae
