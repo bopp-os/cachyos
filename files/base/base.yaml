@@ -171,6 +171,7 @@ firmware:
   - alsa-firmware
   - wireless-regdb
   - linux-firmware-marvell
+  - xone-dongle-firmware
 networking:
   - networkmanager
   - networkmanager-openvpn
