@@ -77,5 +77,11 @@ for kdir in /usr/lib/modules/*/; do
     fi
 done
 
+echo "Verifying /opt is the bootc symlink..."
+if [ "$(readlink /opt)" != "var/opt" ]; then
+    echo "ERROR: /opt is not a symlink to var/opt (a package replaced it?)" >&2
+    exit 1
+fi
+
 echo "Running bootc container lint to verify cleanup..."
 bootc container lint

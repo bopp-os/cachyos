@@ -143,6 +143,14 @@ if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
     exit 0
 fi
 
+# Flavor layers inherit /opt -> var/opt, which is dangling at build time; point it at the
+# overlay lowerdir so pacman upgrades /opt packages in place instead of replacing the symlink
+if [ -L /opt ]; then
+    mkdir -p /usr/lib/opt
+    ln -sfnT usr/lib/opt /opt
+    trap 'ln -sfnT var/opt /opt' EXIT
+fi
+
 # Phase 2: Install each section block separately with network isolation
 TOTAL_SECTIONS=$(echo "$SECTIONS_OUTPUT" | grep -c "^SECTION::" || true)
 CURRENT_SEC=0
