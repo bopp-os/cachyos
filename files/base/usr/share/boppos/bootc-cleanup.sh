@@ -69,5 +69,13 @@ fi
 echo "Cleaning /run and /tmp..."
 rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true
 
+echo "Verifying every kernel has an initramfs..."
+for kdir in /usr/lib/modules/*/; do
+    if [ -f "$kdir/vmlinuz" ] && [ ! -f "$kdir/initramfs.img" ]; then
+        echo "ERROR: ${kdir}vmlinuz has no initramfs.img (kernel changed after dracut ran?)" >&2
+        exit 1
+    fi
+done
+
 echo "Running bootc container lint to verify cleanup..."
 bootc container lint

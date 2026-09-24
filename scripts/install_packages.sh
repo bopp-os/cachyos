@@ -71,6 +71,13 @@ fi
 # Flatten all packages for Phase 1 Download
 ALL_PKGS=$(echo "$SECTIONS_OUTPUT" | sed 's/SECTION::[^:]*:://' | tr '\n' ' ')
 
+# Kernel, modules and initramfs are built in the base layer; flavor layers must not upgrade them
+IGNORE_ARG=""
+if [[ " $ALL_PKGS " != *" linux-cachyos "* ]]; then
+    IGNORE_ARG="--ignore linux-cachyos,linux-cachyos-headers"
+    echo "Holding kernel packages at base-layer version: linux-cachyos linux-cachyos-headers"
+fi
+
 # Determine network-isolated execution wrapper if unshare is available
 ISOLATE_CMD=""
 if command -v unshare >/dev/null 2>&1; then
@@ -97,7 +104,7 @@ DOWNLOAD_SUCCESS=false
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Pre-fetching package archives for $YAML_FILE..."
 
-    DOWNLOAD_EXEC="pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $ALL_PKGS"
+    DOWNLOAD_EXEC="pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $IGNORE_ARG $ALL_PKGS"
 
     if [ "$VERBOSE" -eq 1 ]; then
         if $DOWNLOAD_EXEC 2>&1 | tee /tmp/pacman-download.log; then
@@ -161,7 +168,7 @@ while IFS= read -r sec_line; do
 
     SEC_RETRY=0
     SEC_SUCCESS=false
-    INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --overwrite '*' $SEC_PKGS"
+    INSTALL_EXEC="$ISOLATE_CMD pacman -Su --noconfirm --ask 4 --needed --overwrite '*' $IGNORE_ARG $SEC_PKGS"
 
     while [ $SEC_RETRY -lt $MAX_RETRIES ]; do
         if [ "$VERBOSE" -eq 1 ]; then
