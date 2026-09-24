@@ -27,19 +27,20 @@ COPY --from=brew /system_files /
 RUN setfattr -n user.component -v "homebrew" "/usr/share/homebrew.tar.zst"
 
 
-COPY files/keys/ /tmp/keys/
-COPY scripts/ /tmp/scripts/
-
-# Re-initialize and trust keys and configure pacman repositories
-RUN chmod +x /tmp/scripts/*.sh && \
-    /tmp/scripts/setup_pacman_repos.sh
-
+# Install rated mirrors before the first pacman sync
 RUN --mount=type=bind,source=mirrors,target=/workspace-mirrors \
     cp /workspace-mirrors/cachyos-mirrorlist /etc/pacman.d/cachyos-mirrorlist \
     && cp /workspace-mirrors/cachyos-v3-mirrorlist /etc/pacman.d/cachyos-v3-mirrorlist \
     && if [ "$TARGET_CPU_MARCH" == "v4" ] || [ "$TARGET_CPU_MARCH" == "znver4" ]; then \
     cp /workspace-mirrors/cachyos-v4-mirrorlist /etc/pacman.d/cachyos-v4-mirrorlist; \
     fi
+
+COPY files/keys/ /tmp/keys/
+COPY scripts/ /tmp/scripts/
+
+# Re-initialize and trust keys and configure pacman repositories
+RUN chmod +x /tmp/scripts/*.sh && \
+    /tmp/scripts/setup_pacman_repos.sh
 
 RUN mkdir -p /etc/pacman.d/hooks && \
     ln -sf /dev/null /etc/pacman.d/hooks/90-mkinitcpio-install.hook && \

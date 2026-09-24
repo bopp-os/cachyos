@@ -13,21 +13,9 @@ build-mirrorlist arch='v3':
         --security-opt=seccomp=unconfined \
         --rm --network=host \
         -v $(pwd)/mirrors:/workspace-mirrors:z \
+        -v $(pwd)/scripts:/workspace-scripts:ro,z \
         $(if [ "{{arch}}" = "znver4" ]; then echo "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo "docker.io/cachyos/cachyos-{{arch}}:latest"; fi) \
-        bash -c "timeout 120 \
-            bash -c 'pacman -Sy --noconfirm cachyos-rate-mirrors < /dev/null \
-                        && cachyos-rate-mirrors < /dev/null'" || \
-    echo 'Mirror rating timed out or failed, falling back to defaults' && \
-    podman run \
-        --security-opt=seccomp=unconfined \
-        --rm --network=host \
-        -v $(pwd)/mirrors:/workspace-mirrors:z \
-        $(if [ "{{arch}}" = "znver4" ]; then echo "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo "docker.io/cachyos/cachyos-{{arch}}:latest"; fi) \
-        bash -c "cp /etc/pacman.d/cachyos-mirrorlist /workspace-mirrors/ \
-                && cp /etc/pacman.d/cachyos-v3-mirrorlist /workspace-mirrors/ \
-                &&  if [ \"{{arch}}\" == \"v4\" ] || [ \"{{arch}}\" == \"znver4\" ]; then \
-                        cp /etc/pacman.d/cachyos-v4-mirrorlist /workspace-mirrors/; \
-                    fi"
+        bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
 
 # Pre-fetch and security audit package archives for selected flavors.
 prefetch arch='v3' plasma='true' gnome='true' niri='true' cinnamon='true':
