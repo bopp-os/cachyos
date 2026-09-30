@@ -65,7 +65,6 @@ env:
   BASE_IMAGE: "docker.io/cachyos/cachyos-v3:latest"
   TARGET_MARCH: "v3"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
-  CHUNKAH_IMAGE: "quay.io/coreos/chunkah:v0.7.0" # pinned: chunkah upgrades can change every layer digest
 
 concurrency:
   group: boppos-build-queue
@@ -407,6 +406,10 @@ jobs:
         run: |
           if [ ! -f scripts/package-intervals.json ]; then echo "{}" > scripts/package-intervals.json; fi
 
+      - name: Read pinned chunkah image
+        run: |
+          echo "CHUNKAH_IMAGE=$(sed -n 's/^FROM //p' .github/chunkah/Containerfile)" >> "$GITHUB_ENV"
+
       - name: Get current date
         id: date
         run: |
@@ -548,13 +551,21 @@ jobs:
           
           PODMAN_OPTS=""
           if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-          
-          echo "Rechunking $FLAVOR (PR Dry Run)..."
-          sudo podman run $PODMAN_OPTS --rm --network=none \
-            --mount=type=image,source=$IMAGE_REF,target=/chunkah \
-            -e SOURCE_DATE_EPOCH=0 \
-            -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-            "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
+
+          # A chunkah upgrade can change every layer digest (v0.7.0 did), so compare against the base branch's pin
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF" || true
+          BASE_CHUNKAH=$(git show FETCH_HEAD:.github/chunkah/Containerfile 2>/dev/null | sed -n 's/^FROM //p' || true)
+          if [ -n "$BASE_CHUNKAH" ] && [ "$BASE_CHUNKAH" != "$CHUNKAH_IMAGE" ]; then
+            chmod +x scripts/compare-chunkah-layers.sh
+            PODMAN_OPTS="$PODMAN_OPTS" ./scripts/compare-chunkah-layers.sh "$IMAGE_REF" "$CHUNKAH_IMAGE" "$BASE_CHUNKAH"
+          else
+            echo "Rechunking $FLAVOR (PR Dry Run)..."
+            sudo podman run $PODMAN_OPTS --rm --network=none \
+              --mount=type=image,source=$IMAGE_REF,target=/chunkah \
+              -e SOURCE_DATE_EPOCH=0 \
+              -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
+              "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
+          fi
 
       - name: Rechunk & Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'

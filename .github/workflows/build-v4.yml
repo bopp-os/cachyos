@@ -62,7 +62,6 @@ env:
   BASE_IMAGE: "docker.io/cachyos/cachyos-v4:latest"
   TARGET_MARCH: "v4"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
-  CHUNKAH_IMAGE: "quay.io/coreos/chunkah:v0.7.0" # pinned: chunkah upgrades can change every layer digest
 
 concurrency:
   group: boppos-build-queue
@@ -403,6 +402,10 @@ jobs:
       - name: Ensure Package Intervals JSON exists
         run: |
           if [ ! -f scripts/package-intervals.json ]; then echo "{}" > scripts/package-intervals.json; fi
+
+      - name: Read pinned chunkah image
+        run: |
+          echo "CHUNKAH_IMAGE=$(sed -n 's/^FROM //p' .github/chunkah/Containerfile)" >> "$GITHUB_ENV"
 
       - name: Get current date
         id: date

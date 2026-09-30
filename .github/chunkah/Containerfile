@@ -1,0 +1,4 @@
+# Pinned chunkah version used to rechunk images (build workflows and Justfile).
+# This file is never built; it exists so Dependabot opens a PR for new chunkah
+# releases. That PR's v3 build compares layer digests from both versions.
+FROM quay.io/coreos/chunkah:v0.7.0
