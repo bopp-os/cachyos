@@ -415,6 +415,8 @@ gaming-core:
   - opencl-icd-loader
   - giflib
   - glfw
+  # SteamVR's setcap prompt runs the Steam scout runtime's GTK2 zenity with host library paths only
+  - gtk2
   - libva
   - libxslt
   - mpg123
