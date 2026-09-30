@@ -62,6 +62,7 @@ env:
   BASE_IMAGE: "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"
   TARGET_MARCH: "znver4"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
+  CHUNKAH_IMAGE: "quay.io/coreos/chunkah:v0.7.0" # pinned: chunkah upgrades can change every layer digest
 
 concurrency:
   group: boppos-build-queue
@@ -546,7 +547,7 @@ jobs:
             --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e SOURCE_DATE_EPOCH=0 \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-            quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
+            "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
 
       - name: Rechunk & Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'
@@ -584,7 +585,7 @@ jobs:
                 --mount=type=image,source=$IMAGE_REF,target=/chunkah \
                 -e SOURCE_DATE_EPOCH=0 \
                 -e CHUNKAH_CONFIG_STR="$CHUNKAH_CONFIG_STR" \
-                quay.io/coreos/chunkah build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
+                "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
             PODMAN_PID=$!
             
             if sudo skopeo copy \

@@ -83,5 +83,20 @@ if [ "$(readlink /opt)" != "var/opt" ]; then
     exit 1
 fi
 
+echo "Clamping build-generated mtimes for reproducible layers..."
+# chunkah clamps each xattr component to its newest file mtime, so files created or edited
+# during the build (initramfs, kmods, hook caches, edited configs) would change their layer
+# digest on every build. makepkg stamps packaged files with the package BUILDDATE, so
+# anything newer than the newest BUILDDATE was produced by this build.
+newest_builddate=$(awk '/^%BUILDDATE%$/ { getline; if ($1 > max) max = $1 } END { print max + 0 }' \
+    /usr/lib/sysimage/lib/pacman/local/*/desc 2>/dev/null || echo 0)
+if [ "$newest_builddate" -gt 0 ]; then
+    find /usr /etc /var -xdev -newermt "@$newest_builddate" \
+        -exec touch -h -d "@${SOURCE_DATE_EPOCH:-0}" {} + \
+        || echo "WARNING: failed to clamp some build-generated mtimes" >&2
+else
+    echo "WARNING: no package BUILDDATE found, skipping mtime clamp" >&2
+fi
+
 echo "Running bootc container lint to verify cleanup..."
 bootc container lint

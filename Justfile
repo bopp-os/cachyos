@@ -1,6 +1,8 @@
 # Configuration
 registry := "ghcr.io"
 user := "ripps818"
+# Pinned: chunkah upgrades can change every layer digest
+chunkah_image := "quay.io/coreos/chunkah:v0.7.0"
 
 # Default action
 default:
@@ -74,7 +76,7 @@ rechunk arch='v3' flavor='base':
         echo "Rechunking cachyos-boppos-base:{{arch}}..."; \
         podman run --rm --mount=type=image,source={{registry}}/{{user}}/cachyos-boppos-base:{{arch}},target=/chunkah \
             -e CHUNKAH_CONFIG_STR="$$(podman inspect {{registry}}/{{user}}/cachyos-boppos-base:{{arch}})" \
-            quay.io/coreos/chunkah build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | podman load > /tmp/podman_load_output.txt; \
+            {{chunkah_image}} build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | podman load > /tmp/podman_load_output.txt; \
         IMAGE_ID=$$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $$3}'); \
         podman tag "$$IMAGE_ID" "{{registry}}/{{user}}/cachyos-boppos-base:{{arch}}"; \
     else \
