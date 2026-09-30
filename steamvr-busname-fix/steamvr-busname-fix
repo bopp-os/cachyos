@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+# steamvr-busname-fix - keep SteamVR's compositor launchable with Steam's
+# 64-bit (steamrt64) client. Workaround for ValveSoftware/SteamVR-for-Linux#936:
+# https://github.com/ValveSoftware/SteamVR-for-Linux/issues/936
+#
+# The steamrt64 client registers its launcher service on the session bus only
+# as com.steampowered.PressureVessel.LaunchAlongsideSteam.Instance<N>, but
+# vrserver starts vrcompositor with `steam-runtime-launch-client
+# --alongside-steam`, which looks for the plain name. Whenever Steam is running
+# and nothing owns the plain name, this asks Steam's instance service to start a
+# second launcher service that claims it. That second service dies with Steam,
+# so this keeps watching and registers it again after every Steam restart.
+
+set -uo pipefail
+
+readonly PROG=steamvr-busname-fix
+readonly PLAIN=com.steampowered.PressureVessel.LaunchAlongsideSteam
+readonly INSTANCE_RE='com\.steampowered\.PressureVessel\.LaunchAlongsideSteam\.Instance[A-Za-z0-9_-]+'
+readonly CLIENT_NAME=steam-runtime-launch-client
+# Steam's own launcher service runs this binary too (ps shows x86_64-linux-gn).
+readonly SERVICE_NAME=x86_64-linux-gnu-srt-launcher-service
+# Where Steam kept them when this was written, relative to the Steam root.
+readonly KNOWN_PV=steamrt64/pv-runtime/steam-runtime-steamrt/pressure-vessel
+readonly KNOWN_CLIENT=$KNOWN_PV/bin/$CLIENT_NAME
+readonly KNOWN_SERVICE=$KNOWN_PV/libexec/steam-runtime-tools-0/$SERVICE_NAME
+
+readonly POLL_INTERVAL=5      # seconds between bus checks
+readonly REGISTER_TIMEOUT=10  # seconds to wait for the plain name to appear
+readonly RETRY_MIN=15         # first retry delay after a failure; doubles on
+readonly RETRY_MAX=300        # each failure up to this, reset by any success
+readonly SEARCH_INTERVAL=30   # seconds between searches while nothing is found
+
+client='' service=''   # cached runtime binaries
+launcher_pid=''        # our steam-runtime-launch-client while it runs
+registered=0           # we registered the plain name and it is still there
+owner_logged=0 missing_logged=0 next_search=0
+steam_id='' retry_delay=$RETRY_MIN next_attempt=0
+
+# Under systemd, prefix messages with a syslog priority for journald (so
+# `journalctl -p warning` works); anywhere else, prefix the program name.
+journal=0
+if [[ -n ${JOURNAL_STREAM:-} &&
+    $(stat -L -c '%d:%i' "/proc/$$/fd/2" 2>/dev/null) == "$JOURNAL_STREAM" ]]; then
+    journal=1
+fi
+
+say() {
+    local prio=$1
+    shift
+    if ((journal)); then
+        printf '<%d>%s\n' "$prio" "$*" >&2
+    else
+        printf '%s: %s\n' "$PROG" "$*" >&2
+    fi
+}
+log() { say 6 "$@"; }
+warn() { say 4 "$@"; }
+
+# Ask the session bus daemon itself: bus METHOD [SIGNATURE ARGS...]
+bus() {
+    busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
+        org.freedesktop.DBus "$@" 2>/dev/null
+}
+
+name_has_owner() { [[ $(bus NameHasOwner s "$1") == "b true" ]]; }
+
+# Print Steam's own LaunchAlongsideSteam.Instance<N> name, if it is running.
+steam_instance() {
+    bus ListNames | grep -oE "\"$INSTANCE_RE\"" | tr -d '"' | sort -V | head -n 1
+}
+
+# Candidate Steam roots, most likely first, without duplicates (~/.steam/root
+# and ~/.steam/steam are symlinks Steam keeps pointing at its real location).
+steam_roots() {
+    local dir real
+    local -A seen=()
+    for dir in "$HOME/.local/share/Steam" "${XDG_DATA_HOME:-$HOME/.local/share}/Steam" \
+        "$HOME/.steam/root" "$HOME/.steam/steam" "$HOME/.steam/debian-installation"; do
+        real=$(realpath -e -- "$dir" 2>/dev/null) || continue
+        [[ -z ${seen[$real]:-} ]] || continue
+        seen[$real]=1
+        printf '%s\n' "$real"
+    done
+}
+
+# find_exe DIR NAME: executables called NAME under DIR, sorted. Skips var/,
+# where pressure-vessel keeps temporary copies of the runtime.
+find_exe() {
+    find -L "$1" -maxdepth 8 -name var -prune -o \
+        -type f -name "$2" -executable -print 2>/dev/null | sort
+}
+
+# Set $client and $service, or set $searched and return 1.
+discover() {
+    local root tree pv c s
+    local -a roots
+    mapfile -t roots < <(steam_roots)
+    for root in "${roots[@]}"; do
+        c=$root/$KNOWN_CLIENT s=$root/$KNOWN_SERVICE
+        if [[ -x $c && -x $s ]]; then
+            client=$c service=$s
+            return 0
+        fi
+    done
+    # Layout changed: search each steamrt64 tree, and take the service from
+    # the same runtime as the client so the pair matches.
+    for root in "${roots[@]}"; do
+        tree=$root/steamrt64
+        [[ -d $tree ]] || continue
+        while IFS= read -r c; do
+            pv=${c%/*/*} # .../pressure-vessel/bin/client -> .../pressure-vessel
+            [[ $pv == "$tree"/* ]] || pv=$tree
+            s=$(find_exe "$pv" "$SERVICE_NAME" | head -n 1)
+            if [[ -n $s ]]; then
+                client=$c service=$s
+                return 0
+            fi
+        done < <(find_exe "$tree" "$CLIENT_NAME")
+    done
+    if ((${#roots[@]})); then
+        searched="${roots[*]/%//steamrt64}"
+    else
+        searched="(no Steam directory at ~/.local/share/Steam, ~/.steam/root, ~/.steam/steam or ~/.steam/debian-installation)"
+    fi
+    return 1
+}
+
+# Make sure $client and $service exist, searching again if the cached ones
+# are gone. Logs once per stretch of not finding anything.
+ensure_runtime() {
+    local searched
+    [[ -x $client && -x $service ]] && return 0
+    if [[ -n $client ]]; then
+        warn "runtime binaries are gone ($client, $service); searching again (Steam update?)"
+        client='' service=''
+    fi
+    ((SECONDS >= next_search)) || return 1
+    if discover; then
+        log "using $client"
+        log "using $service"
+        missing_logged=0
+        return 0
+    fi
+    next_search=$((SECONDS + SEARCH_INTERVAL))
+    if ((!missing_logged)); then
+        warn "can't find $CLIENT_NAME and $SERVICE_NAME under: $searched." \
+            "Not the 64-bit Steam client, or a Steam update moved them? Will keep looking every ${SEARCH_INTERVAL}s."
+        missing_logged=1
+    fi
+    return 1
+}
+
+launcher_running() {
+    local pid
+    [[ -n $launcher_pid ]] || return 1
+    for pid in $(jobs -rp); do
+        [[ $pid == "$launcher_pid" ]] && return 0
+    done
+    return 1
+}
+
+stop_launcher() {
+    local i
+    if launcher_running; then
+        # The launch client forwards the signal to the service it started.
+        kill -TERM "$launcher_pid" 2>/dev/null
+        for ((i = 0; i < 10; i++)); do
+            launcher_running || break
+            sleep 0.5
+        done
+        launcher_running && kill -KILL "$launcher_pid" 2>/dev/null
+        wait "$launcher_pid" 2>/dev/null
+    fi
+    launcher_pid=''
+}
+
+# register INSTANCE: start the second launcher service through Steam's instance
+# service. On failure, sets $reason and returns 1.
+register() {
+    local inst=$1 i status
+    log "registering $PLAIN via $inst"
+    # The launch client stays attached to the service for as long as it runs,
+    # so keep it in the background. Its stderr (and the service's) goes to our
+    # log, which is where the reason for a failure shows up.
+    "$client" --bus-name="$inst" -- "$service" --alongside-steam --bus-name="$PLAIN" \
+        </dev/null >/dev/null &
+    launcher_pid=$!
+    for ((i = 0; i < REGISTER_TIMEOUT; i++)); do
+        sleep 1
+        if name_has_owner "$PLAIN"; then
+            log "registered $PLAIN via $inst"
+            return 0
+        fi
+        launcher_running || break
+    done
+    if launcher_running; then
+        reason="$PLAIN did not appear within ${REGISTER_TIMEOUT}s"
+        stop_launcher
+    else
+        wait "$launcher_pid"
+        status=$?
+        reason="$CLIENT_NAME exited with status $status"
+        launcher_pid=''
+    fi
+    return 1
+}
+
+back_off() {
+    warn "$1; retrying in ${retry_delay}s"
+    next_attempt=$((SECONDS + retry_delay))
+    retry_delay=$((retry_delay * 2 > RETRY_MAX ? RETRY_MAX : retry_delay * 2))
+}
+
+# Clean up, then die of the same signal so the exit status stays honest.
+on_signal() {
+    trap - EXIT "$1"
+    stop_launcher
+    kill -s "$1" "$$"
+}
+
+main() {
+    local inst owner id reason
+    trap stop_launcher EXIT
+    trap 'on_signal INT' INT
+    trap 'on_signal TERM' TERM
+    trap 'on_signal HUP' HUP
+
+    if ! command -v busctl >/dev/null; then
+        warn "busctl not found (it ships with systemd)"
+        exit 1
+    fi
+    log "watching the session bus for $PLAIN (SteamVR-for-Linux #936 workaround)"
+
+    while true; do
+        if name_has_owner "$PLAIN"; then
+            if ((!registered && !owner_logged)); then
+                log "$PLAIN already has an owner; nothing to do"
+                owner_logged=1
+            fi
+            sleep "$POLL_INTERVAL"
+            continue
+        fi
+        owner_logged=0
+
+        inst=$(steam_instance)
+        owner=''
+        [[ -n $inst ]] && owner=$(bus GetNameOwner s "$inst")
+        id="$inst $owner" # changes whenever Steam restarts
+
+        if ((registered)); then
+            registered=0
+            stop_launcher
+            if [[ $id == "$steam_id" ]]; then
+                back_off "$PLAIN went away while Steam kept running"
+            else
+                log "$PLAIN went away (Steam exited or restarted); will register it again once Steam is back"
+            fi
+        fi
+
+        if [[ -z $inst ]]; then # Steam isn't running
+            stop_launcher
+            sleep "$POLL_INTERVAL"
+            continue
+        fi
+        if [[ $id != "$steam_id" ]]; then
+            steam_id=$id retry_delay=$RETRY_MIN next_attempt=0
+        fi
+
+        if ((SECONDS >= next_attempt)) && ensure_runtime; then
+            stop_launcher
+            if register "$inst"; then
+                registered=1 retry_delay=$RETRY_MIN
+            else
+                back_off "registration failed: $reason"
+            fi
+        fi
+        sleep "$POLL_INTERVAL"
+    done
+}
+
+main "$@"

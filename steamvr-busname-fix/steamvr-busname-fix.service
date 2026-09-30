@@ -1,0 +1,15 @@
+[Unit]
+Description=Register plain LaunchAlongsideSteam bus name for SteamVR (SteamVR-for-Linux #936)
+Documentation=https://github.com/ValveSoftware/SteamVR-for-Linux/issues/936
+Documentation=https://github.com/bopp-os/cachyos/tree/main/steamvr-busname-fix
+After=dbus.socket
+
+[Service]
+Type=exec
+ExecStart=%h/.local/bin/steamvr-busname-fix
+SyslogIdentifier=steamvr-busname-fix
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
