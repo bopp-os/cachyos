@@ -1,8 +1,8 @@
 # Configuration
 registry := "ghcr.io"
 user := "ripps818"
-# Pinned: chunkah upgrades can change every layer digest
-chunkah_image := "quay.io/coreos/chunkah:v0.7.0"
+# Pinned in .github/chunkah/Containerfile: chunkah upgrades can change every layer digest
+chunkah_image := `sed -n 's/^FROM //p' .github/chunkah/Containerfile`
 
 # Default action
 default:

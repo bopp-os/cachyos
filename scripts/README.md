@@ -10,6 +10,7 @@ This directory contains the automation, build, and maintenance scripts for BoppO
 - **`install_packages.sh`**: YAML-driven package installer that parses package manifests (`base.yaml`, `plasma.yaml`, `gnome.yaml`, `niri.yaml`) and executes optimized pacman installations.
 - **`generate-package-list.sh`**: Queries pacman to generate package manifests (`all-packages.txt`, `cachyos-packages.txt`, `boppos-packages.txt`) for tracking installed packages.
 - **`apply-update-intervals.py`**: High-performance script setting `user.update-interval` and `user.component` xattr tags via direct Linux kernel syscalls and clamping system cache timestamps for layer determinism.
+- **`compare-chunkah-layers.sh`**: Rechunks one image with two chunkah versions and reports how many layer digests the upgrade changes. Runs in the v3 PR build when the pin in `.github/chunkah/Containerfile` changes.
 
 ### Security & Auditing Scripts
 - **`scan-pkg-cache.sh`**: Pre-build security scanner that audits downloaded pacman package `.pkg.tar.zst` archives and `.INSTALL` scriptlets for obfuscation, network calls, or credential harvesting.
