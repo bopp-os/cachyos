@@ -9,3 +9,4 @@ mirrors/
 __pycache__/
 *.pyc
 .rooignore
+.claude/settings.local.json
