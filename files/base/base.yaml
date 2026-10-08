@@ -114,6 +114,8 @@ filesystems:
   - smbclient
   - cifs-utils
   - udisks2
+  - compsize
+  - snapper
 archiving:
   - unp
   - unarj
@@ -246,6 +248,7 @@ hardware-management:
   - howdy-git
   - asusctl
   - supergfxctl
+  - framework-system
   - switcheroo-control
 shells:
   - bash
@@ -328,7 +331,6 @@ containers:
   - distrobox
   - flatpak
   - ptyxis
-  - libvirt
 schedulers:
   - scx-scheds
   - scx-tools
@@ -388,6 +390,7 @@ gaming-core:
   - lib32-mangohud
   - lutris
   - heroic-games-launcher
+  - faugus-launcher
   - steam
   - lib32-systemd
   - winboat
