@@ -367,6 +367,8 @@ media-video:
   - libdvdcss
   - gst-libav
   - mpv
+  - mpv-uosc
+  - mpv-thumbfast-git
   - ffmpeg
   - gpu-screen-recorder-ui
   - ffmpegthumbnailer
