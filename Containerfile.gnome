@@ -33,7 +33,8 @@ COPY files/gnome/usr /usr/
 # We disable SDDM if it was enabled, and enable GDM
 RUN systemctl disable sddm.service || true && \
     systemctl disable plasmalogin.service || true && \
-    systemctl enable gdm.service
+    systemctl enable gdm.service && \
+    systemctl enable cardwired.service
 
 # Preserve /opt contents for OverlayFS
 # (visual-studio-code-bin and others install here)

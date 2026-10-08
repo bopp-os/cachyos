@@ -46,6 +46,7 @@ RUN systemctl disable sddm.service || true && \
     systemctl disable plasmalogin.service || true && \
     systemctl disable gdm.service || true && \
     systemctl enable greetd.service && \
+    systemctl enable switcheroo-control.service && \
     systemctl enable touchegg.service || true
 
 # Preserve /opt contents for OverlayFS

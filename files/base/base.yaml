@@ -247,9 +247,7 @@ hardware-management:
   - fprintd
   - howdy-git
   - asusctl
-  - supergfxctl
   - framework-system
-  - switcheroo-control
 shells:
   - bash
   - zsh

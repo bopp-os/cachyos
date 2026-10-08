@@ -12,6 +12,7 @@ niri-core:
   - polkit-gnome
   - mako
   - qt6-svg
+  - cardwire
 niri-utilities:
   - alacritty
   - gnome-calculator

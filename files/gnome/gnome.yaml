@@ -15,6 +15,7 @@ gnome-core:
   - gnome-text-editor
   - tracker3
   - tracker3-miners
+  - cardwire
 gnome-utilities:
   - file-roller
   - extension-manager
