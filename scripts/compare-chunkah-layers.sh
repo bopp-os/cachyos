@@ -29,7 +29,7 @@ list_layers() {
         --mount=type=image,source="$IMAGE_REF",target=/chunkah \
         -e SOURCE_DATE_EPOCH=0 \
         -e CHUNKAH_CONFIG_STR="$CONFIG_STR" \
-        "$chunkah_image" build --label containers.bootc=1 --max-layers 450 \
+        "$chunkah_image" build --label containers.bootc=1 --max-layers 485 \
         --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ \
         | OUT_DIR="$out_dir" tar -x --to-command='
             if [ "$TAR_SIZE" -lt 4194304 ]; then
