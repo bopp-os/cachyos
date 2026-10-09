@@ -8,6 +8,8 @@ This directory contains the automation, build, and maintenance scripts for BoppO
 - **`bootc-rootfs.sh`**: Initializes the ostree/bootc sysroot structure (`/sysroot`, `/ostree`, `/var`, `/home`, etc.) and sets up system layout during container image creation.
 - **`setup_pacman_repos.sh`**: Imports repository signing keys (`/tmp/keys/*.asc`) and configures pacman mirrorlists and repository priorities.
 - **`install_packages.sh`**: YAML-driven package installer that parses package manifests (`base.yaml`, `plasma.yaml`, `gnome.yaml`, `niri.yaml`) and executes optimized pacman installations.
+- **`build_kernel_modules.sh`**: Builds out-of-tree kernel modules (nct6687d, it87, xpadneo, xone, zenergy) against the installed kernel headers without DKMS.
+- **`build_initramfs.sh`**: Runs depmod and dracut for the installed kernel, then tags `/usr/lib/modules` so the initramfs and out-of-tree modules get their own chunkah components while stock modules keep the `linux-cachyos` package tag. Dracut config lives in `files/base/usr/lib/dracut/dracut.conf.d/`.
 - **`generate-package-list.sh`**: Queries pacman to generate package manifests (`all-packages.txt`, `cachyos-packages.txt`, `boppos-packages.txt`) for tracking installed packages.
 - **`apply-update-intervals.py`**: High-performance script setting `user.update-interval` and `user.component` xattr tags via direct Linux kernel syscalls and clamping system cache timestamps for layer determinism.
 - **`compare-chunkah-layers.sh`**: Rechunks one image with two chunkah versions and reports how many layer digests the upgrade changes. Runs in the v3 PR build when the pin in `.github/chunkah/Containerfile` changes.

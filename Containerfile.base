@@ -210,17 +210,10 @@ RUN systemctl enable var-opt.mount && \
     systemctl disable asusd.service || true
 
 # Bootc / Dracut Fixes
+# Dracut config comes from files/base/usr/lib/dracut/dracut.conf.d (copied above)
 RUN --mount=type=tmpfs,dst=/run \
-    mkdir -p /usr/lib/dracut/dracut.conf.d/ && \
-    printf "systemdsystemconfdir=/etc/systemd/system\nsystemdsystemunitdir=/usr/lib/systemd/system\n" | tee /usr/lib/dracut/dracut.conf.d/30-boppos-fix-bootc-module.conf && \
-    printf 'reproducible="yes"\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc crypt systemd-cryptsetup tpm2-tss drm plymouth btrfs i18n "\nforce_drivers+=" i915 xe amdgpu nouveau "\n' | tee "/usr/lib/dracut/dracut.conf.d/30-boppos-dracut-container-build.conf" && \
     bash /tmp/scripts/build_kernel_modules.sh && \
-    KERNEL_DIR="$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)" && \
-    KERNEL_VER="$(basename "$KERNEL_DIR")" && \
-    depmod -a "$KERNEL_VER" && \
-    find "$KERNEL_DIR" -maxdepth 1 -type f -name "modules.*" -exec touch -d "@${SOURCE_DATE_EPOCH:-0}" {} + && \
-    SOURCE_DATE_EPOCH=0 dracut --force --reproducible "$KERNEL_DIR/initramfs.img" "$KERNEL_VER" && \
-    find /usr/lib/modules -type f -exec setfattr -h -n user.component -v "kernel-initramfs" {} + -exec setfattr -h -n user.update-interval -v "daily" {} +
+    bash /tmp/scripts/build_initramfs.sh
 
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
