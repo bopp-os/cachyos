@@ -202,13 +202,12 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable scx_loader.service && \
     systemctl enable brew-setup.service && \
     systemctl enable power-profiles-daemon.service && \
-    systemctl enable switcheroo-control.service && \
     systemctl enable fstrim.timer && \
     systemctl enable boppos-update-monitor.timer && \
     systemctl --global enable bopp-tray.service || true && \
     systemctl enable cups.socket && \
     systemctl enable docker.socket && \
-    systemctl disable asusd.service supergfxd.service || true
+    systemctl disable asusd.service || true
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \

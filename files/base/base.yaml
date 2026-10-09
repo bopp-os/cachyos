@@ -114,6 +114,8 @@ filesystems:
   - smbclient
   - cifs-utils
   - udisks2
+  - compsize
+  - snapper
 archiving:
   - unp
   - unarj
@@ -245,8 +247,7 @@ hardware-management:
   - fprintd
   - howdy-git
   - asusctl
-  - supergfxctl
-  - switcheroo-control
+  - framework-system
 shells:
   - bash
   - zsh
@@ -328,7 +329,6 @@ containers:
   - distrobox
   - flatpak
   - ptyxis
-  - libvirt
 schedulers:
   - scx-scheds
   - scx-tools
@@ -367,6 +367,8 @@ media-video:
   - libdvdcss
   - gst-libav
   - mpv
+  - mpv-uosc
+  - mpv-thumbfast-git
   - ffmpeg
   - gpu-screen-recorder-ui
   - ffmpegthumbnailer
@@ -388,6 +390,7 @@ gaming-core:
   - lib32-mangohud
   - lutris
   - heroic-games-launcher
+  - faugus-launcher
   - steam
   - lib32-systemd
   - winboat

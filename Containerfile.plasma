@@ -41,7 +41,8 @@ RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
           /usr/bin/sddmthemeinstaller 2>/dev/null || true && \
     systemctl disable sddm.service || true && \
     systemctl disable gdm.service || true && \
-    systemctl enable plasmalogin.service
+    systemctl enable plasmalogin.service && \
+    systemctl enable cardwired.service
 
 # Remove PackageKit backend for Discover to prevent crashes on our immutable OS
 RUN rm -f /usr/lib/qt6/plugins/discover/packagekit-backend.so
