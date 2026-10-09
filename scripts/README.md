@@ -15,8 +15,9 @@ This directory contains the automation, build, and maintenance scripts for BoppO
 - **`compare-chunkah-layers.sh`**: Rechunks one image with two chunkah versions and reports how many layer digests the upgrade changes. Runs in the v3 PR build when the pin in `.github/chunkah/Containerfile` changes.
 
 ### Security & Auditing Scripts
-- **`scan-pkg-cache.sh`**: Pre-build security scanner that audits downloaded pacman package `.pkg.tar.zst` archives and `.INSTALL` scriptlets for obfuscation, network calls, or credential harvesting.
-- **`scan-image-ioc.sh`**: Post-build container image auditor that mounts built container filesystems to inspect for known threat indicators, suspicious systemd service units, eBPF artifacts, and dropped temp files.
+- **`scan-pkg-cache.sh`**: Pre-build security scanner for downloaded pacman packages. Reads each package's `.MTREE` to check for known IOC paths, then scans its `.INSTALL` scriptlet and any ALPM hooks/scripts it ships for obfuscation, network droppers, or credential access (plus YARA when installed). Clean packages are cached by SHA-256; bump `SCAN_VERSION` when the checks change.
+- **`scan-image-ioc.sh`**: Post-build image auditor. From one walk of the mounted image it checks IOC paths, payload sizes, temp-dir drops, setuid/setgid files against `files/security/setuid-allowlist.txt` (warning), package scriptlets, ALPM scripts, `profile.d`, and `Exec*=` lines in system/user units, ALPM hooks and autostart entries.
+- **`scan-patterns.sh`**: Heuristics shared by both scanners (sourced). Rerun them against a real image's scriptlets, hooks and units before widening, to keep builds free of false positives.
 - **`sign.sh`**: Signs built container image tags using `cosign` and exported keys.
 
 ### Utility & Data Scripts

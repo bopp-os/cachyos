@@ -20,13 +20,27 @@ if [ ! -d "$CACHE_DIR" ]; then
   exit 1
 fi
 
+# shellcheck source=scripts/scan-patterns.sh
+source "$(dirname "$(readlink -f "$0")")/scan-patterns.sh"
+
+if ! command -v bsdtar >/dev/null 2>&1; then
+  echo "::error::bsdtar (libarchive) is required to inspect package archives."
+  exit 1
+fi
+
 FOUND=0
 FINDINGS=()
 
 # -----------------------------------------------------------
 # Cryptographic SHA-256 Bit-Sum Cache
 # -----------------------------------------------------------
-CACHE_FILE="$CACHE_DIR/.pkg_scan_cache"
+# Bump SCAN_VERSION whenever the checks change so packages verified under older rules are
+# rescanned once instead of being skipped forever
+SCAN_VERSION=2
+CACHE_FILE="$CACHE_DIR/.pkg_scan_cache.v$SCAN_VERSION"
+for old_cache in "$CACHE_DIR/.pkg_scan_cache" "$CACHE_DIR"/.pkg_scan_cache.v[0-9]*; do
+  if [ "$old_cache" != "$CACHE_FILE" ]; then rm -f "$old_cache"; fi
+done
 declare -A SCANNED_CACHE=()
 
 if [ -f "$CACHE_FILE" ]; then
@@ -89,86 +103,89 @@ if [ "$PKG_COUNT" -eq 0 ]; then
   exit 1
 fi
 
-if [ "$PKG_COUNT" -gt 0 ]; then
-  TAR_CMD="tar"
-  if command -v bsdtar >/dev/null 2>&1; then
-    TAR_CMD="bsdtar"
+# yara_check <label> <content>: run the YARA rules over a script body, if YARA is available
+yara_check() {
+  [ ${#YARA_RULES[@]} -gt 0 ] || return 0
+  local target="$YARA_RULES_DIR/target" res
+  grep -vE '^\s*#' <<< "$2" > "$target" || true
+  if ! res=$(yara "${YARA_RULES[@]}" "$target" 2>&1); then
+    echo "::error::YARA failed while scanning $1: $res"
+    exit 1
+  fi
+  if [[ -n "$res" ]]; then
+    FINDINGS+=("YARA_SIGNATURE_MATCH (${res%% *}) in $1")
+    FOUND=1
+  fi
+}
+
+EXTRACT_DIR="$YARA_RULES_DIR/extract"
+HOOK_PATHS_RE='^\./usr/share/libalpm/(hooks|scripts)/'
+
+CURRENT_IDX=0
+while IFS= read -r pkg_file; do
+  [[ -z "$pkg_file" ]] && continue
+  pkg_name=$(basename "$pkg_file")
+
+  # Cryptographic SHA-256 bit sum verification
+  PKG_HASH=$(sha256sum "$pkg_file" 2>/dev/null | awk '{print $1}')
+  if [[ -n "$PKG_HASH" && "${SCANNED_CACHE[$pkg_name]:-}" == "$PKG_HASH" ]]; then
+    SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+    continue
   fi
 
-  CURRENT_IDX=0
-  while IFS= read -r pkg_file; do
-    [[ -z "$pkg_file" ]] && continue
-    pkg_name=$(basename "$pkg_file")
+  INSPECTED_COUNT=$((INSPECTED_COUNT + 1))
+  CURRENT_IDX=$((CURRENT_IDX + 1))
 
-    # Cryptographic SHA-256 bit sum verification
-    PKG_HASH=$(sha256sum "$pkg_file" 2>/dev/null | awk '{print $1}')
-    if [[ -n "$PKG_HASH" && "${SCANNED_CACHE[$pkg_name]:-}" == "$PKG_HASH" ]]; then
-      SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-      continue
-    fi
+  # .MTREE sits at the front of every package and lists every file, so reading it with
+  # --fast-read tells us what to extract without decompressing the whole archive
+  FILE_PATHS=$(bsdtar -qxOf "$pkg_file" .MTREE 2>/dev/null | gzip -dc 2>/dev/null | awk '!/type=dir/ && /^\.\// {print $1}' || true)
+  if [[ -z "$FILE_PATHS" ]]; then
+    echo "::warning::$pkg_name has no readable .MTREE; listing the full archive instead."
+    FILE_PATHS=$(bsdtar -tf "$pkg_file" 2>/dev/null | grep -v '/$' | sed 's|^|./|' || true)
+  fi
 
-    INSPECTED_COUNT=$((INSPECTED_COUNT + 1))
-    CURRENT_IDX=$((CURRENT_IDX + 1))
+  # 1. Known IOC paths shipped by the package (checked before anything is installed)
+  IOC_HITS=$(grep -E "$PAT_IOC_PATHS" <<< "$FILE_PATHS" || true)
+  if [[ -n "$IOC_HITS" ]]; then
+    FINDINGS+=("IOC_PATH in $pkg_name: $(tr '\n' ' ' <<< "$IOC_HITS")")
+    FOUND=1
+  fi
 
-    # Extract .INSTALL scriptlet if present in package archive
-    INSTALL_CONTENT=""
-    if [ "$TAR_CMD" = "bsdtar" ]; then
-      INSTALL_CONTENT=$(bsdtar -O -xf "$pkg_file" .INSTALL 2>/dev/null || true)
-    else
-      INSTALL_CONTENT=$(tar -xOf "$pkg_file" .INSTALL 2>/dev/null || true)
-    fi
+  # 2. .INSTALL scriptlet (runs as root during install)
+  HAS_INSTALL=0
+  if grep -qx '\./\.INSTALL' <<< "$FILE_PATHS"; then
+    HAS_INSTALL=1
+    INSTALL_CONTENT=$(bsdtar -qxOf "$pkg_file" .INSTALL 2>/dev/null || true)
+    check_script "$pkg_name .INSTALL" "$INSTALL_CONTENT"
+    yara_check "$pkg_name .INSTALL" "$INSTALL_CONTENT"
+  fi
 
-    if [ "$VERBOSE" -eq 1 ]; then
-      if [ -n "$INSTALL_CONTENT" ]; then
-        echo "  🔍 [$CURRENT_IDX/$PKG_COUNT] Inspecting $pkg_name (.INSTALL scriptlet found)..."
+  # 3. ALPM hooks and the scripts they run (also run as root during every transaction)
+  mapfile -t HOOK_FILES < <(grep -E "$HOOK_PATHS_RE" <<< "$FILE_PATHS" | sed 's|^\./||' || true)
+  if [ ${#HOOK_FILES[@]} -gt 0 ]; then
+    rm -rf "$EXTRACT_DIR" && mkdir -p "$EXTRACT_DIR"
+    bsdtar -xf "$pkg_file" -C "$EXTRACT_DIR" "${HOOK_FILES[@]}" 2>/dev/null || true
+    for hook_file in "${HOOK_FILES[@]}"; do
+      [ -f "$EXTRACT_DIR/$hook_file" ] || continue
+      HOOK_CONTENT=$(< "$EXTRACT_DIR/$hook_file")
+      if [[ "$hook_file" == *.hook ]]; then
+        check_exec_lines "$pkg_name /$hook_file" "$HOOK_CONTENT"
       else
-        echo "  🔍 [$CURRENT_IDX/$PKG_COUNT] Inspecting $pkg_name (clean binary archive)..."
+        check_script "$pkg_name /$hook_file" "$HOOK_CONTENT"
+        yara_check "$pkg_name /$hook_file" "$HOOK_CONTENT"
       fi
-    fi
+    done
+  fi
 
-    if [[ -n "$INSTALL_CONTENT" ]]; then
-      # Strip comment lines to prevent false positives on documentation or echo URLs
-      CLEAN_CONTENT=$(echo "$INSTALL_CONTENT" | grep -vE '^\s*#' || true)
+  if [ "$VERBOSE" -eq 1 ]; then
+    echo "  🔍 [$CURRENT_IDX] $pkg_name (.INSTALL: $HAS_INSTALL, ALPM hook files: ${#HOOK_FILES[@]})"
+  fi
 
-      # 1. Obfuscation & Dynamic Evaluation (detecting active execution)
-      if echo "$CLEAN_CONTENT" | grep -qE '(base64\s+(-d|--decode)|eval\s+(\$|`)|openssl\s+enc|xxd\s+-r|\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile)'; then
-        FINDINGS+=("OBFUSCATED_SCRIPTLET in package archive: $pkg_name")
-        FOUND=1
-      fi
-
-      # 2. Suspicious Outbound Execution & Webhooks (distinguishing active commands from echo text)
-      if echo "$CLEAN_CONTENT" | grep -qE '((curl|wget|fetch)\s+.*(\||>|\$\()|ncat\s|nc\s+-e|/dev/tcp/|discord\.com/api/webhooks|api\.telegram\.org)'; then
-        FINDINGS+=("NETWORK_EGRESS_CALL in scriptlet: $pkg_name")
-        FOUND=1
-      fi
-
-      # 3. Sensitive Path / Credential Access
-      if echo "$CLEAN_CONTENT" | grep -qE '(/etc/shadow|\.ssh/id_|\.aws/credentials|\.config/(BraveSoftware|google-chrome|chromium)/.*Default)'; then
-        FINDINGS+=("CREDENTIAL_ACCESS_TARGET in scriptlet: $pkg_name")
-        FOUND=1
-      fi
-
-      # 4. YARA Threat Signature Scan (if YARA is available)
-      if [ ${#YARA_RULES[@]} -gt 0 ]; then
-        TMP_SCRIPT_FILE="$YARA_RULES_DIR/scriptlet"
-        echo "$CLEAN_CONTENT" > "$TMP_SCRIPT_FILE"
-        if ! YARA_RES=$(yara "${YARA_RULES[@]}" "$TMP_SCRIPT_FILE" 2>&1); then
-          echo "::error::YARA failed while scanning $pkg_name: $YARA_RES"
-          exit 1
-        fi
-        if [[ -n "$YARA_RES" ]]; then
-          FINDINGS+=("YARA_SIGNATURE_MATCH ($YARA_RES) in scriptlet: $pkg_name")
-          FOUND=1
-        fi
-      fi
-    fi
-
-    # Record verified package hash for persistent caching
-    if [[ $FOUND -eq 0 && -n "$PKG_HASH" ]]; then
-      NEW_VERIFIED+=("$PKG_HASH $pkg_name")
-    fi
-  done <<< "$PKG_FILES"
-fi
+  # Record verified package hash for persistent caching
+  if [[ $FOUND -eq 0 && -n "$PKG_HASH" ]]; then
+    NEW_VERIFIED+=("$PKG_HASH $pkg_name")
+  fi
+done <<< "$PKG_FILES"
 
 if [[ $FOUND -eq 1 ]]; then
   echo "::error::🚨 COMPROMISED PACKAGE ARCHIVE DETECTED IN CACHE! 🚨"

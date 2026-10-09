@@ -1,0 +1,35 @@
+# Setuid/setgid files expected in BoppOS images (bash glob patterns, paths relative to /).
+# Built from the package mtrees of a published image plus the chmod list in Containerfile.base.
+# scan-image-ioc.sh warns about any setuid/setgid file not matched here.
+usr/bin/chage
+usr/bin/chfn
+usr/bin/chsh
+usr/bin/cnpkmoduleufr2r
+usr/bin/expiry
+usr/bin/fusermount
+usr/bin/fusermount3
+usr/bin/gpasswd
+usr/bin/ksu
+usr/bin/mount
+usr/bin/mount.cifs
+usr/bin/mount.nfs
+usr/bin/newgrp
+usr/bin/passwd
+usr/bin/pkexec
+usr/bin/plocate
+usr/bin/sg
+usr/bin/su
+usr/bin/sudo
+usr/bin/umount
+usr/bin/unix_chkpwd
+usr/bin/wall
+usr/bin/write
+usr/lib/dbus-daemon-launch-helper
+usr/lib/lxc/lxc-user-nic
+usr/lib/polkit-1/polkit-agent-helper-1
+usr/lib/ssh/ssh-keysign
+usr/lib/utempter/utempter
+# Electron/Chromium sandbox helpers (versioned paths, plus apps relocated from /opt)
+usr/lib/electron*/chrome-sandbox
+usr/lib/opt/*/chrome-sandbox
+usr/lib/*/chrome-sandbox
