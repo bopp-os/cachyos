@@ -117,7 +117,9 @@ def main():
                     if e.errno not in (errno.ENODATA, 61):  # 61 is ENOATTR on macOS / Linux fallback
                         continue
 
-                # Check if user.component exists and append interval suffix
+                # Append interval suffix to an existing user.component; files from packages that
+                # predate the ALPM hook (shipped in the upstream base image) have none, so name
+                # the component after the package like the hook does
                 try:
                     comp_bytes = os.getxattr(full_path, "user.component", follow_symlinks=False)
                     comp = comp_bytes.decode(errors="ignore")
@@ -125,8 +127,10 @@ def main():
                         if comp.endswith(s):
                             comp = comp[:-len(s)]
                             break
-                    comp_val = f"{comp}-{interval}"
-                    os.setxattr(full_path, "user.component", comp_val.encode(), follow_symlinks=False)
+                except OSError:
+                    comp = pkg
+                try:
+                    os.setxattr(full_path, "user.component", f"{comp}-{interval}".encode(), follow_symlinks=False)
                 except OSError:
                     pass
 
@@ -173,12 +177,50 @@ def main():
             except OSError:
                 pass
 
-    # Sweep for remaining untagged regular files in /usr and /etc
+    # Re-tag the pacman database unconditionally: every pacman transaction writes new files
+    # without xattrs, and earlier sweeps may have claimed them for another component
+    print("Tagging pacman database as user.component=pacman-db...")
+    sysimage_dir = os.path.join(rootfs, "usr/lib/sysimage")
+    if os.path.isdir(sysimage_dir):
+        for root, _, fnames in os.walk(sysimage_dir, followlinks=False):
+            for fname in fnames:
+                fpath = os.path.join(root, fname)
+                try:
+                    if stat.S_ISREG(os.lstat(fpath).st_mode):
+                        os.setxattr(fpath, "user.component", b"pacman-db", follow_symlinks=False)
+                        os.setxattr(fpath, "user.update-interval", b"daily", follow_symlinks=False)
+                except OSError:
+                    pass
+
+    # Sweep for remaining untagged regular files in /usr and /etc, splitting them by kind so
+    # small volatile files don't share a layer with large stable ones
     print("Sweeping for remaining untagged regular files in /usr and /etc...")
     sweep_dirs = [
         os.path.join(rootfs, "usr"),
         os.path.join(rootfs, "etc"),
     ]
+    config_prefixes = (
+        "usr/lib/systemd/",
+        "usr/lib/tmpfiles.d/",
+        "usr/lib/sysusers.d/",
+        "usr/lib/modprobe.d/",
+        "usr/lib/modules-load.d/",
+        "usr/lib/udev/rules.d/",
+        "usr/lib/dracut/",
+        "usr/share/libalpm/hooks/",
+        "etc/",
+    )
+    sweep_counts = {}
+
+    def sweep_component(rel_path, fname):
+        if rel_path.startswith("usr/lib/locale/"):
+            return "locale-archive", "monthly"
+        if fname.endswith(".cache") or rel_path in ("usr/share/info/dir", "usr/lib/udev/hwdb.bin"):
+            return "system-cache", "daily"
+        if rel_path.startswith(config_prefixes):
+            return "system-config", "weekly"
+        parts = rel_path.split("/")
+        return "image-generated-" + "-".join(parts[:min(3, len(parts) - 1)]), "weekly"
 
     for sdir in sweep_dirs:
         if not os.path.isdir(sdir):
@@ -194,11 +236,15 @@ def main():
                         os.getxattr(fpath, "user.component", follow_symlinks=False)
                     except OSError as e:
                         if e.errno in (errno.ENODATA, 61):
-                            os.setxattr(fpath, "user.component", b"image-generated", follow_symlinks=False)
-                            os.setxattr(fpath, "user.update-interval", b"weekly", follow_symlinks=False)
+                            comp, interval = sweep_component(os.path.relpath(fpath, rootfs), fname)
+                            os.setxattr(fpath, "user.component", comp.encode(), follow_symlinks=False)
+                            os.setxattr(fpath, "user.update-interval", interval.encode(), follow_symlinks=False)
+                            sweep_counts[comp] = sweep_counts.get(comp, 0) + 1
                 except OSError:
                     pass
 
+    for comp in sorted(sweep_counts):
+        print(f"  {comp}: {sweep_counts[comp]} files")
     print("Fallback component tagging complete.")
 
 
