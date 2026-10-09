@@ -16,9 +16,8 @@ echo "::group::Pre-Build Package Cache Security Scan"
 echo "Scanning package archives in $CACHE_DIR..."
 
 if [ ! -d "$CACHE_DIR" ]; then
-  echo "Package cache directory $CACHE_DIR does not exist. Skipping pre-scan."
-  echo "::endgroup::"
-  exit 0
+  echo "::error::Package cache directory $CACHE_DIR does not exist; refusing to report a clean scan."
+  exit 1
 fi
 
 FOUND=0
@@ -40,30 +39,44 @@ NEW_VERIFIED=()
 SKIPPED_COUNT=0
 INSPECTED_COUNT=0
 
-# Prepare YARA threat rules once upfront if YARA is available
-YARA_RULES_DIR="/tmp/yara-rules"
-YARA_COMPILED=""
+# Prepare YARA threat rules once upfront if YARA is available. The local rules must load and
+# pass a self-test; the remote rules are optional and dropped with a warning if they fail.
+YARA_RULES_DIR=$(mktemp -d /tmp/yara-rules.XXXXXX)
+trap 'rm -rf "$YARA_RULES_DIR"' EXIT
+YARA_RULES=()
 if command -v yara >/dev/null 2>&1; then
-  if [ ! -d "$YARA_RULES_DIR" ]; then
-    mkdir -p "$YARA_RULES_DIR"
-    curl -sSL --retry 2 --max-time 10 "https://raw.githubusercontent.com/Neo23x0/signature-base/master/yara/gen_webshells.yar" -o "$YARA_RULES_DIR/remote.yar" 2>/dev/null || true
-    if [ -f "/tmp/files/security/yara_rules.yar" ]; then
-      cat "/tmp/files/security/yara_rules.yar" >> "$YARA_RULES_DIR/combined.yar"
-    elif [ -f "files/security/yara_rules.yar" ]; then
-      cat "files/security/yara_rules.yar" >> "$YARA_RULES_DIR/combined.yar"
+  LOCAL_RULES=""
+  for candidate in /tmp/files/security/yara_rules.yar files/security/yara_rules.yar; do
+    if [ -f "$candidate" ]; then
+      LOCAL_RULES="$candidate"
+      break
     fi
-    if [ -f "$YARA_RULES_DIR/remote.yar" ]; then
-      cat "$YARA_RULES_DIR/remote.yar" >> "$YARA_RULES_DIR/combined.yar" 2>/dev/null || true
-    fi
+  done
+  if [ -z "$LOCAL_RULES" ]; then
+    echo "::error::YARA is installed but files/security/yara_rules.yar was not found."
+    exit 1
   fi
-  if [ -f "$YARA_RULES_DIR/combined.yar" ]; then
-    if command -v yarac >/dev/null 2>&1; then
-      yarac "$YARA_RULES_DIR/combined.yar" "$YARA_RULES_DIR/combined.yarc" 2>/dev/null || true
-      if [ -f "$YARA_RULES_DIR/combined.yarc" ]; then
-        YARA_COMPILED="$YARA_RULES_DIR/combined.yarc"
-      fi
-    fi
+  YARA_RULES+=("$LOCAL_RULES")
+
+  REMOTE_RULES="$YARA_RULES_DIR/remote.yar"
+  : > "$YARA_RULES_DIR/empty"
+  if curl -fsSL --retry 2 --max-time 30 "https://raw.githubusercontent.com/Neo23x0/signature-base/master/yara/gen_webshells.yar" -o "$REMOTE_RULES" &&
+    yara "$REMOTE_RULES" "$YARA_RULES_DIR/empty" >/dev/null 2>&1; then
+    YARA_RULES+=("$REMOTE_RULES")
+  else
+    echo "::warning::Remote YARA rules could not be downloaded or loaded; scanning with local rules only."
   fi
+
+  # Self-test: a known-bad sample must match, otherwise the YARA scan is not working
+  SELFTEST_FILE="$YARA_RULES_DIR/selftest.sh"
+  echo 'echo cGF5bG9hZA== | base64 -d | sh' > "$SELFTEST_FILE"
+  if ! yara "${YARA_RULES[@]}" "$SELFTEST_FILE" 2>&1 | grep -q '^Obfuscated_Base64_Payload '; then
+    echo "::error::YARA self-test failed: rules from $LOCAL_RULES did not match a known-bad sample."
+    exit 1
+  fi
+  echo "YARA ready: ${#YARA_RULES[@]} rule file(s) loaded, self-test passed."
+else
+  echo "::warning::YARA is not installed; scanning scriptlets with grep heuristics only."
 fi
 
 # Find all package archives in cache
@@ -71,6 +84,10 @@ PKG_FILES=$(find "$CACHE_DIR" -type f \( -name "*.pkg.tar.zst" -o -name "*.pkg.t
 PKG_COUNT=$(echo "$PKG_FILES" | grep -c "\.pkg\.tar" || true)
 
 echo "Found $PKG_COUNT package archives to inspect (${#SCANNED_CACHE[@]} bit-sums cached)..."
+if [ "$PKG_COUNT" -eq 0 ]; then
+  echo "::error::No package archives found in $CACHE_DIR; refusing to report a clean scan."
+  exit 1
+fi
 
 if [ "$PKG_COUNT" -gt 0 ]; then
   TAR_CMD="tar"
@@ -132,17 +149,13 @@ if [ "$PKG_COUNT" -gt 0 ]; then
       fi
 
       # 4. YARA Threat Signature Scan (if YARA is available)
-      if command -v yara >/dev/null 2>&1; then
-        TMP_SCRIPT_FILE=$(mktemp /tmp/scriptlet.XXXXXX)
+      if [ ${#YARA_RULES[@]} -gt 0 ]; then
+        TMP_SCRIPT_FILE="$YARA_RULES_DIR/scriptlet"
         echo "$CLEAN_CONTENT" > "$TMP_SCRIPT_FILE"
-        if [ -n "$YARA_COMPILED" ] && [ -f "$YARA_COMPILED" ]; then
-          YARA_RES=$(yara -C "$YARA_COMPILED" "$TMP_SCRIPT_FILE" 2>/dev/null || true)
-        elif [ -f "$YARA_RULES_DIR/combined.yar" ]; then
-          YARA_RES=$(yara "$YARA_RULES_DIR/combined.yar" "$TMP_SCRIPT_FILE" 2>/dev/null || true)
-        else
-          YARA_RES=""
+        if ! YARA_RES=$(yara "${YARA_RULES[@]}" "$TMP_SCRIPT_FILE" 2>&1); then
+          echo "::error::YARA failed while scanning $pkg_name: $YARA_RES"
+          exit 1
         fi
-        rm -f "$TMP_SCRIPT_FILE"
         if [[ -n "$YARA_RES" ]]; then
           FINDINGS+=("YARA_SIGNATURE_MATCH ($YARA_RES) in scriptlet: $pkg_name")
           FOUND=1

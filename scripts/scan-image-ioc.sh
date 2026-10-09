@@ -14,7 +14,11 @@ echo "Building file listing from mount..."
 # sed strips the mount prefix so paths match the expected relative format
 FILE_LIST=$(sudo find "$MNT_DIR" -type f 2>/dev/null | sed "s|^$MNT_DIR/||")
 
-FILE_COUNT=$(echo "$FILE_LIST" | wc -l)
+FILE_COUNT=$(echo "$FILE_LIST" | grep -c . || true)
+if [[ "$FILE_COUNT" -eq 0 ]]; then
+  echo "::error::Image mount at $MNT_DIR has no files; refusing to report a clean scan."
+  exit 1
+fi
 echo "Scanning $FILE_COUNT files..."
 
 FOUND=0
@@ -44,13 +48,25 @@ fi
 
 # --- Package .install & ALPM Scriptlet Heuristics ---
 echo "Auditing pacman package .install scriptlets for heuristics..."
-INSTALL_HOOKS=$(sudo find "$MNT_DIR/var/lib/pacman/local" -type f \( -name "install" -o -name "*.install" \) 2>/dev/null || true)
+# The real database lives under /usr/lib/sysimage. /var/lib/pacman is an absolute symlink
+# that resolves against the runner's filesystem, not the mounted image, so never use it.
+PACMAN_DB="$MNT_DIR/usr/lib/sysimage/lib/pacman/local"
+if ! sudo test -d "$PACMAN_DB" || sudo test -L "$PACMAN_DB"; then
+  echo "::error::Pacman database not found at ${PACMAN_DB#$MNT_DIR}; cannot audit scriptlets."
+  exit 1
+fi
+DB_ENTRIES=$(sudo find "$PACMAN_DB" -mindepth 1 -maxdepth 1 -type d | wc -l)
+if [[ "$DB_ENTRIES" -eq 0 ]]; then
+  echo "::error::Pacman database at ${PACMAN_DB#$MNT_DIR} is empty; cannot audit scriptlets."
+  exit 1
+fi
+INSTALL_HOOKS=$(sudo find "$PACMAN_DB" -type f \( -name "install" -o -name "*.install" \))
+echo "Found $(echo "$INSTALL_HOOKS" | grep -c . || true) scriptlets across $DB_ENTRIES installed packages."
 
 if [[ -n "$INSTALL_HOOKS" ]]; then
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     clean_name=${file#$MNT_DIR/}
-    pkg_name=$(echo "$clean_name" | cut -d'/' -f5 || echo "$clean_name")
 
     # Read content stripping comment lines
     HOOK_CONTENT=$(sudo grep -vE '^\s*#' "$file" 2>/dev/null || true)
