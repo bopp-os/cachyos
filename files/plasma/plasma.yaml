@@ -6,7 +6,6 @@ kde-core:
   - xdg-desktop-portal
   - xdg-desktop-portal-kde
   - xdg-desktop-portal-gtk
-  - colord-kde
   - cardwire
 kde-integration:
   - udisks2
