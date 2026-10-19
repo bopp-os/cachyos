@@ -338,6 +338,7 @@ schedulers:
 desktop-integration:
   - xorg-xwayland
   - xdg-utils
+  - xdg-native-messaging-proxy
   - libappimage
   - gtk3
   - gtk4
