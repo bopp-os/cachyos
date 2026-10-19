@@ -327,6 +327,8 @@ containers:
   - podman
   - podman-compose
   - distrobox
+  - litterbox-sandbox
+  - litterbox-sandbox-addons
   - flatpak
   - ptyxis
 schedulers:
@@ -385,6 +387,7 @@ gaming-core:
   - xorg-xwininfo
   - xdotool
   - scopebuddy-git
+  - afmf-linux
   - yad
   - mangohud
   - lib32-mangohud
