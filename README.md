@@ -40,7 +40,7 @@ This is all very experimental. So use at your own risk.
 Some of these tools (specifically `bopp-migrate`) manipulate core system and user configurations. **Do NOT run them unless you fully understand what they do.** They are largely untested and could result in a broken system or data loss. Always ensure you have a separate, verified backup of your data before running migration commands.
 
 Important commands included in `boppos-tools`:
-- `boppos-update`: A comprehensive update script that seamlessly updates your OS (`bootc`), firmware, Flatpaks, Homebrew, and Distroboxes.
+- `boppos-update`: A comprehensive update script that seamlessly updates your OS (`bootc`), firmware, Flatpaks, Homebrew, Distroboxes, and Litterboxes.
 - `bopp-tray`: A background tray application that checks for new image updates periodically.
 - `bopp-diff`: Analyzes the current running system against staged or upstream `bootc` images to provide a clear package diff.
 - `bopp-kargs`: A utility to manage Boot Loader Specification (BLS) kernel arguments for atomic deployments.
