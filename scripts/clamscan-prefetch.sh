@@ -5,7 +5,9 @@
 #   3. the upstream base image rootfs (files it ships with that never pass through the package cache)
 #
 # Uses the clamav/clamav container, like the pkgbuilds repo. Anything already scanned clean (package by SHA-256,
-# image by ID) is recorded in <cache_dir>/.clamav_scan_cache and skipped on later runs.
+# image by ID) is recorded and skipped on later runs. The record sits one level up from <cache_dir>, so it is shared by
+# the per-arch caches (<root>/v3, <root>/v4, ...): any-arch packages, packages from the shared repos and the brew image
+# are scanned once for all arches. The build workflows share one concurrency group, so only one run writes it at a time.
 #
 # Usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>
 set -euo pipefail
@@ -14,7 +16,10 @@ CACHE_DIR=$(readlink -f "${1:?usage: clamscan-prefetch.sh <cache_dir> <base_imag
 BASE_IMAGE=${2:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}
 BREW_IMAGE=${3:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}
 CLAMAV_IMAGE="docker.io/clamav/clamav:stable"
-CACHE_FILE="$CACHE_DIR/.clamav_scan_cache"
+CACHE_ROOT=$(dirname "$CACHE_DIR")
+CACHE_FILE="$CACHE_ROOT/.clamav_scan_cache"
+# Per-arch record from before the record was shared; merged in once, then removed.
+LEGACY_CACHE_FILE="$CACHE_DIR/.clamav_scan_cache"
 # Unpacked packages are scanned in batches of about this much compressed data, so a cold cache does not need the
 # whole package set unpacked on disk at once. Each batch reloads the signature database (~20-40s).
 BATCH_BYTES=$((2 * 1024 * 1024 * 1024))
@@ -31,12 +36,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Both are sets of "<sha256-or-image-id> <package-file-or-image:ref>" entries.
 declare -A SCANNED=()
-if [ -f "$CACHE_FILE" ]; then
+for f in "$CACHE_FILE" "$LEGACY_CACHE_FILE"; do
+  [ -f "$f" ] || continue
   while IFS=' ' read -r hash name; do
-    [[ -n "$name" && -n "$hash" ]] && SCANNED["$name"]="$hash"
-  done < "$CACHE_FILE"
-fi
+    [[ -n "$name" && -n "$hash" ]] && SCANNED["$hash $name"]=1
+  done < "$f"
+done
 declare -A KEEP=()
 FINDINGS=()
 
@@ -79,8 +86,8 @@ mount_unscanned_image() {
   IMAGE_MNT=""
   sudo podman image exists "$ref" || sudo podman pull -q "$ref" >/dev/null
   IMAGE_ID=$(sudo podman image inspect --format '{{.Id}}' "$ref")
-  if [[ "${SCANNED["image:$ref"]:-}" == "$IMAGE_ID" ]]; then
-    KEEP["image:$ref"]=$IMAGE_ID
+  if [[ -n "${SCANNED["$IMAGE_ID image:$ref"]:-}" ]]; then
+    KEEP["$IMAGE_ID image:$ref"]=1
     echo "  ✓ $ref already scanned clean, skipping."
     return 0
   fi
@@ -118,7 +125,7 @@ scan_batch() {
   echo "  🔍 Scanning batch of ${#BATCH[@]} unpacked packages..."
   if clamscan_paths pkgs "$PKG_DIR"; then
     for entry in "${BATCH[@]}"; do
-      KEEP["${entry#* }"]=${entry%% *}
+      KEEP["$entry"]=1
     done
   fi
   sudo rm -rf "$PKG_DIR"
@@ -129,8 +136,8 @@ scan_batch() {
 while IFS= read -r -d '' pkg_file; do
   pkg_name=$(basename "$pkg_file")
   pkg_hash=$(sha256sum "$pkg_file" | awk '{print $1}')
-  if [[ "${SCANNED[$pkg_name]:-}" == "$pkg_hash" ]]; then
-    KEEP["$pkg_name"]=$pkg_hash
+  if [[ -n "${SCANNED["$pkg_hash $pkg_name"]:-}" ]]; then
+    KEEP["$pkg_hash $pkg_name"]=1
     SKIPPED_PKGS=$((SKIPPED_PKGS + 1))
     continue
   fi
@@ -163,7 +170,7 @@ if [ -n "$BREW_MNT" ]; then
     sudo $TAR_CMD -xf "$tarball" -C "$out"
   done < <(sudo find "$BREW_MNT/system_files" -type f -name "*.tar.*" -print0)
   if clamscan_paths brew "$BREW_MNT/system_files" brew-unpacked "$BREW_UNPACKED"; then
-    KEEP["image:$BREW_IMAGE"]=$IMAGE_ID
+    KEEP["$IMAGE_ID image:$BREW_IMAGE"]=1
   fi
   sudo rm -rf "$BREW_UNPACKED"
   printf -- '- Brew image `%s`: scanned\n' "$BREW_IMAGE" >> "$SUMMARY"
@@ -179,19 +186,34 @@ BASE_MNT=$IMAGE_MNT
 if [ -n "$BASE_MNT" ]; then
   echo "  🔍 Scanning $BASE_IMAGE rootfs..."
   if clamscan_paths base "$BASE_MNT"; then
-    KEEP["image:$BASE_IMAGE"]=$IMAGE_ID
+    KEEP["$IMAGE_ID image:$BASE_IMAGE"]=1
   fi
   printf -- '- Base image `%s`: scanned\n' "$BASE_IMAGE" >> "$SUMMARY"
 else
   printf -- '- Base image `%s`: already clean\n' "$BASE_IMAGE" >> "$SUMMARY"
 fi
 
-# Only clean entries that still exist are kept, so pruned packages and replaced images drop out.
-TMP_CACHE=$(mktemp "$CACHE_DIR/.clamav_scan_cache.XXXXXX")
-for name in "${!KEEP[@]}"; do
-  echo "${KEEP[$name]} $name"
-done > "$TMP_CACHE"
-mv -f "$TMP_CACHE" "$CACHE_FILE"
+# Only clean entries that still exist are kept, so pruned packages and replaced images drop out. Entries from the
+# other arches stay while their package file is still in that arch's cache, or for images this run did not use.
+for entry in "${!SCANNED[@]}"; do
+  [[ -n "${KEEP[$entry]:-}" ]] && continue
+  name=${entry#* }
+  if [[ "$name" == image:* ]]; then
+    [[ "$name" != "image:$BASE_IMAGE" && "$name" != "image:$BREW_IMAGE" ]] && KEEP["$entry"]=1
+    continue
+  fi
+  for other in "$CACHE_ROOT"/*/"$name"; do
+    if [[ -f "$other" && "$(dirname "$other")" != "$CACHE_DIR" ]]; then
+      KEEP["$entry"]=1
+      break
+    fi
+  done
+done
+TMP_CACHE="$WORK_DIR/clamav_scan_cache"
+printf '%s\n' "${!KEEP[@]}" | sort -k2 > "$TMP_CACHE"
+# The cache root is created by root, and the per-arch folders are not world-writable everywhere.
+sudo install -m 0644 "$TMP_CACHE" "$CACHE_FILE"
+sudo rm -f "$LEGACY_CACHE_FILE"
 
 echo "::endgroup::"
 

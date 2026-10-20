@@ -685,7 +685,7 @@ jobs:
           CACHE_GB=$(du -s --block-size=1G "$CACHE_DIR" | cut -f1)
           if [ "$CACHE_GB" -gt "${{ env.PKG_CACHE_MAX_GB }}" ]; then
             echo "Cache is ${CACHE_GB}G (limit ${{ env.PKG_CACHE_MAX_GB }}G). Wiping it; the next prefetch re-downloads."
-            sudo rm -rf "$CACHE_DIR"/* "$CACHE_DIR"/.pkg_scan_cache "$CACHE_DIR"/.clamav_scan_cache
+            sudo rm -rf "$CACHE_DIR"/* "$CACHE_DIR"/.pkg_scan_cache
           fi
 
           echo "Pacman cache size after pruning:"
