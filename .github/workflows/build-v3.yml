@@ -269,6 +269,13 @@ jobs:
             -f Containerfile.prefetch .
           echo "::endgroup::"
 
+      - name: ClamAV Scan (Packages, Brew & Base Image)
+        run: |
+          # Scan the brew image Containerfile.base actually copies from, so the two cannot drift apart
+          BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
+          chmod +x scripts/clamscan-prefetch.sh
+          ./scripts/clamscan-prefetch.sh "${{ env.LOCAL_CACHE_DIR }}" "${{ env.BASE_IMAGE }}" "$BREW_IMAGE"
+
       - name: Build Base Image
         id: build_base
         timeout-minutes: 60
@@ -678,7 +685,7 @@ jobs:
           CACHE_GB=$(du -s --block-size=1G "$CACHE_DIR" | cut -f1)
           if [ "$CACHE_GB" -gt "${{ env.PKG_CACHE_MAX_GB }}" ]; then
             echo "Cache is ${CACHE_GB}G (limit ${{ env.PKG_CACHE_MAX_GB }}G). Wiping it; the next prefetch re-downloads."
-            sudo rm -rf "$CACHE_DIR"/* "$CACHE_DIR"/.pkg_scan_cache
+            sudo rm -rf "$CACHE_DIR"/* "$CACHE_DIR"/.pkg_scan_cache "$CACHE_DIR"/.clamav_scan_cache
           fi
 
           echo "Pacman cache size after pruning:"
