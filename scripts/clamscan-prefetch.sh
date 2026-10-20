@@ -54,19 +54,23 @@ FINDINGS=()
 
 # Scans the given paths inside the clamd container (WORK_DIR is /scan/work there) with clamdscan --multiscan; clamdscan
 # options such as --file-list=/scan/work/<list> can be passed too.
-# Returns 0 when clean; findings and scan errors are added to FINDINGS.
+# Returns 0 when clean; findings and scan errors are added to FINDINGS. FLAGGED_PATHS lists the files with findings,
+# and SCAN_RC is clamdscan's exit code (1: findings only, 2: scan errors).
 clamd_scan() {
   local out rc
+  FLAGGED_PATHS=()
   set +e
   out=$(sudo podman exec "$CLAMD_CTR" clamdscan --config-file=/scan/work/clamd.conf \
     --multiscan --no-summary --infected "$@" 2>&1)
   rc=$?
+  SCAN_RC=$rc
   set -e
   case $rc in
     0) return 0 ;;
     1)
       while IFS= read -r line; do
         FINDINGS+=("${line#/scan/}")
+        FLAGGED_PATHS+=("${line%%: *}")
       done < <(echo "$out" | grep 'FOUND$')
       ;;
     *)
@@ -150,6 +154,9 @@ ScanArchive yes
 MaxFileSize 2000M
 MaxScanSize 4000M
 AlertExceedsMax yes
+# Per-file time limit (default 2 min). Firefox's omni.ja, a large zip of browser resources, needs longer; a file that
+# still hits it counts as a finding (Heuristics.Limits.Exceeded.MaxScanTime).
+MaxScanTime 900000
 ConcurrentDatabaseReload no
 EOF
 CLAMD_MOUNTS=("-v" "$WORK_DIR:/scan/work:ro")
@@ -179,6 +186,17 @@ scan_batch() {
   if clamd_scan /scan/work/pkgs; then
     for entry in "${BATCH[@]}"; do
       KEEP["$entry"]=1
+    done
+    save_record
+  elif [ "$SCAN_RC" -eq 1 ]; then
+    # Only findings, no scan errors: every package without one was scanned clean, so the rest of the batch is kept.
+    declare -A flagged=()
+    for path in "${FLAGGED_PATHS[@]}"; do
+      path=${path#/scan/work/pkgs/}
+      flagged["${path%%/*}"]=1
+    done
+    for entry in "${BATCH[@]}"; do
+      [[ -z "${flagged[${entry#* }]:-}" ]] && KEEP["$entry"]=1
     done
     save_record
   fi
