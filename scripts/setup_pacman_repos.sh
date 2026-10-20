@@ -16,13 +16,16 @@ SYNC_DB_DIR="${BOPPOS_SYNC_DB_DIR:-/var/lib/pacman/sync}"
 FROZEN_DB_DIR="${BOPPOS_FROZEN_DB_DIR:-/var/cache/pacman/pkg/.sync}"
 BOOTSTRAP_DIR="${BOPPOS_BOOTSTRAP_DIR:-/var/cache/pacman/pkg/.bootstrap}"
 if [ "$MODE" = "auto" ]; then
-  if compgen -G "$FROZEN_DB_DIR/*.db" >/dev/null \
-     && [ -f "$BOOTSTRAP_DIR/chaotic-keyring.pkg.tar.zst" ] && [ -f "$BOOTSTRAP_DIR/chaotic-mirrorlist.pkg.tar.zst" ]; then
+  if compgen -G "$FROZEN_DB_DIR/*.db" >/dev/null; then
     MODE="offline"
   else
     MODE="online"
   fi
 fi
+
+# Full fingerprints of the committed Chaotic-AUR keys (files/keys/chaotic-*.asc, kept current by
+# refresh-chaotic-keys.yml, which only accepts these exact keys)
+CHAOTIC_FPRS="882DCFE48E2051D48E2562ABF3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB EF925EA60F33D0CB85C44AD13056513887B78AEB"
 
 # Installs repository packages: with a sync when online, from the frozen databases and the package cache when offline.
 repo_install() {
@@ -59,14 +62,11 @@ if [ -n "$KEYS_DIR" ]; then
   for key in "$KEYS_DIR"/*.asc; do [ -f "$key" ] && pacman-key --add "$key" || true; done
 fi
 
-if [ "$MODE" = "online" ]; then
-  curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF3B607488DB35A47" | pacman-key --add - || echo "Key refresh failed, using committed copy"
-  curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB" | pacman-key --add - || echo "Key refresh failed, using committed copy"
-  curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3056513887B78AEB" | pacman-key --add - || echo "Key refresh failed, using committed copy"
-fi
-pacman-key --lsign-key F3B607488DB35A47 || true
-pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB || true
-pacman-key --lsign-key 3056513887B78AEB || true
+# Only the committed keys are trusted (no keyserver fetch here, so prefetch and the builds trust the same keys), and
+# they are signed by full fingerprint
+for fpr in $CHAOTIC_FPRS; do
+  pacman-key --lsign-key "$fpr" || true
+done
 pacman-key --lsign-key 3806768589376830FEA123D6CF30985CE903D47C || true
 
 # Add boppos repository GPG key and locally sign it
@@ -160,25 +160,67 @@ CHAOTIC_MIRRORLIST_URLS=(
   'https://mirror.albony.in/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
 )
 
+download_sig() {
+  local target="$1"
+  shift
+  rm -f "$target"
+  for url in "$@"; do
+    if curl -f -s -S -L --retry 3 --retry-delay 2 --retry-connrefused --max-time 30 "$url" -o "$target" && [ -s "$target" ]; then
+      return 0
+    fi
+  done
+  rm -f "$target"
+  return 1
+}
+
+# pacman -U does not check the signature of a local file, so check it here: the package must carry a valid signature
+# (<file>.sig) whose primary key is one of the committed Chaotic-AUR keys.
+verify_chaotic() {
+  local primary
+  primary=$(gpg --homedir /etc/pacman.d/gnupg --status-fd 1 --verify "$1.sig" "$1" 2>/dev/null \
+    | awk '$2 == "VALIDSIG" {print $NF}')
+  if [ -z "$primary" ] || [[ " $CHAOTIC_FPRS " != *" $primary "* ]]; then
+    echo "::error::$(basename "$1") is not signed by a trusted Chaotic-AUR key; refusing to install it"
+    exit 1
+  fi
+}
+
+install_chaotic() {
+  verify_chaotic "$1/chaotic-keyring.pkg.tar.zst"
+  verify_chaotic "$1/chaotic-mirrorlist.pkg.tar.zst"
+  pacman -U --overwrite '*' --noconfirm "$1/chaotic-keyring.pkg.tar.zst" "$1/chaotic-mirrorlist.pkg.tar.zst"
+  pacman-key --populate chaotic || true
+}
+
+CHAOTIC_FILES="chaotic-keyring.pkg.tar.zst chaotic-keyring.pkg.tar.zst.sig chaotic-mirrorlist.pkg.tar.zst chaotic-mirrorlist.pkg.tar.zst.sig"
 CHAOTIC_OK=0
 if [ "$MODE" = "offline" ]; then
-  # The prefetch step downloaded and scanned these; installing them needs no network.
-  pacman -U --overwrite '*' --noconfirm "$BOOTSTRAP_DIR/chaotic-keyring.pkg.tar.zst" "$BOOTSTRAP_DIR/chaotic-mirrorlist.pkg.tar.zst"
-  pacman-key --populate chaotic || true
-  CHAOTIC_OK=1
-elif download_pkg /tmp/chaotic-keyring.pkg.tar.zst "${CHAOTIC_KEYRING_URLS[@]}" && \
-     download_pkg /tmp/chaotic-mirrorlist.pkg.tar.zst "${CHAOTIC_MIRRORLIST_URLS[@]}"; then
-  pacman -U --overwrite '*' --noconfirm /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
-  # Keep copies next to the cached packages so the offline builds can install them; the next ClamAV scan checks them.
-  mkdir -p "$BOOTSTRAP_DIR" && cp -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst "$BOOTSTRAP_DIR"/ \
-    || echo "Warning: could not save the Chaotic packages for the offline builds"
-  rm -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
-  pacman-key --populate chaotic || true
-  CHAOTIC_OK=1
+  # The prefetch step downloaded, verified and scanned these; installing them needs no network.
+  have_all=1
+  for f in $CHAOTIC_FILES; do [ -f "$BOOTSTRAP_DIR/$f" ] || have_all=0; done
+  if [ "$have_all" = "1" ]; then
+    install_chaotic "$BOOTSTRAP_DIR"
+    CHAOTIC_OK=1
+  fi
+else
+  # Files from an earlier prefetch must not be used if this one cannot get them
+  for f in $CHAOTIC_FILES; do rm -f "$BOOTSTRAP_DIR/$f"; done
+  mkdir -p /tmp/chaotic
+  if download_pkg /tmp/chaotic/chaotic-keyring.pkg.tar.zst "${CHAOTIC_KEYRING_URLS[@]}" && \
+     download_sig /tmp/chaotic/chaotic-keyring.pkg.tar.zst.sig "${CHAOTIC_KEYRING_URLS[@]/%/.sig}" && \
+     download_pkg /tmp/chaotic/chaotic-mirrorlist.pkg.tar.zst "${CHAOTIC_MIRRORLIST_URLS[@]}" && \
+     download_sig /tmp/chaotic/chaotic-mirrorlist.pkg.tar.zst.sig "${CHAOTIC_MIRRORLIST_URLS[@]/%/.sig}"; then
+    install_chaotic /tmp/chaotic
+    # Keep copies next to the cached packages so the offline builds can install them; the next ClamAV scan checks them.
+    mkdir -p "$BOOTSTRAP_DIR" && (cd /tmp/chaotic && cp -f $CHAOTIC_FILES "$BOOTSTRAP_DIR"/) \
+      || echo "Warning: could not save the Chaotic packages for the offline builds"
+    CHAOTIC_OK=1
+  fi
+  rm -rf /tmp/chaotic
 fi
 
 if [ "$CHAOTIC_OK" = "0" ]; then
-  echo "Warning: Could not download chaotic-aur packages; writing fallback mirrorlist..."
+  echo "Warning: Chaotic-AUR keyring/mirrorlist packages not available; writing fallback mirrorlist (the committed keys are used)..."
   mkdir -p /etc/pacman.d
   cat << 'EOF' > /etc/pacman.d/chaotic-mirrorlist
 Server = https://cdn-mirror.chaotic.cx/chaotic-aur/$arch

@@ -20,3 +20,8 @@ updates:
     directory: "/.github/grype"
     schedule:
       interval: "weekly"
+  # scripts/requirements.txt is compiled from requirements.in with hashes (pip-compile --generate-hashes)
+  - package-ecosystem: "pip"
+    directory: "/scripts"
+    schedule:
+      interval: "weekly"

@@ -1,0 +1,6 @@
+# Direct dependencies of the update-intervals workflow. requirements.txt is generated from this file with exact
+# versions and hashes (pip-compile --generate-hashes); the workflow installs with --require-hashes.
+aiohttp
+beautifulsoup4
+PyYAML
+Pillow

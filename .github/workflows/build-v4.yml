@@ -174,6 +174,9 @@ jobs:
       - name: Checkout
         if: steps.check_compatibility.outputs.should_skip != 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          # Nothing in this workflow pushes to git; don't leave the token in .git/config for later steps and tools
+          persist-credentials: false
 
       - name: Ensure Package Intervals JSON exists
         if: steps.check_compatibility.outputs.should_skip != 'true'
@@ -396,6 +399,9 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          # Nothing in this workflow pushes to git; don't leave the token in .git/config for later steps and tools
+          persist-credentials: false
 
       - name: Ensure Package Intervals JSON exists
         run: |
