@@ -135,7 +135,7 @@ jobs:
           fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* || true
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/clamscan-prefetch.* || true
           
           # Ensure local base tags are cleared at the very beginning of a new pipeline run
           sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
@@ -268,6 +268,13 @@ jobs:
             --network=host \
             -f Containerfile.prefetch .
           echo "::endgroup::"
+
+      - name: ClamAV Scan (Packages, Brew & Base Image)
+        run: |
+          # Scan the brew image Containerfile.base actually copies from, so the two cannot drift apart
+          BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
+          chmod +x scripts/clamscan-prefetch.sh
+          ./scripts/clamscan-prefetch.sh "${{ env.LOCAL_CACHE_DIR }}" "${{ env.BASE_IMAGE }}" "$BREW_IMAGE"
 
       - name: Build Base Image
         id: build_base
