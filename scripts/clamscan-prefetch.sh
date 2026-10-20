@@ -254,7 +254,9 @@ fi
 # -----------------------------------------------------------
 if [ -n "$BASE_MNT" ]; then
   BASE_HASHES="$WORK_DIR/base-hashes"
-  sudo find "$BASE_MNT" -xdev -type f -print0 | sudo xargs -0 -r sha256sum > "$BASE_HASHES"
+  # -z turns off sha256sum's escaping of file names with a backslash or newline (systemd units such as
+  # system-systemd\x2dcryptsetup.slice), which would otherwise mangle both the checksum and the path.
+  sudo find "$BASE_MNT" -xdev -type f -print0 | sudo xargs -0 -r sha256sum -z | tr '\0' '\n' > "$BASE_HASHES"
   SCAN_LIST="$WORK_DIR/base-scan-list"
   # sha256sum prints "<64 hex>  <path>"; paths are rewritten to where the rootfs is mounted in the container
   awk -v mnt="$BASE_MNT/" 'FILENAME == ARGV[1] { clean[$1] = 1; next }
