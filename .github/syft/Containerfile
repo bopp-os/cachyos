@@ -1,0 +1,4 @@
+# Pinned syft version used to generate the SBOM in the build workflows.
+# This file is never built; it exists so Dependabot opens a PR for new syft releases.
+# The image is ClamAV-scanned in the prefetch step and run from that local copy (--pull=never).
+FROM docker.io/anchore/syft:v1.55.0

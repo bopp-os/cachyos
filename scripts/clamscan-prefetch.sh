@@ -4,6 +4,8 @@
 #      Chaotic keyring/mirrorlist packages (.bootstrap/) and the kernel module source tarballs (.src/)
 #   2. the Homebrew files copied from the brew image (COPY --from=brew in Containerfile.base)
 #   3. the upstream base image rootfs (files it ships with that never pass through the package cache)
+#   4. the container images of the tools the workflows run (chunkah, syft, grype), whole; the workflows then run them
+#      with --pull=never, so they use exactly the copy scanned here
 #
 # Uses the clamav/clamav container, like the pkgbuilds repo, running one clamd for the whole step: the signature
 # database loads once, and --multiscan spreads the files over every core (the scan runs before the build, so the cores
@@ -12,12 +14,13 @@
 # the per-arch caches (<root>/v3, <root>/v4, ...): any-arch packages, packages from the shared repos and the brew image
 # are scanned once for all arches. The build workflows share one concurrency group, so only one run writes it at a time.
 #
-# Usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>
+# Usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]
 set -euo pipefail
 
-CACHE_DIR=$(readlink -f "${1:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}")
-BASE_IMAGE=${2:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}
-BREW_IMAGE=${3:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}
+CACHE_DIR=$(readlink -f "${1:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]}")
+BASE_IMAGE=${2:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]}
+BREW_IMAGE=${3:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]}
+TOOL_IMAGES=("${@:4}")
 CLAMAV_IMAGE="docker.io/clamav/clamav:stable"
 CACHE_ROOT=$(dirname "$CACHE_DIR")
 CACHE_FILE="$CACHE_ROOT/.clamav_scan_cache"
@@ -131,6 +134,13 @@ sudo podman run --rm --pull never --entrypoint clamscan "$CLAMAV_IMAGE" --versio
 printf '## ClamAV prefetch scan\n\n' >> "$SUMMARY"
 
 # Images are mounted before clamd starts, because mounts made later do not show up inside its container.
+TOOL_MNTS=()
+TOOL_IDS=()
+for ref in "${TOOL_IMAGES[@]}"; do
+  mount_unscanned_image "$ref"
+  TOOL_MNTS+=("$IMAGE_MNT")
+  TOOL_IDS+=("$IMAGE_ID")
+done
 mount_unscanned_image "$BREW_IMAGE"
 BREW_MNT=$IMAGE_MNT
 BREW_ID=$IMAGE_ID
@@ -164,6 +174,9 @@ EOF
 CLAMD_MOUNTS=("-v" "$WORK_DIR:/scan/work:ro")
 [ -n "$BREW_MNT" ] && CLAMD_MOUNTS+=("-v" "$BREW_MNT/system_files:/scan/brew:ro")
 [ -n "$BASE_MNT" ] && CLAMD_MOUNTS+=("-v" "$BASE_MNT:/scan/base:ro")
+for i in "${!TOOL_IMAGES[@]}"; do
+  [ -n "${TOOL_MNTS[$i]}" ] && CLAMD_MOUNTS+=("-v" "${TOOL_MNTS[$i]}:/scan/tool$i:ro")
+done
 sudo podman run -d --name "$CLAMD_CTR" --pull never --network=none --security-opt label=disable "${CLAMD_MOUNTS[@]}" \
   --entrypoint clamd "$CLAMAV_IMAGE" --config-file=/scan/work/clamd.conf >/dev/null
 echo "  Waiting for clamd to load the signature database..."
@@ -253,6 +266,20 @@ else
 fi
 
 # -----------------------------------------------------------
+# Tool images (chunkah, syft, grype)
+# -----------------------------------------------------------
+for i in "${!TOOL_IMAGES[@]}"; do
+  ref=${TOOL_IMAGES[$i]}
+  if [ -n "${TOOL_MNTS[$i]}" ]; then
+    echo "  🔍 Scanning $ref..."
+    clamd_scan "/scan/tool$i" && KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+    printf -- '- Tool image `%s`: scanned\n' "$ref" >> "$SUMMARY"
+  else
+    printf -- '- Tool image `%s`: already clean\n' "$ref" >> "$SUMMARY"
+  fi
+done
+
+# -----------------------------------------------------------
 # 3. Upstream base image rootfs
 # -----------------------------------------------------------
 if [ -n "$BASE_MNT" ]; then
@@ -293,7 +320,12 @@ for entry in "${!SCANNED[@]}"; do
   [[ -n "${KEEP[$entry]:-}" ]] && continue
   name=${entry#* }
   if [[ "$name" == image:* ]]; then
-    [[ "$name" != "image:$BASE_IMAGE" && "$name" != "image:$BREW_IMAGE" ]] && KEEP["$entry"]=1
+    # Older IDs of the images this run used are dropped; images other arches or runs use are kept
+    used=0
+    for ref in "$BASE_IMAGE" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"; do
+      [[ "$name" == "image:$ref" ]] && used=1
+    done
+    [ "$used" = 0 ] && KEEP["$entry"]=1
     continue
   fi
   for other in "$CACHE_ROOT"/*/"$name" "$CACHE_ROOT"/*/.bootstrap/"$name" "$CACHE_ROOT"/*/.src/"$name"; do
