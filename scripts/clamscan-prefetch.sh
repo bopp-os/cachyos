@@ -4,7 +4,9 @@
 #   2. the Homebrew files copied from the brew image (COPY --from=brew in Containerfile.base)
 #   3. the upstream base image rootfs (files it ships with that never pass through the package cache)
 #
-# Uses the clamav/clamav container, like the pkgbuilds repo. Anything already scanned clean (package by SHA-256,
+# Uses the clamav/clamav container, like the pkgbuilds repo, running one clamd for the whole step: the signature
+# database loads once, and --multiscan spreads the files over every core (the scan runs before the build, so the cores
+# are otherwise idle). Anything already scanned clean (package by SHA-256,
 # image by ID) is recorded and skipped on later runs. The record sits one level up from <cache_dir>, so it is shared by
 # the per-arch caches (<root>/v3, <root>/v4, ...): any-arch packages, packages from the shared repos and the brew image
 # are scanned once for all arches. The build workflows share one concurrency group, so only one run writes it at a time.
@@ -21,13 +23,16 @@ CACHE_FILE="$CACHE_ROOT/.clamav_scan_cache"
 # Per-arch record from before the record was shared; merged in once, then removed.
 LEGACY_CACHE_FILE="$CACHE_DIR/.clamav_scan_cache"
 # Unpacked packages are scanned in batches of about this much compressed data, so a cold cache does not need the
-# whole package set unpacked on disk at once. Each batch reloads the signature database (~20-40s).
+# whole package set unpacked on disk at once. The record is saved after each batch, so a cancelled or timed-out run
+# keeps what it already scanned.
 BATCH_BYTES=$((2 * 1024 * 1024 * 1024))
 SUMMARY=${GITHUB_STEP_SUMMARY:-/dev/null}
 
 WORK_DIR=$(mktemp -d /var/tmp/clamscan-prefetch.XXXXXX)
+CLAMD_CTR="clamscan-prefetch-$$"
 MOUNTED_IMAGES=()
 cleanup() {
+  sudo podman rm -f -t 0 "$CLAMD_CTR" >/dev/null 2>&1 || true
   for img in "${MOUNTED_IMAGES[@]}"; do
     sudo podman image unmount "$img" >/dev/null 2>&1 || true
   done
@@ -47,21 +52,14 @@ done
 declare -A KEEP=()
 FINDINGS=()
 
-# Scans the given host paths (each mounted read-only under /scan/<label>) in one clamscan run.
-# Flags match the pkgbuilds repo: oversized files count as findings, so nothing slips through unscanned.
+# Scans the given paths inside the clamd container (WORK_DIR is /scan/work there) with clamdscan --multiscan; clamdscan
+# options such as --file-list=/scan/work/<list> can be passed too.
 # Returns 0 when clean; findings and scan errors are added to FINDINGS.
-clamscan_paths() {
-  local mounts=() label path out rc
-  while [ $# -gt 0 ]; do
-    label=$1 path=$2
-    shift 2
-    mounts+=("-v" "$path:/scan/$label:ro")
-  done
+clamd_scan() {
+  local out rc
   set +e
-  out=$(sudo podman run --rm --pull never --network=none --security-opt label=disable "${mounts[@]}" \
-    --entrypoint clamscan "$CLAMAV_IMAGE" \
-    --no-summary --infected --recursive --scan-archive=yes \
-    --max-filesize=2000M --max-scansize=4000M --alert-exceeds-max=yes /scan 2>&1)
+  out=$(sudo podman exec "$CLAMD_CTR" clamdscan --config-file=/scan/work/clamd.conf \
+    --multiscan --no-summary --infected "$@" 2>&1)
   rc=$?
   set -e
   case $rc in
@@ -73,26 +71,42 @@ clamscan_paths() {
       ;;
     *)
       echo "$out"
-      FINDINGS+=("clamscan exited with $rc while scanning: $(echo "$out" | grep -m5 -i 'error' | tr '\n' ' ')")
+      FINDINGS+=("clamdscan exited with $rc while scanning: $(echo "$out" | grep -m5 -i 'error' | tr '\n' ' ')")
       ;;
   esac
   return 1
 }
 
-# Sets IMAGE_ID and IMAGE_MNT (the read-only rootfs). IMAGE_MNT stays empty if this image ID is already clean.
+# Sets IMAGE_ID and IMAGE_MNT (the read-only rootfs). IMAGE_MNT stays empty if this image ID is already clean,
+# unless a second argument names a file that must exist (it is then mounted anyway, so that file can be created).
 # Pulls only when missing, the same policy podman build uses, so the scanned image is the one the build gets.
 mount_unscanned_image() {
-  local ref=$1
+  local ref=$1 needed=${2:-}
   IMAGE_MNT=""
+  IMAGE_CLEAN=""
   sudo podman image exists "$ref" || sudo podman pull -q "$ref" >/dev/null
   IMAGE_ID=$(sudo podman image inspect --format '{{.Id}}' "$ref")
   if [[ -n "${SCANNED["$IMAGE_ID image:$ref"]:-}" ]]; then
     KEEP["$IMAGE_ID image:$ref"]=1
+    IMAGE_CLEAN=1
     echo "  ✓ $ref already scanned clean, skipping."
-    return 0
+    [[ -z "$needed" || -f "$needed" ]] && return 0
   fi
   MOUNTED_IMAGES+=("$ref")
   IMAGE_MNT=$(sudo podman image mount "$ref")
+}
+
+# Writes the record. Mid-run it holds every entry known clean so far; with "final", only the entries kept by the
+# pruning at the end.
+save_record() {
+  local tmp="$WORK_DIR/clamav_scan_cache"
+  if [ "${1:-}" = "final" ]; then
+    printf '%s\n' "${!KEEP[@]}" | sort -u -k2 > "$tmp"
+  else
+    printf '%s\n' "${!SCANNED[@]}" "${!KEEP[@]}" | sort -u -k2 > "$tmp"
+  fi
+  # The cache root is created by root, and the per-arch folders are not world-writable everywhere.
+  sudo install -m 0644 "$tmp" "$CACHE_FILE"
 }
 
 TAR_CMD="tar"
@@ -111,6 +125,45 @@ fi
 sudo podman run --rm --pull never --entrypoint clamscan "$CLAMAV_IMAGE" --version
 printf '## ClamAV prefetch scan\n\n' >> "$SUMMARY"
 
+# Images are mounted before clamd starts, because mounts made later do not show up inside its container.
+mount_unscanned_image "$BREW_IMAGE"
+BREW_MNT=$IMAGE_MNT
+BREW_ID=$IMAGE_ID
+# The upstream base image is rebuilt often (daily for CachyOS), but most of its files stay the same. The SHA-256 of
+# every file in the last clean rootfs is recorded per image ref, and a new image only has its new or changed files
+# scanned.
+BASE_FILES_RECORD="$CACHE_ROOT/.clamav_files.$(printf '%s' "$BASE_IMAGE" | tr -c 'A-Za-z0-9._-' '_')"
+mount_unscanned_image "$BASE_IMAGE" "$BASE_FILES_RECORD"
+BASE_MNT=$IMAGE_MNT
+BASE_ID=$IMAGE_ID
+BASE_CLEAN=$IMAGE_CLEAN
+
+# Limits match the pkgbuilds repo's clamscan flags: oversized files count as findings, so nothing slips through
+# unscanned. clamd runs as root in the container so it can read every file of the mounted rootfs.
+cat > "$WORK_DIR/clamd.conf" <<EOF
+Foreground yes
+LocalSocket /tmp/clamd.sock
+DatabaseDirectory /var/lib/clamav
+MaxThreads $(nproc)
+MaxDirectoryRecursion 64
+ScanArchive yes
+MaxFileSize 2000M
+MaxScanSize 4000M
+AlertExceedsMax yes
+ConcurrentDatabaseReload no
+EOF
+CLAMD_MOUNTS=("-v" "$WORK_DIR:/scan/work:ro")
+[ -n "$BREW_MNT" ] && CLAMD_MOUNTS+=("-v" "$BREW_MNT/system_files:/scan/brew:ro")
+[ -n "$BASE_MNT" ] && CLAMD_MOUNTS+=("-v" "$BASE_MNT:/scan/base:ro")
+sudo podman run -d --name "$CLAMD_CTR" --pull never --network=none --security-opt label=disable "${CLAMD_MOUNTS[@]}" \
+  --entrypoint clamd "$CLAMAV_IMAGE" --config-file=/scan/work/clamd.conf >/dev/null
+echo "  Waiting for clamd to load the signature database..."
+if ! sudo podman exec "$CLAMD_CTR" clamdscan --config-file=/scan/work/clamd.conf --ping=300:1 >/dev/null 2>&1; then
+  sudo podman logs --tail 20 "$CLAMD_CTR" || true
+  echo "::error::clamd did not start"
+  exit 1
+fi
+
 # -----------------------------------------------------------
 # 1. Package archives
 # -----------------------------------------------------------
@@ -123,10 +176,11 @@ SKIPPED_PKGS=0
 scan_batch() {
   [ ${#BATCH[@]} -eq 0 ] && return 0
   echo "  🔍 Scanning batch of ${#BATCH[@]} unpacked packages..."
-  if clamscan_paths pkgs "$PKG_DIR"; then
+  if clamd_scan /scan/work/pkgs; then
     for entry in "${BATCH[@]}"; do
       KEEP["$entry"]=1
     done
+    save_record
   fi
   sudo rm -rf "$PKG_DIR"
   BATCH=()
@@ -158,8 +212,6 @@ printf -- '- Packages: %s scanned, %s already clean\n' "$NEW_PKGS" "$SKIPPED_PKG
 # -----------------------------------------------------------
 # 2. Homebrew files from the brew image
 # -----------------------------------------------------------
-mount_unscanned_image "$BREW_IMAGE"
-BREW_MNT=$IMAGE_MNT
 if [ -n "$BREW_MNT" ]; then
   echo "  🔍 Scanning $BREW_IMAGE..."
   BREW_UNPACKED="$WORK_DIR/brew"
@@ -169,8 +221,8 @@ if [ -n "$BREW_MNT" ]; then
     mkdir -p "$out"
     sudo $TAR_CMD -xf "$tarball" -C "$out"
   done < <(sudo find "$BREW_MNT/system_files" -type f -name "*.tar.*" -print0)
-  if clamscan_paths brew "$BREW_MNT/system_files" brew-unpacked "$BREW_UNPACKED"; then
-    KEEP["$IMAGE_ID image:$BREW_IMAGE"]=1
+  if clamd_scan /scan/brew /scan/work/brew; then
+    KEEP["$BREW_ID image:$BREW_IMAGE"]=1
   fi
   sudo rm -rf "$BREW_UNPACKED"
   printf -- '- Brew image `%s`: scanned\n' "$BREW_IMAGE" >> "$SUMMARY"
@@ -181,14 +233,32 @@ fi
 # -----------------------------------------------------------
 # 3. Upstream base image rootfs
 # -----------------------------------------------------------
-mount_unscanned_image "$BASE_IMAGE"
-BASE_MNT=$IMAGE_MNT
 if [ -n "$BASE_MNT" ]; then
-  echo "  🔍 Scanning $BASE_IMAGE rootfs..."
-  if clamscan_paths base "$BASE_MNT"; then
-    KEEP["$IMAGE_ID image:$BASE_IMAGE"]=1
+  BASE_HASHES="$WORK_DIR/base-hashes"
+  sudo find "$BASE_MNT" -xdev -type f -print0 | sudo xargs -0 -r sha256sum > "$BASE_HASHES"
+  SCAN_LIST="$WORK_DIR/base-scan-list"
+  # sha256sum prints "<64 hex>  <path>"; paths are rewritten to where the rootfs is mounted in the container
+  awk -v mnt="$BASE_MNT/" 'FILENAME == ARGV[1] { clean[$1] = 1; next }
+    !($1 in clean) { print "/scan/base/" substr($0, 67 + length(mnt)) }' \
+    <(cat "$BASE_FILES_RECORD" 2>/dev/null) "$BASE_HASHES" > "$SCAN_LIST"
+  BASE_TOTAL=$(wc -l < "$BASE_HASHES")
+  BASE_NEW=$(wc -l < "$SCAN_LIST")
+  if [ -n "$BASE_CLEAN" ]; then
+    echo "  Recording file checksums of $BASE_IMAGE for later incremental scans."
+    BASE_NEW=0
+  elif [ "$BASE_NEW" -eq 0 ]; then
+    BASE_CLEAN=1
+  else
+    echo "  🔍 Scanning $BASE_IMAGE rootfs: $BASE_NEW of $BASE_TOTAL files are new or changed..."
+    clamd_scan --file-list=/scan/work/base-scan-list && BASE_CLEAN=1
   fi
-  printf -- '- Base image `%s`: scanned\n' "$BASE_IMAGE" >> "$SUMMARY"
+  if [ -n "$BASE_CLEAN" ]; then
+    KEEP["$BASE_ID image:$BASE_IMAGE"]=1
+    cut -c1-64 "$BASE_HASHES" | sort -u > "$WORK_DIR/base-files-record"
+    sudo install -m 0644 "$WORK_DIR/base-files-record" "$BASE_FILES_RECORD"
+  fi
+  echo "  Base image: $BASE_NEW of $BASE_TOTAL files scanned."
+  printf -- '- Base image `%s`: %s of %s files scanned\n' "$BASE_IMAGE" "$BASE_NEW" "$BASE_TOTAL" >> "$SUMMARY"
 else
   printf -- '- Base image `%s`: already clean\n' "$BASE_IMAGE" >> "$SUMMARY"
 fi
@@ -209,10 +279,7 @@ for entry in "${!SCANNED[@]}"; do
     fi
   done
 done
-TMP_CACHE="$WORK_DIR/clamav_scan_cache"
-printf '%s\n' "${!KEEP[@]}" | sort -k2 > "$TMP_CACHE"
-# The cache root is created by root, and the per-arch folders are not world-writable everywhere.
-sudo install -m 0644 "$TMP_CACHE" "$CACHE_FILE"
+save_record final
 sudo rm -f "$LEGACY_CACHE_FILE"
 
 echo "::endgroup::"
