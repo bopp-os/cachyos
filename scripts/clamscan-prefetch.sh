@@ -154,9 +154,10 @@ ScanArchive yes
 MaxFileSize 2000M
 MaxScanSize 4000M
 AlertExceedsMax yes
-# Per-file time limit (default 2 min). Firefox's omni.ja, a large zip of browser resources, needs longer; a file that
-# still hits it counts as a finding (Heuristics.Limits.Exceeded.MaxScanTime).
+# Per-file time limit (default 2 min) and files per archive (default 10000). Firefox's omni.ja, a large zip of browser
+# resources, exceeds both; a file that still hits either counts as a finding (Heuristics.Limits.Exceeded.*).
 MaxScanTime 900000
+MaxFiles 100000
 ConcurrentDatabaseReload no
 EOF
 CLAMD_MOUNTS=("-v" "$WORK_DIR:/scan/work:ro")
