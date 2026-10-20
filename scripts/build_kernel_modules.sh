@@ -46,7 +46,8 @@ done
 
 if [ ${#BUILD_DEPS[@]} -gt 0 ]; then
     echo "Installing temporary build dependencies: ${BUILD_DEPS[*]}"
-    pacman -Sy --noconfirm --needed "${BUILD_DEPS[@]}"
+    # No -y: the databases are the ones prefetch saved, so these are the packages it already downloaded and scanned
+    pacman -S --noconfirm --needed "${BUILD_DEPS[@]}"
 fi
 
 # Create temporary workspace for module source trees

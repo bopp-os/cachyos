@@ -36,7 +36,7 @@ RUN chmod +x /tmp/scripts/*.sh && \
     /tmp/scripts/setup_pacman_repos.sh
 
 # Install yara and python-yaml from extra repository, pre-fetch packages, and scan package cache
-RUN pacman -Sy --noconfirm yara python-yaml && \
+RUN pacman -Sy --noconfirm yara python-yaml yq && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     echo "::group::Pre-fetching base packages..." && \
     /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml $VERBOSE_ARG && \
@@ -56,5 +56,7 @@ RUN pacman -Sy --noconfirm yara python-yaml && \
         echo "::group::Pre-fetching cinnamon packages..."; \
         /tmp/scripts/install_packages.sh --download-only /tmp/files/cinnamon/cinnamon.yaml $VERBOSE_ARG; \
     fi && \
+    echo "::group::Pre-fetching kernel module build tools..." && \
+    pacman -Sw --noconfirm git make gcc clang llvm lld zstd && \
     echo "::group::Running package cache security scan..." && \
     /tmp/scripts/scan-pkg-cache.sh /var/cache/pacman/pkg $VERBOSE_ARG

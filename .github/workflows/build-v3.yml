@@ -331,6 +331,12 @@ jobs:
           sudo podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           echo "::endgroup::"
 
+      - name: Verify Package Cache Was Fully Scanned
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          chmod +x scripts/verify-package-cache.sh
+          ./scripts/verify-package-cache.sh "${{ env.LOCAL_CACHE_DIR }}"
+
       - name: Clean Workspace & Podman Storage
         if: always()
         run: |
@@ -472,6 +478,11 @@ jobs:
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=host --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
           echo "::endgroup::"
+
+      - name: Verify Package Cache Was Fully Scanned
+        run: |
+          chmod +x scripts/verify-package-cache.sh
+          ./scripts/verify-package-cache.sh "${{ env.LOCAL_CACHE_DIR }}"
 
       - name: Post-build Image IOC Scan
         run: |

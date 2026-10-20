@@ -92,8 +92,31 @@ fi
 
 if [ -n "$ISOLATE_CMD" ]; then
     echo "🔒 Network isolation wrapper active: $ISOLATE_CMD"
+elif [ "$DOWNLOAD_ONLY" -eq 0 ] && [ -z "${ALLOW_NETWORK_INSTALL:-}" ]; then
+    # Installs must not reach the network: packages are downloaded and scanned in prefetch only.
+    echo "::error::Network isolation (unshare -n) is unavailable, so package installs could reach the network. Set ALLOW_NETWORK_INSTALL=1 to build without it (local builds)."
+    exit 1
 else
     echo "⚠️ Network isolation wrapper unshare unavailable in current container environment."
+fi
+
+# Prefetch syncs the package databases once and saves them next to the cached packages. Builds restore that snapshot
+# instead of syncing again, so they see exactly the package versions that were downloaded and scanned.
+SYNC_DB_DIR="${BOPPOS_SYNC_DB_DIR:-/var/lib/pacman/sync}"
+FROZEN_DB_DIR="${BOPPOS_FROZEN_DB_DIR:-/var/cache/pacman/pkg/.sync}"
+SYNC_MARKER="${BOPPOS_SYNC_MARKER:-/tmp/.boppos-prefetch-synced}"
+SYNC_ARG="y"
+if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
+    # Only the first section of a prefetch run syncs, so every section is fetched against the same databases.
+    [ -f "$SYNC_MARKER" ] && SYNC_ARG=""
+elif compgen -G "$FROZEN_DB_DIR/*.db" >/dev/null; then
+    echo "🧊 Using the package databases frozen by prefetch (no sync)."
+    mkdir -p "$SYNC_DB_DIR"
+    rm -f "$SYNC_DB_DIR"/*.db
+    cp -f "$FROZEN_DB_DIR"/*.db "$SYNC_DB_DIR"/
+    SYNC_ARG=""
+else
+    echo "::warning::No frozen package databases found; syncing, so packages newer than the prefetched ones may be downloaded."
 fi
 
 # Phase 1: Download all packages and transaction dependencies at once
@@ -104,7 +127,7 @@ DOWNLOAD_SUCCESS=false
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "📦 Phase 1: Pre-fetching package archives for $YAML_FILE..."
 
-    DOWNLOAD_EXEC="pacman -Swyu --noconfirm --ask 4 --needed --overwrite '*' $IGNORE_ARG $ALL_PKGS"
+    DOWNLOAD_EXEC="pacman -Sw${SYNC_ARG}u --noconfirm --ask 4 --needed --overwrite '*' $IGNORE_ARG $ALL_PKGS"
 
     if [ "$VERBOSE" -eq 1 ]; then
         if $DOWNLOAD_EXEC 2>&1 | tee /tmp/pacman-download.log; then
@@ -139,6 +162,11 @@ if [ "$DOWNLOAD_SUCCESS" = "false" ]; then
 fi
 
 if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
+    touch "$SYNC_MARKER"
+    mkdir -p "$FROZEN_DB_DIR"
+    rm -f "$FROZEN_DB_DIR"/*.db
+    cp -f "$SYNC_DB_DIR"/*.db "$FROZEN_DB_DIR"/
+    echo "🧊 Saved the package databases next to the cached packages for the builds."
     echo "ℹ️ --download-only mode active. Skipping installation phase."
     exit 0
 fi
