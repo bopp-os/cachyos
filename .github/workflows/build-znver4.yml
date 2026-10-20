@@ -132,7 +132,7 @@ jobs:
           fi
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* || true
+          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/clamscan-prefetch.* || true
           
           # Ensure local base tags are cleared at the very beginning of a new pipeline run
           sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
