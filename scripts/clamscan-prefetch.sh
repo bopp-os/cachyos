@@ -1,6 +1,7 @@
 #!/bin/bash
 # ClamAV scan of everything the build pulls in from outside the repo, run right after Containerfile.prefetch:
-#   1. new package archives in the pre-fetched pacman cache
+#   1. new package archives in the pre-fetched pacman cache, plus what prefetch saved for the offline builds: the
+#      Chaotic keyring/mirrorlist packages (.bootstrap/) and the kernel module source tarballs (.src/)
 #   2. the Homebrew files copied from the brew image (COPY --from=brew in Containerfile.base)
 #   3. the upstream base image rootfs (files it ships with that never pass through the package cache)
 #
@@ -223,7 +224,9 @@ while IFS= read -r -d '' pkg_file; do
   if [ "$BATCH_SIZE" -ge "$BATCH_BYTES" ]; then
     scan_batch
   fi
-done < <(find "$CACHE_DIR" -maxdepth 1 -type f \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" \) -print0)
+done < <({ find "$CACHE_DIR" -maxdepth 1 -type f \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" \) -print0
+  find "$CACHE_DIR/.bootstrap" "$CACHE_DIR/.src" -maxdepth 1 -type f \
+    \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" -o -name "*.tar" \) -print0 2>/dev/null || true; })
 scan_batch
 echo "  Packages: $NEW_PKGS scanned, $SKIPPED_PKGS already clean."
 printf -- '- Packages: %s scanned, %s already clean\n' "$NEW_PKGS" "$SKIPPED_PKGS" >> "$SUMMARY"
@@ -293,7 +296,7 @@ for entry in "${!SCANNED[@]}"; do
     [[ "$name" != "image:$BASE_IMAGE" && "$name" != "image:$BREW_IMAGE" ]] && KEEP["$entry"]=1
     continue
   fi
-  for other in "$CACHE_ROOT"/*/"$name"; do
+  for other in "$CACHE_ROOT"/*/"$name" "$CACHE_ROOT"/*/.bootstrap/"$name" "$CACHE_ROOT"/*/.src/"$name"; do
     if [[ -f "$other" && "$(dirname "$other")" != "$CACHE_DIR" ]]; then
       KEEP["$entry"]=1
       break

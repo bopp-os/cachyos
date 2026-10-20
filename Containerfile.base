@@ -157,9 +157,12 @@ RUN if [ -e /usr/etc ]; then \
     rm -rf /usr/etc; \
     fi
 
-# Configure Flatpak with retry logic to handle transient network issues
-RUN for i in {1..5}; do \
-    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && break || \
+# Configure Flatpak from the remote definition prefetch saved (the build has no network); local builds without a
+# prefetched cache download it, with retry logic to handle transient network issues
+RUN FLATHUB_REPO=/var/cache/pacman/pkg/.bootstrap/flathub.flatpakrepo; \
+    [ -f "$FLATHUB_REPO" ] || FLATHUB_REPO=https://flathub.org/repo/flathub.flatpakrepo; \
+    for i in {1..5}; do \
+    flatpak remote-add --if-not-exists flathub "$FLATHUB_REPO" && break || \
     echo "Flatpak remote-add failed (attempt $i), retrying in 5 seconds..." && sleep 5; \
     done && \
     find /var/lib/flatpak /etc/flatpak -type f 2>/dev/null | xargs -r sh -c \

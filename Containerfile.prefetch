@@ -33,10 +33,10 @@ COPY scripts/ /tmp/scripts/
 COPY files/ /tmp/files/
 
 RUN chmod +x /tmp/scripts/*.sh && \
-    /tmp/scripts/setup_pacman_repos.sh
+    /tmp/scripts/setup_pacman_repos.sh --online
 
 # Install yara and python-yaml from extra repository, pre-fetch packages, and scan package cache
-RUN pacman -Sy --noconfirm yara python-yaml yq && \
+RUN pacman -Sy --noconfirm yara python-yaml yq git && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     echo "::group::Pre-fetching base packages..." && \
     /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml $VERBOSE_ARG && \
@@ -56,7 +56,10 @@ RUN pacman -Sy --noconfirm yara python-yaml yq && \
         echo "::group::Pre-fetching cinnamon packages..."; \
         /tmp/scripts/install_packages.sh --download-only /tmp/files/cinnamon/cinnamon.yaml $VERBOSE_ARG; \
     fi && \
-    echo "::group::Pre-fetching kernel module build tools..." && \
-    pacman -Sw --noconfirm git make gcc clang llvm lld zstd && \
+    echo "::group::Pre-fetching kernel module build tools and bootstrap packages..." && \
+    pacman -Sw --noconfirm git make gcc clang llvm lld zstd \
+        archlinux-keyring cachyos-keyring gnupg curl cachyos-hooks gpgme && \
+    echo "::group::Pre-fetching Flathub remote and kernel module sources..." && \
+    /tmp/scripts/prefetch_extras.sh /var/cache/pacman/pkg && \
     echo "::group::Running package cache security scan..." && \
     /tmp/scripts/scan-pkg-cache.sh /var/cache/pacman/pkg $VERBOSE_ARG

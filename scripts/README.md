@@ -15,6 +15,8 @@ This directory contains the automation, build, and maintenance scripts for BoppO
 ### Security & Auditing Scripts
 - **`scan-pkg-cache.sh`**: Pre-build security scanner that audits downloaded pacman package `.pkg.tar.zst` archives and `.INSTALL` scriptlets for obfuscation, network calls, or credential harvesting.
 - **`clamscan-prefetch.sh`**: Runs after the package prefetch and scans new package archives, the Homebrew files from the brew image, and the upstream base image rootfs with the `clamav/clamav` container. Clean packages (by SHA-256) and images (by ID) are recorded in `.clamav_scan_cache` at the root of the package cache, shared by all arches, and skipped on later runs.
+- **`prefetch_extras.sh`**: Runs in the prefetch step. Saves what the offline builds need that is not a pacman package into hidden folders of the package cache: the Flathub remote definition (`.bootstrap/`) and a tarball of the latest commit of each kernel module repo listed in `kmod_sources.sh` (`.src/`, with the commit hash). The tarballs are ClamAV-scanned with the packages.
+- **`kmod_sources.sh`**: The out-of-tree kernel module repositories, shared by `prefetch_extras.sh` and `build_kernel_modules.sh`.
 - **`verify-package-cache.sh`**: Run after the base and flavor builds. Fails if the package cache holds an archive whose name and SHA-256 are not in the ClamAV record, i.e. a pacman call in the build downloaded a package after the prefetch scan.
 - **`scan-image-ioc.sh`**: Post-build container image auditor that mounts built container filesystems to inspect for known threat indicators, suspicious systemd service units, eBPF artifacts, and dropped temp files.
 - **`sign.sh`**: Signs built container image tags using `cosign` and exported keys.

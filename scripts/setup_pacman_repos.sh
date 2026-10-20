@@ -1,13 +1,48 @@
 #!/bin/bash
 set -eo pipefail
 
-echo "::group::Configuring Pacman Repositories & Keyrings"
+# --online:  sync and download as before (used by prefetch, which saves what it downloads next to the cached packages)
+# --offline: use only what prefetch saved: the frozen package databases, the cached packages and the saved Chaotic
+#            keyring/mirrorlist. Nothing is downloaded.
+# Default: offline when prefetch left everything needed, online otherwise (local builds).
+MODE="auto"
+for arg in "$@"; do
+  case "$arg" in
+    --online) MODE="online" ;;
+    --offline) MODE="offline" ;;
+  esac
+done
+SYNC_DB_DIR="${BOPPOS_SYNC_DB_DIR:-/var/lib/pacman/sync}"
+FROZEN_DB_DIR="${BOPPOS_FROZEN_DB_DIR:-/var/cache/pacman/pkg/.sync}"
+BOOTSTRAP_DIR="${BOPPOS_BOOTSTRAP_DIR:-/var/cache/pacman/pkg/.bootstrap}"
+if [ "$MODE" = "auto" ]; then
+  if compgen -G "$FROZEN_DB_DIR/*.db" >/dev/null \
+     && [ -f "$BOOTSTRAP_DIR/chaotic-keyring.pkg.tar.zst" ] && [ -f "$BOOTSTRAP_DIR/chaotic-mirrorlist.pkg.tar.zst" ]; then
+    MODE="offline"
+  else
+    MODE="online"
+  fi
+fi
+
+# Installs repository packages: with a sync when online, from the frozen databases and the package cache when offline.
+repo_install() {
+  if [ "$MODE" = "offline" ]; then
+    mkdir -p "$SYNC_DB_DIR"
+    rm -f "$SYNC_DB_DIR"/*.db
+    cp -f "$FROZEN_DB_DIR"/*.db "$SYNC_DB_DIR"/
+    pacman -S --noconfirm "$@"
+  else
+    pacman -Sy --noconfirm "$@"
+  fi
+}
+
+echo "::group::Configuring Pacman Repositories & Keyrings ($MODE)"
 
 # Ensure DisableSandboxNetwork is enabled early for container builds
 grep -q "DisableSandboxNetwork" /etc/pacman.conf || sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
 
 # 1. Re-initialize and trust keys
-pacman -Sy --noconfirm archlinux-keyring cachyos-keyring gnupg curl
+repo_install archlinux-keyring cachyos-keyring gnupg curl
 rm -rf /etc/pacman.d/gnupg
 pacman-key --init
 echo "no-tty" >> /etc/pacman.d/gnupg/gpg.conf
@@ -24,9 +59,11 @@ if [ -n "$KEYS_DIR" ]; then
   for key in "$KEYS_DIR"/*.asc; do [ -f "$key" ] && pacman-key --add "$key" || true; done
 fi
 
-curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF3B607488DB35A47" | pacman-key --add - || echo "Key refresh failed, using committed copy"
-curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB" | pacman-key --add - || echo "Key refresh failed, using committed copy"
-curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3056513887B78AEB" | pacman-key --add - || echo "Key refresh failed, using committed copy"
+if [ "$MODE" = "online" ]; then
+  curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF3B607488DB35A47" | pacman-key --add - || echo "Key refresh failed, using committed copy"
+  curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB" | pacman-key --add - || echo "Key refresh failed, using committed copy"
+  curl -s --max-time 10 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3056513887B78AEB" | pacman-key --add - || echo "Key refresh failed, using committed copy"
+fi
 pacman-key --lsign-key F3B607488DB35A47 || true
 pacman-key --lsign-key 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB || true
 pacman-key --lsign-key 3056513887B78AEB || true
@@ -40,7 +77,7 @@ elif [ -f "/tmp/keys/boppos.asc" ]; then
   KEY_FILE="/tmp/keys/boppos.asc"
 elif [ -f "/tmp/files/keys/boppos.asc" ]; then
   KEY_FILE="/tmp/files/keys/boppos.asc"
-elif curl -fsSL --max-time 10 https://repo.ripps.me/boppos.gpg -o /tmp/boppos.gpg 2>/dev/null; then
+elif [ "$MODE" = "online" ] && curl -fsSL --max-time 10 https://repo.ripps.me/boppos.gpg -o /tmp/boppos.gpg 2>/dev/null; then
   KEY_FILE="/tmp/boppos.gpg"
 fi
 
@@ -89,7 +126,7 @@ ln -sf /dev/null /etc/pacman.d/hooks/udev-hwdb.hook || true
 ln -sf /dev/null /etc/pacman.d/hooks/archlinux-keyring-wkd-sync.hook || true
 
 # 4. Install cachyos-hooks and [chaotic-aur] keyring/mirrorlist
-pacman -Sy --noconfirm --needed cachyos-hooks gpgme
+repo_install --needed cachyos-hooks gpgme
 download_pkg() {
   local target="$1"
   shift
@@ -123,12 +160,24 @@ CHAOTIC_MIRRORLIST_URLS=(
   'https://mirror.albony.in/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
 )
 
-if download_pkg /tmp/chaotic-keyring.pkg.tar.zst "${CHAOTIC_KEYRING_URLS[@]}" && \
-   download_pkg /tmp/chaotic-mirrorlist.pkg.tar.zst "${CHAOTIC_MIRRORLIST_URLS[@]}"; then
+CHAOTIC_OK=0
+if [ "$MODE" = "offline" ]; then
+  # The prefetch step downloaded and scanned these; installing them needs no network.
+  pacman -U --overwrite '*' --noconfirm "$BOOTSTRAP_DIR/chaotic-keyring.pkg.tar.zst" "$BOOTSTRAP_DIR/chaotic-mirrorlist.pkg.tar.zst"
+  pacman-key --populate chaotic || true
+  CHAOTIC_OK=1
+elif download_pkg /tmp/chaotic-keyring.pkg.tar.zst "${CHAOTIC_KEYRING_URLS[@]}" && \
+     download_pkg /tmp/chaotic-mirrorlist.pkg.tar.zst "${CHAOTIC_MIRRORLIST_URLS[@]}"; then
   pacman -U --overwrite '*' --noconfirm /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
+  # Keep copies next to the cached packages so the offline builds can install them; the next ClamAV scan checks them.
+  mkdir -p "$BOOTSTRAP_DIR" && cp -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst "$BOOTSTRAP_DIR"/ \
+    || echo "Warning: could not save the Chaotic packages for the offline builds"
   rm -f /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
   pacman-key --populate chaotic || true
-else
+  CHAOTIC_OK=1
+fi
+
+if [ "$CHAOTIC_OK" = "0" ]; then
   echo "Warning: Could not download chaotic-aur packages; writing fallback mirrorlist..."
   mkdir -p /etc/pacman.d
   cat << 'EOF' > /etc/pacman.d/chaotic-mirrorlist

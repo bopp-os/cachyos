@@ -30,7 +30,9 @@ while IFS= read -r line; do
   name=$(basename "${line#*  }")
   TOTAL=$((TOTAL + 1))
   [[ -n "${CLEAN["$hash $name"]:-}" ]] || UNSCANNED+=("$name")
-done < <(find "$CACHE_DIR" -maxdepth 1 -type f \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" \) -print0 \
+done < <({ find "$CACHE_DIR" -maxdepth 1 -type f \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" \) -print0
+  find "$CACHE_DIR/.bootstrap" "$CACHE_DIR/.src" -maxdepth 1 -type f \
+    \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" -o -name "*.tar" \) -print0 2>/dev/null || true; } \
   | xargs -0 -r sha256sum)
 echo "::endgroup::"
 

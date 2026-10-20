@@ -51,6 +51,12 @@ on:
         type: boolean
         default: false
 
+      allow_build_network:
+        description: 'Give the base and flavor image builds network access (normally none: everything is prefetched)'
+        required: false
+        type: boolean
+        default: false
+
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image (v4)"
   IMAGE_KEYWORDS: "bootc,arch,cachyos"
@@ -63,6 +69,9 @@ env:
   TARGET_MARCH: "v4"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
   PKG_CACHE_MAX_GB: "20"
+  # Network for the RUN steps of the base and flavor image builds. Everything they need is downloaded and ClamAV-scanned
+  # in the prefetch step, so they run with none; the allow_build_network input (manual runs only) switches to host.
+  BUILD_NETWORK: "${{ inputs.allow_build_network && 'host' || 'none' }}"
 
 concurrency:
   group: boppos-build-queue
@@ -321,7 +330,7 @@ jobs:
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}" "--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
-            --network=host \
+            --network=${{ env.BUILD_NETWORK }} \
             --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
 
           # Ensure the local base image is tagged properly so the DE overlays can layer onto it!
@@ -470,7 +479,7 @@ jobs:
           DOCKERFILE="Containerfile.${FLAVOR}"
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
 
-          sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=host --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
+          sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=${{ env.BUILD_NETWORK }} --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
           echo "::endgroup::"
 
       - name: Verify Package Cache Was Fully Scanned
