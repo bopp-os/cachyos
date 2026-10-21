@@ -460,7 +460,8 @@ jobs:
           CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
           sudo mkdir -p "$CACHE_DIR"
           sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
-          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
+          # Nothing is deleted here: this build has no network and needs everything prefetch downloaded and scanned
+          sudo rm -f "$CACHE_DIR"/*.part
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
       - name: Pre-build Package Cache Security Scan

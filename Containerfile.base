@@ -97,8 +97,9 @@ RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
 # ==========================================
 # PACMAN CACHE CLEANUP
 # ==========================================
-RUN rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
-    rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
+# The cache holds what prefetch downloaded and scanned, and this build has no network: delete nothing from it here
+# (stale lua packages are removed before prefetch, in the workflow's "Prepare Local Cache Directory" step)
+RUN rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
     if ! mountpoint -q /usr/lib/sysimage/cache/pacman/pkg; then \
     pacman -Sc --noconfirm ; \
     fi
