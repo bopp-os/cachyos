@@ -23,11 +23,6 @@ on:
         required: false
         type: boolean
         default: false
-      unconfined_build:
-        description: 'Disable seccomp profile (--security-opt seccomp=unconfined)'
-        required: false
-        type: boolean
-        default: false
       build_plasma:
         description: 'Build Plasma flavor'
         required: false
@@ -155,21 +150,34 @@ jobs:
           sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           
+          # Images the scan steps reuse from run to run are never pruned here: the ClamAV image carries its ~1 GB
+          # signature database, and the pinned syft, grype and chunkah images are already ClamAV-scanned. Their old
+          # versions are dropped by the ClamAV step when a newer one is pulled.
+          KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah)$'
+          # remove_images [--force] [podman images filter...]: removes the matching images except the ones above
+          remove_images() {
+            local force=()
+            if [ "${1:-}" = "--force" ]; then force=(--force); shift; fi
+            sudo podman images "$@" --format '{{.ID}} {{.Repository}}' | grep -vE "$KEEP_IMAGES" | awk '{print $1}' \
+              | sort -u | xargs -r sudo podman rmi "${force[@]}" >/dev/null 2>&1 || true
+          }
+
           # 3. Prune dangling Podman data (Preserve recent build cache for speed)
           sudo podman system prune --force || true
-          sudo podman image prune --all --force --filter "until=72h" || true
+          remove_images --filter "until=72h"
           
-          # 4. With the manual wipe toggle, also drop all unused Podman images, volumes and build cache
+          # 4. With the manual wipe toggle, also drop all other unused Podman images, volumes and build cache
           #    (the package cache itself is emptied in "Prepare Local Cache Directory", before prefetch)
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Pruning all unused Podman images, volumes and build cache..."
-            sudo podman system prune --all --force --volumes --build || true
+            echo "Pruning unused Podman images (except the scanner and tool images), volumes and build cache..."
+            sudo podman system prune --force --volumes --build || true
+            remove_images
           fi
           
-          # 5. Purge all local podman images if a clean build is requested to fix layer corruption
+          # 5. Purge local podman images if a clean build is requested to fix layer corruption
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
-            echo "Nuking all cached images to enforce a strict clean build..."
-            sudo podman rmi --all --force || true
+            echo "Removing all cached images (except the scanner and tool images) to enforce a strict clean build..."
+            remove_images --force
           fi
           
           # 6. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
@@ -262,9 +270,7 @@ jobs:
         run: |
           echo "::group::Generating fastest mirrors"
           mkdir -p ${{ github.workspace }}/mirrors
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-          sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z ${{ env.BASE_IMAGE }} bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
+          sudo podman run --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z ${{ env.BASE_IMAGE }} bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
           echo "::endgroup::"
 
       - name: Pre-fetch & Audit Package Archives
@@ -322,10 +328,6 @@ jobs:
           fi
 
 
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then
-            echo "Manual unconfined build triggered. Appending --security-opt seccomp=unconfined..."
-            BUILD_ARGS+=("--security-opt" "seccomp=unconfined")
-          fi
 
           if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then
             echo "Manual verbose build triggered. Appending build arg..."
@@ -483,7 +485,6 @@ jobs:
           done <<< "$META_LABELS"
 
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then BUILD_ARGS+=("--no-cache"); fi
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then BUILD_ARGS+=("--security-opt" "seccomp=unconfined"); fi
           if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "VERBOSE=true"); fi
           BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
           
@@ -560,9 +561,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "Extracting package list from image..."
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-          CONTAINER_ID=$(sudo podman create $PODMAN_OPTS localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
+          CONTAINER_ID=$(sudo podman create localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
           sudo podman cp ${CONTAINER_ID}:/usr/share/boppos/packages.json packages-${{ matrix.flavor }}-${{ github.sha }}.json
           sudo podman rm ${CONTAINER_ID}
 
@@ -574,18 +573,16 @@ jobs:
           CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
           IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
 
           # A chunkah upgrade can change every layer digest (v0.7.0 did), so compare against the base branch's pin
           git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF" || true
           BASE_CHUNKAH=$(git show FETCH_HEAD:.github/chunkah/Containerfile 2>/dev/null | sed -n 's/^FROM //p' || true)
           if [ -n "$BASE_CHUNKAH" ] && [ "$BASE_CHUNKAH" != "$CHUNKAH_IMAGE" ]; then
             chmod +x scripts/compare-chunkah-layers.sh
-            PODMAN_OPTS="$PODMAN_OPTS" ./scripts/compare-chunkah-layers.sh "$IMAGE_REF" "$CHUNKAH_IMAGE" "$BASE_CHUNKAH"
+            ./scripts/compare-chunkah-layers.sh "$IMAGE_REF" "$CHUNKAH_IMAGE" "$BASE_CHUNKAH"
           else
             echo "Rechunking $FLAVOR (PR Dry Run)..."
-            sudo podman run $PODMAN_OPTS --rm --network=none \
+            sudo podman run --rm --network=none \
               --mount=type=image,source=$IMAGE_REF,target=/chunkah \
               -e SOURCE_DATE_EPOCH=0 \
               -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
@@ -606,11 +603,8 @@ jobs:
           IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           DEFAULT_DEST="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
           
           export CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)"
-          export PODMAN_OPTS
           export IMAGE_REF
           export DEFAULT_DEST
           
@@ -624,7 +618,7 @@ jobs:
           for i in $(seq "${MAX_RETRIES}"); do
             echo "Attempt $i: Building and streaming directly to registry via FIFO..."
             
-            sudo podman run $PODMAN_OPTS --rm --network=none \
+            sudo podman run --rm --network=none \
                 --mount=type=image,source=$IMAGE_REF,target=/chunkah \
                 -e SOURCE_DATE_EPOCH=0 \
                 -e CHUNKAH_CONFIG_STR="$CHUNKAH_CONFIG_STR" \
@@ -713,11 +707,9 @@ jobs:
           PRUNE_IMAGE="localhost/cachyos-base:${{ env.DEFAULT_TAG }}"
           sudo podman image exists "$PRUNE_IMAGE" || PRUNE_IMAGE="${{ env.BASE_IMAGE }}"
 
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
 
           # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
-          sudo podman run $PODMAN_OPTS --rm --network=host -v "$CACHE_DIR":/host-cache:z \
+          sudo podman run --rm --network=host -v "$CACHE_DIR":/host-cache:z \
             "$PRUNE_IMAGE" \
             bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -c /host-cache -rk1" \
             || echo "::warning::paccache prune failed, package cache was not pruned"

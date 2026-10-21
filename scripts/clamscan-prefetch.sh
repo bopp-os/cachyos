@@ -140,6 +140,9 @@ for ref in "${TOOL_IMAGES[@]}"; do
   mount_unscanned_image "$ref"
   TOOL_MNTS+=("$IMAGE_MNT")
   TOOL_IDS+=("$IMAGE_ID")
+  # The workflows' image pruning skips these repositories, so drop the versions a pin bump left behind here
+  sudo podman images --filter "reference=${ref%:*}" --format '{{.ID}}' | sort -u | grep -vx "${IMAGE_ID:0:12}" \
+    | xargs -r sudo podman rmi >/dev/null 2>&1 || true
 done
 mount_unscanned_image "$BREW_IMAGE"
 BREW_MNT=$IMAGE_MNT
