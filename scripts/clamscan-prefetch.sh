@@ -1,8 +1,11 @@
 #!/bin/bash
 # ClamAV scan of everything the build pulls in from outside the repo, run right after Containerfile.prefetch:
-#   1. new package archives in the pre-fetched pacman cache
+#   1. new package archives in the pre-fetched pacman cache, plus what prefetch saved for the offline builds: the
+#      Chaotic keyring/mirrorlist packages (.bootstrap/) and the kernel module source tarballs (.src/)
 #   2. the Homebrew files copied from the brew image (COPY --from=brew in Containerfile.base)
 #   3. the upstream base image rootfs (files it ships with that never pass through the package cache)
+#   4. the container images of the tools the workflows run (chunkah, syft, grype), whole; the workflows then run them
+#      with --pull=never, so they use exactly the copy scanned here
 #
 # Uses the clamav/clamav container, like the pkgbuilds repo, running one clamd for the whole step: the signature
 # database loads once, and --multiscan spreads the files over every core (the scan runs before the build, so the cores
@@ -11,12 +14,13 @@
 # the per-arch caches (<root>/v3, <root>/v4, ...): any-arch packages, packages from the shared repos and the brew image
 # are scanned once for all arches. The build workflows share one concurrency group, so only one run writes it at a time.
 #
-# Usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>
+# Usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]
 set -euo pipefail
 
-CACHE_DIR=$(readlink -f "${1:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}")
-BASE_IMAGE=${2:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}
-BREW_IMAGE=${3:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image>}
+CACHE_DIR=$(readlink -f "${1:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]}")
+BASE_IMAGE=${2:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]}
+BREW_IMAGE=${3:?usage: clamscan-prefetch.sh <cache_dir> <base_image> <brew_image> [tool_image...]}
+TOOL_IMAGES=("${@:4}")
 CLAMAV_IMAGE="docker.io/clamav/clamav:stable"
 CACHE_ROOT=$(dirname "$CACHE_DIR")
 CACHE_FILE="$CACHE_ROOT/.clamav_scan_cache"
@@ -104,10 +108,12 @@ mount_unscanned_image() {
 # pruning at the end.
 save_record() {
   local tmp="$WORK_DIR/clamav_scan_cache"
+  # Sorted by name, but unique by the whole entry: one name can have several entries, because the arch caches can hold
+  # different files under the same name (packages rebuilt without a version bump)
   if [ "${1:-}" = "final" ]; then
-    printf '%s\n' "${!KEEP[@]}" | sort -u -k2 > "$tmp"
+    printf '%s\n' "${!KEEP[@]}" | sort -u -k2,2 -k1,1 > "$tmp"
   else
-    printf '%s\n' "${!SCANNED[@]}" "${!KEEP[@]}" | sort -u -k2 > "$tmp"
+    printf '%s\n' "${!SCANNED[@]}" "${!KEEP[@]}" | sort -u -k2,2 -k1,1 > "$tmp"
   fi
   # The cache root is created by root, and the per-arch folders are not world-writable everywhere.
   sudo install -m 0644 "$tmp" "$CACHE_FILE"
@@ -130,6 +136,19 @@ sudo podman run --rm --pull never --entrypoint clamscan "$CLAMAV_IMAGE" --versio
 printf '## ClamAV prefetch scan\n\n' >> "$SUMMARY"
 
 # Images are mounted before clamd starts, because mounts made later do not show up inside its container.
+TOOL_MNTS=()
+TOOL_IDS=()
+TOOL_LABELS=()
+for ref in "${TOOL_IMAGES[@]}"; do
+  mount_unscanned_image "$ref"
+  TOOL_MNTS+=("$IMAGE_MNT")
+  TOOL_IDS+=("$IMAGE_ID")
+  # Mounted at /scan/tool-<name> (e.g. tool-syft), so findings and exclude rules name the image
+  TOOL_LABELS+=("tool-$(basename "${ref%%[:@]*}")")
+  # The workflows' image pruning skips these repositories, so drop the versions a pin bump left behind here
+  sudo podman images --filter "reference=${ref%:*}" --format '{{.ID}}' | sort -u | grep -vx "${IMAGE_ID:0:12}" \
+    | xargs -r sudo podman rmi >/dev/null 2>&1 || true
+done
 mount_unscanned_image "$BREW_IMAGE"
 BREW_MNT=$IMAGE_MNT
 BREW_ID=$IMAGE_ID
@@ -154,15 +173,40 @@ ScanArchive yes
 MaxFileSize 2000M
 MaxScanSize 4000M
 AlertExceedsMax yes
-# Per-file time limit (default 2 min) and files per archive (default 10000). Firefox's omni.ja, a large zip of browser
-# resources, exceeds both; a file that still hits either counts as a finding (Heuristics.Limits.Exceeded.*).
+# Per-file time limit (default 2 min) and files per archive (default 10000), raised for large archives such as
+# Firefox's omni.ja (now skipped, see clamav-exclude.conf); a file that still hits either counts as a finding
+# (Heuristics.Limits.Exceeded.*).
 MaxScanTime 900000
 MaxFiles 100000
 ConcurrentDatabaseReload no
 EOF
+# Paths skipped by policy: files/security/clamav-exclude.conf, one regex per line (comments and blank lines ignored)
+EXCLUDE_CONF="$(dirname "$0")/../files/security/clamav-exclude.conf"
+EXCLUDE_REGEXES=()
+if [ -f "$EXCLUDE_CONF" ]; then
+  mapfile -t EXCLUDE_REGEXES < <(grep -vE '^[[:space:]]*(#|$)' "$EXCLUDE_CONF")
+fi
+for re in "${EXCLUDE_REGEXES[@]}"; do
+  echo "ExcludePath $re" >> "$WORK_DIR/clamd.conf"
+done
+
+# Lists the files under a host folder (seen by clamd at the given container path) that the exclude rules skip, so every
+# skip shows up in the log and job summary
+log_excluded() {
+  local container_path=$1 host_path=$2 f
+  [ ${#EXCLUDE_REGEXES[@]} -gt 0 ] || return 0
+  while IFS= read -r f; do
+    echo "  ⏭️  Not scanned (clamav-exclude.conf): ${f#/scan/}"
+    printf -- '- Not scanned (clamav-exclude.conf): `%s`\n' "${f#/scan/}" >> "$SUMMARY"
+  done < <(find "$host_path" -type f | sed "s#^$host_path#$container_path#" \
+    | grep -E -f <(printf '%s\n' "${EXCLUDE_REGEXES[@]}") || true)
+}
 CLAMD_MOUNTS=("-v" "$WORK_DIR:/scan/work:ro")
 [ -n "$BREW_MNT" ] && CLAMD_MOUNTS+=("-v" "$BREW_MNT/system_files:/scan/brew:ro")
 [ -n "$BASE_MNT" ] && CLAMD_MOUNTS+=("-v" "$BASE_MNT:/scan/base:ro")
+for i in "${!TOOL_IMAGES[@]}"; do
+  [ -n "${TOOL_MNTS[$i]}" ] && CLAMD_MOUNTS+=("-v" "${TOOL_MNTS[$i]}:/scan/${TOOL_LABELS[$i]}:ro")
+done
 sudo podman run -d --name "$CLAMD_CTR" --pull never --network=none --security-opt label=disable "${CLAMD_MOUNTS[@]}" \
   --entrypoint clamd "$CLAMAV_IMAGE" --config-file=/scan/work/clamd.conf >/dev/null
 echo "  Waiting for clamd to load the signature database..."
@@ -184,6 +228,7 @@ SKIPPED_PKGS=0
 scan_batch() {
   [ ${#BATCH[@]} -eq 0 ] && return 0
   echo "  🔍 Scanning batch of ${#BATCH[@]} unpacked packages..."
+  log_excluded /scan/work/pkgs "$PKG_DIR"
   if clamd_scan /scan/work/pkgs; then
     for entry in "${BATCH[@]}"; do
       KEEP["$entry"]=1
@@ -223,7 +268,9 @@ while IFS= read -r -d '' pkg_file; do
   if [ "$BATCH_SIZE" -ge "$BATCH_BYTES" ]; then
     scan_batch
   fi
-done < <(find "$CACHE_DIR" -maxdepth 1 -type f \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" \) -print0)
+done < <({ find "$CACHE_DIR" -maxdepth 1 -type f \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" \) -print0
+  find "$CACHE_DIR/.bootstrap" "$CACHE_DIR/.src" -maxdepth 1 -type f \
+    \( -name "*.pkg.tar.zst" -o -name "*.pkg.tar.xz" -o -name "*.tar" \) -print0 2>/dev/null || true; })
 scan_batch
 echo "  Packages: $NEW_PKGS scanned, $SKIPPED_PKGS already clean."
 printf -- '- Packages: %s scanned, %s already clean\n' "$NEW_PKGS" "$SKIPPED_PKGS" >> "$SUMMARY"
@@ -248,6 +295,32 @@ if [ -n "$BREW_MNT" ]; then
 else
   printf -- '- Brew image `%s`: already clean\n' "$BREW_IMAGE" >> "$SUMMARY"
 fi
+
+# -----------------------------------------------------------
+# Tool images (chunkah, syft, grype)
+# -----------------------------------------------------------
+for i in "${!TOOL_IMAGES[@]}"; do
+  ref=${TOOL_IMAGES[$i]}
+  if [ -n "${TOOL_MNTS[$i]}" ]; then
+    echo "  🔍 Scanning $ref..."
+    before=${#FINDINGS[@]}
+    if clamd_scan "/scan/${TOOL_LABELS[$i]}"; then
+      KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+    elif [ "$SCAN_RC" -eq 1 ] && ! printf '%s\n' "${FINDINGS[@]:$before}" | grep -qv 'Heuristics\.Limits\.Exceeded\.[A-Za-z]* FOUND$'; then
+      # These images are pinned and only run tools; a file that hits a scan limit was scanned up to that limit with no
+      # signature match, so it is reported but does not fail the step. Any real signature hit still does.
+      for finding in "${FINDINGS[@]:$before}"; do
+        echo "::warning::ClamAV: $finding (scan limit reached in a pinned tool image; not counted as a finding)"
+        printf -- '- Scan limit reached (warning only): `%s`\n' "$finding" >> "$SUMMARY"
+      done
+      FINDINGS=("${FINDINGS[@]:0:$before}")
+      KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+    fi
+    printf -- '- Tool image `%s`: scanned\n' "$ref" >> "$SUMMARY"
+  else
+    printf -- '- Tool image `%s`: already clean\n' "$ref" >> "$SUMMARY"
+  fi
+done
 
 # -----------------------------------------------------------
 # 3. Upstream base image rootfs
@@ -290,10 +363,15 @@ for entry in "${!SCANNED[@]}"; do
   [[ -n "${KEEP[$entry]:-}" ]] && continue
   name=${entry#* }
   if [[ "$name" == image:* ]]; then
-    [[ "$name" != "image:$BASE_IMAGE" && "$name" != "image:$BREW_IMAGE" ]] && KEEP["$entry"]=1
+    # Older IDs of the images this run used are dropped; images other arches or runs use are kept
+    used=0
+    for ref in "$BASE_IMAGE" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"; do
+      [[ "$name" == "image:$ref" ]] && used=1
+    done
+    [ "$used" = 0 ] && KEEP["$entry"]=1
     continue
   fi
-  for other in "$CACHE_ROOT"/*/"$name"; do
+  for other in "$CACHE_ROOT"/*/"$name" "$CACHE_ROOT"/*/.bootstrap/"$name" "$CACHE_ROOT"/*/.src/"$name"; do
     if [[ -f "$other" && "$(dirname "$other")" != "$CACHE_DIR" ]]; then
       KEEP["$entry"]=1
       break

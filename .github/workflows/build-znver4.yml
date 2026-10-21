@@ -1,7 +1,7 @@
 name: Build container image (znver4)
 on:
   schedule:
-    # 09:30am UTC every other day. Staggered after v3 and v4 builds.
+    # 09:30am UTC every other day, 3 hours after v4: the builds share one queue, which holds only one waiting run
     - cron: "30 09 */2 * *"
   workflow_dispatch:
     inputs:
@@ -11,17 +11,12 @@ on:
         type: boolean
         default: false
       wipe_pkg_cache:
-        description: 'Wipe package cache before build'
+        description: 'Wipe the package cache before prefetch (everything is downloaded again; files already scanned clean are not rescanned)'
         required: false
         type: boolean
         default: false
       test_tag:
         description: 'Append -test to the image tag'
-        required: false
-        type: boolean
-        default: false
-      unconfined_build:
-        description: 'Disable seccomp profile (--security-opt seccomp=unconfined)'
         required: false
         type: boolean
         default: false
@@ -51,6 +46,17 @@ on:
         type: boolean
         default: false
 
+      allow_build_network:
+        description: 'Give the base and flavor image builds network access (normally none: everything is prefetched)'
+        required: false
+        type: boolean
+        default: false
+      allow_critical_vulns:
+        description: 'Publish even if grype finds critical vulnerabilities with a fix available, or cannot scan'
+        required: false
+        type: boolean
+        default: false
+
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image (znver4)"
   IMAGE_KEYWORDS: "bootc,arch,cachyos"
@@ -63,6 +69,9 @@ env:
   TARGET_MARCH: "znver4"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
   PKG_CACHE_MAX_GB: "20"
+  # Network for the RUN steps of the base and flavor image builds. Everything they need is downloaded and ClamAV-scanned
+  # in the prefetch step, so they run with none; the allow_build_network input (manual runs only) switches to host.
+  BUILD_NETWORK: "${{ inputs.allow_build_network && 'host' || 'none' }}"
 
 concurrency:
   group: boppos-build-queue
@@ -138,21 +147,34 @@ jobs:
           sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           
+          # Images the scan steps reuse from run to run are never pruned here: the ClamAV image carries its ~1 GB
+          # signature database, and the pinned syft, grype and chunkah images are already ClamAV-scanned. Their old
+          # versions are dropped by the ClamAV step when a newer one is pulled.
+          KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah)$'
+          # remove_images [--force] [podman images filter...]: removes the matching images except the ones above
+          remove_images() {
+            local force=()
+            if [ "${1:-}" = "--force" ]; then force=(--force); shift; fi
+            sudo podman images "$@" --format '{{.ID}} {{.Repository}}' | grep -vE "$KEEP_IMAGES" | awk '{print $1}' \
+              | sort -u | xargs -r sudo podman rmi "${force[@]}" >/dev/null 2>&1 || true
+          }
+
           # 3. Prune dangling Podman data (Preserve recent build cache for speed)
           sudo podman system prune --force || true
-          sudo podman image prune --all --force --filter "until=72h" || true
+          remove_images --filter "until=72h"
           
-          # 4. Wipe the Podman package cache if the manual UI toggle was checked
+          # 4. With the manual wipe toggle, also drop all other unused Podman images, volumes and build cache
+          #    (the package cache itself is emptied in "Prepare Local Cache Directory", before prefetch)
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Nuking Podman builder cache mount..."
-            sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-* || true
-            sudo podman system prune --all --force --volumes --build || true
+            echo "Pruning unused Podman images (except the scanner and tool images), volumes and build cache..."
+            sudo podman system prune --force --volumes --build || true
+            remove_images
           fi
           
-          # 5. Purge all local podman images if a clean build is requested to fix layer corruption
+          # 5. Purge local podman images if a clean build is requested to fix layer corruption
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
-            echo "Nuking all cached images to enforce a strict clean build..."
-            sudo podman rmi --all --force || true
+            echo "Removing all cached images (except the scanner and tool images) to enforce a strict clean build..."
+            remove_images --force
           fi
           
           # 6. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
@@ -165,6 +187,9 @@ jobs:
       - name: Checkout
         if: steps.check_compatibility.outputs.should_skip != 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          # Nothing in this workflow pushes to git; don't leave the token in .git/config for later steps and tools
+          persist-credentials: false
 
       - name: Ensure Package Intervals JSON exists
         if: steps.check_compatibility.outputs.should_skip != 'true'
@@ -242,9 +267,7 @@ jobs:
         run: |
           echo "::group::Generating fastest mirrors"
           mkdir -p ${{ github.workspace }}/mirrors
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-          sudo podman run $PODMAN_OPTS --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z ${{ env.BASE_IMAGE }} bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
+          sudo podman run --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z ${{ env.BASE_IMAGE }} bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
           echo "::endgroup::"
 
       - name: Pre-fetch & Audit Package Archives
@@ -266,12 +289,14 @@ jobs:
             -f Containerfile.prefetch .
           echo "::endgroup::"
 
-      - name: ClamAV Scan (Packages, Brew & Base Image)
+      - name: ClamAV Scan (Packages, Brew, Base & Tool Images)
         run: |
           # Scan the brew image Containerfile.base actually copies from, so the two cannot drift apart
           BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
+          # Tool images the flavor jobs run with --pull=never, so they use exactly the copies scanned here
+          mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' .github/chunkah/Containerfile .github/syft/Containerfile .github/grype/Containerfile)
           chmod +x scripts/clamscan-prefetch.sh
-          ./scripts/clamscan-prefetch.sh "${{ env.LOCAL_CACHE_DIR }}" "${{ env.BASE_IMAGE }}" "$BREW_IMAGE"
+          ./scripts/clamscan-prefetch.sh "${{ env.LOCAL_CACHE_DIR }}" "${{ env.BASE_IMAGE }}" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"
 
       - name: Build Base Image
         id: build_base
@@ -299,16 +324,7 @@ jobs:
             BUILD_ARGS+=("--no-cache")
           fi
 
-          # Check if the manual 'wipe_pkg_cache' toggle was checked in the GitHub UI
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Manual wipe package cache triggered. Appending build arg..."
-            BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
-          fi
 
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then
-            echo "Manual unconfined build triggered. Appending --security-opt seccomp=unconfined..."
-            BUILD_ARGS+=("--security-opt" "seccomp=unconfined")
-          fi
 
           if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then
             echo "Manual verbose build triggered. Appending build arg..."
@@ -321,12 +337,18 @@ jobs:
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}" "--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
           sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
-            --network=host \
+            --network=${{ env.BUILD_NETWORK }} \
             --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
 
           # Ensure the local base image is tagged properly so the DE overlays can layer onto it!
           sudo podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           echo "::endgroup::"
+
+      - name: Verify Package Cache Was Fully Scanned
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          chmod +x scripts/verify-package-cache.sh
+          ./scripts/verify-package-cache.sh "${{ env.LOCAL_CACHE_DIR }}"
 
       - name: Clean Workspace & Podman Storage
         if: always()
@@ -378,14 +400,19 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          # Nothing in this workflow pushes to git; don't leave the token in .git/config for later steps and tools
+          persist-credentials: false
 
       - name: Ensure Package Intervals JSON exists
         run: |
           if [ ! -f scripts/package-intervals.json ]; then echo "{}" > scripts/package-intervals.json; fi
 
-      - name: Read pinned chunkah image
+      - name: Read pinned tool images
         run: |
           echo "CHUNKAH_IMAGE=$(sed -n 's/^FROM //p' .github/chunkah/Containerfile)" >> "$GITHUB_ENV"
+          echo "SYFT_IMAGE=$(sed -n 's/^FROM //p' .github/syft/Containerfile)" >> "$GITHUB_ENV"
+          echo "GRYPE_IMAGE=$(sed -n 's/^FROM //p' .github/grype/Containerfile)" >> "$GITHUB_ENV"
 
       - name: Get current date
         id: date
@@ -433,8 +460,8 @@ jobs:
           CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
           sudo mkdir -p "$CACHE_DIR"
           sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
-          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf "$CACHE_DIR"/*; fi
+          # Nothing is deleted here: this build has no network and needs everything prefetch downloaded and scanned
+          sudo rm -f "$CACHE_DIR"/*.part
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
       - name: Pre-build Package Cache Security Scan
@@ -452,8 +479,6 @@ jobs:
           done <<< "$META_LABELS"
 
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then BUILD_ARGS+=("--no-cache"); fi
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true"); fi
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then BUILD_ARGS+=("--security-opt" "seccomp=unconfined"); fi
           if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "VERBOSE=true"); fi
           BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
           
@@ -463,22 +488,18 @@ jobs:
           DOCKERFILE="Containerfile.${FLAVOR}"
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
 
-          sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=host --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
+          sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=${{ env.BUILD_NETWORK }} --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
           echo "::endgroup::"
+
+      - name: Verify Package Cache Was Fully Scanned
+        run: |
+          chmod +x scripts/verify-package-cache.sh
+          ./scripts/verify-package-cache.sh "${{ env.LOCAL_CACHE_DIR }}"
 
       - name: Post-build Image IOC Scan
         run: |
           chmod +x scripts/scan-image-ioc.sh
           ./scripts/scan-image-ioc.sh "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
-
-      - name: Install Syft and Grype
-        run: |
-          if ! command -v syft >/dev/null 2>&1; then
-            curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
-          fi
-          if ! command -v grype >/dev/null 2>&1; then
-            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b /usr/local/bin
-          fi
 
       - name: Syft & Grype Vulnerability Scan
         run: |
@@ -493,15 +514,40 @@ jobs:
           fi
 
           echo "::group::Generating SBOM with Syft from podman mount"
-          sudo syft dir:"$MNT_DIR" --config .syft.yaml --source-name "cachyos-${{ matrix.flavor }}" --source-version "${{ env.DEFAULT_TAG }}" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
+          # Pinned syft image, ClamAV-scanned in the build_base job; the rootfs is mounted read-only
+          sudo podman run --rm --pull=never --network=none --security-opt label=disable \
+            -v "$MNT_DIR":/rootfs:ro -v "$PWD/.syft.yaml":/config/.syft.yaml:ro -e SYFT_CHECK_FOR_APP_UPDATE=false \
+            "$SYFT_IMAGE" dir:/rootfs --config /config/.syft.yaml --source-name "cachyos-${{ matrix.flavor }}" --source-version "${{ env.DEFAULT_TAG }}" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
           echo "::endgroup::"
 
           echo "::group::Scanning SBOM with Grype"
-          sudo grype sbom:/tmp/sbom.json --config .grype.yaml -o json > /tmp/grype-results.json || true
-          sudo grype sbom:/tmp/sbom.json --config .grype.yaml || true
+          # Pinned grype image, ClamAV-scanned in the build_base job. It downloads its vulnerability database, so it
+          # needs the network; the database is kept between runs in a host folder.
+          GRYPE_DB_DIR="${{ env.HOST_PKG_CACHE_DIR }}/.grype-db"
+          sudo mkdir -p "$GRYPE_DB_DIR"
+          grype() {
+            sudo podman run --rm --pull=never --network=host --security-opt label=disable \
+              -v /tmp/sbom.json:/sbom.json:ro -v "$PWD/.grype.yaml":/config/.grype.yaml:ro -v "$GRYPE_DB_DIR":/grype-db \
+              -e GRYPE_DB_CACHE_DIR=/grype-db -e GRYPE_CHECK_FOR_APP_UPDATE=false \
+              "$GRYPE_IMAGE" sbom:/sbom.json --config /config/.grype.yaml "$@"
+          }
+          # Critical vulnerabilities that have a fix available (.grype.yaml sets only-fixed) fail the build before
+          # anything is pushed, and so does a scan that could not run. The allow_critical_vulns input (manual runs)
+          # turns both into warnings.
+          if [ "${{ inputs.allow_critical_vulns }}" == "true" ]; then GATE=warning; else GATE=error; fi
+          if ! grype -o json > /tmp/grype-results.json; then
+            echo "::$GATE title=Vulnerability Scan Failed::grype could not scan cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+            [ "$GATE" = error ] && exit 1
+          fi
+          grype || true
           CRIT_COUNT=$(jq '[.matches[]? | select(.vulnerability.severity == "Critical")] | length' /tmp/grype-results.json 2>/dev/null || echo 0)
+          CRIT_COUNT=${CRIT_COUNT:-0}
           if [ "$CRIT_COUNT" -gt 0 ]; then
-            echo "::warning title=Critical Vulnerability Alert::Discovered $CRIT_COUNT critical vulnerability/vulnerabilities in cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+            jq -r '.matches[] | select(.vulnerability.severity == "Critical")
+              | "  \(.vulnerability.id) in \(.artifact.name) \(.artifact.version) (fixed in \(.vulnerability.fix.versions | join(", ")))"' \
+              /tmp/grype-results.json || true
+            echo "::$GATE title=Critical Vulnerability Alert::Discovered $CRIT_COUNT critical vulnerability/vulnerabilities with a fix available in cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+            [ "$GATE" = error ] && exit 1
           fi
           echo "::endgroup::"
 
@@ -509,9 +555,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "Extracting package list from image..."
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
-          CONTAINER_ID=$(sudo podman create $PODMAN_OPTS localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
+          CONTAINER_ID=$(sudo podman create localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
           sudo podman cp ${CONTAINER_ID}:/usr/share/boppos/packages.json packages-${{ matrix.flavor }}-${{ github.sha }}.json
           sudo podman rm ${CONTAINER_ID}
 
@@ -523,15 +567,13 @@ jobs:
           CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
           IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
           
           echo "Rechunking $FLAVOR (PR Dry Run)..."
-          sudo podman run $PODMAN_OPTS --rm --network=none \
+          sudo podman run --rm --network=none \
             --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e SOURCE_DATE_EPOCH=0 \
             -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
-            "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
+            --pull=never "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
 
       - name: Rechunk & Push Flavor Image to GHCR
         if: github.event_name != 'pull_request'
@@ -547,11 +589,8 @@ jobs:
           IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           DEFAULT_DEST="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
           
           export CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)"
-          export PODMAN_OPTS
           export IMAGE_REF
           export DEFAULT_DEST
           
@@ -565,11 +604,11 @@ jobs:
           for i in $(seq "${MAX_RETRIES}"); do
             echo "Attempt $i: Building and streaming directly to registry via FIFO..."
             
-            sudo podman run $PODMAN_OPTS --rm --network=none \
+            sudo podman run --rm --network=none \
                 --mount=type=image,source=$IMAGE_REF,target=/chunkah \
                 -e SOURCE_DATE_EPOCH=0 \
                 -e CHUNKAH_CONFIG_STR="$CHUNKAH_CONFIG_STR" \
-                "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
+                --pull=never "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
             PODMAN_PID=$!
             
             if sudo skopeo copy \
@@ -654,11 +693,9 @@ jobs:
           PRUNE_IMAGE="localhost/cachyos-base:${{ env.DEFAULT_TAG }}"
           sudo podman image exists "$PRUNE_IMAGE" || PRUNE_IMAGE="${{ env.BASE_IMAGE }}"
 
-          PODMAN_OPTS=""
-          if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then PODMAN_OPTS="--security-opt seccomp=unconfined"; fi
 
           # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
-          sudo podman run $PODMAN_OPTS --rm --network=host -v "$CACHE_DIR":/host-cache:z \
+          sudo podman run --rm --network=host -v "$CACHE_DIR":/host-cache:z \
             "$PRUNE_IMAGE" \
             bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -c /host-cache -rk1" \
             || echo "::warning::paccache prune failed, package cache was not pruned"

@@ -46,7 +46,8 @@ done
 
 if [ ${#BUILD_DEPS[@]} -gt 0 ]; then
     echo "Installing temporary build dependencies: ${BUILD_DEPS[*]}"
-    pacman -Sy --noconfirm --needed "${BUILD_DEPS[@]}"
+    # No -y: the databases are the ones prefetch saved, so these are the packages it already downloaded and scanned
+    pacman -S --noconfirm --needed "${BUILD_DEPS[@]}"
 fi
 
 # Create temporary workspace for module source trees
@@ -54,10 +55,35 @@ BUILD_WORK_DIR="/tmp/extra-kmods"
 rm -rf "$BUILD_WORK_DIR"
 mkdir -p "$BUILD_WORK_DIR"
 
+# Module sources come from the tarballs the prefetch step saved and ClamAV-scanned (prefetch_extras.sh); the build has
+# no network. ALLOW_NETWORK_BUILD=1 clones instead, for local builds without a prefetched cache.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=kmod_sources.sh
+source "$SCRIPT_DIR/kmod_sources.sh"
+KMOD_SRC_DIR="${KMOD_SRC_DIR:-/var/cache/pacman/pkg/.src}"
+
+fetch_kmod_src() {
+    local name=$1 dest=$2
+    if [ -f "$KMOD_SRC_DIR/$name.tar" ]; then
+        echo "Using prefetched $name source at commit $(cut -d' ' -f1 "$KMOD_SRC_DIR/$name.commit" 2>/dev/null || echo unknown)"
+        mkdir -p "$dest" && tar -xf "$KMOD_SRC_DIR/$name.tar" -C "$dest"
+    elif [ -n "${ALLOW_NETWORK_BUILD:-}" ]; then
+        git clone --depth 1 "${KMOD_REPOS[$name]}" "$dest"
+    else
+        echo "ERROR: prefetched source $KMOD_SRC_DIR/$name.tar not found (set ALLOW_NETWORK_BUILD=1 to clone instead)" >&2
+        return 1
+    fi
+}
+
+# "git describe --tags" of the prefetched commit; fails when there is none (the tarballs carry no .git)
+kmod_describe() {
+    [ -s "$KMOD_SRC_DIR/$1.describe" ] && cat "$KMOD_SRC_DIR/$1.describe"
+}
+
 # 4. Build nct6687d (Nuvoton NCT6686D / NCT6687D Super I/O)
 if [ "$BUILD_NCT6687D" = "true" ]; then
     echo "--- Building nct6687d (Nuvoton NCT6686D/NCT6687D) ---"
-    git clone --depth 1 https://github.com/Fred78290/nct6687d.git "$BUILD_WORK_DIR/nct6687d"
+    fetch_kmod_src nct6687d "$BUILD_WORK_DIR/nct6687d"
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/nct6687d" $LLVM_FLAGS modules
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/nct6687d" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install
     echo "nct6687d installed."
@@ -68,7 +94,7 @@ fi
 # Arch's depmod search order is "updates extramodules built-in" and "extra" counts as built-in.
 if [ "$BUILD_IT87" = "true" ]; then
     echo "--- Building it87 (ITE IT86xx/IT87xx Super I/O) ---"
-    git clone --depth 1 https://github.com/frankcrawford/it87.git "$BUILD_WORK_DIR/it87"
+    fetch_kmod_src it87 "$BUILD_WORK_DIR/it87"
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/it87" $LLVM_FLAGS modules
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/it87" $LLVM_FLAGS INSTALL_MOD_DIR="updates" modules_install
     echo "it87 installed."
@@ -77,10 +103,10 @@ fi
 # 6. Build xpadneo (Xbox One/Series Bluetooth controller driver)
 if [ "$BUILD_XPADNEO" = "true" ]; then
     echo "--- Building xpadneo (Xbox Wireless Bluetooth) ---"
-    git clone --depth 1 https://github.com/atar-axis/xpadneo.git "$BUILD_WORK_DIR/xpadneo"
+    fetch_kmod_src xpadneo "$BUILD_WORK_DIR/xpadneo"
     
     # xpadneo Makefile expects a VERSION file; on shallow clones git describe fails, so provide a fallback
-    XPADNEO_VER="$(git -C "$BUILD_WORK_DIR/xpadneo" describe --tags 2>/dev/null || echo "v0.10.4")"
+    XPADNEO_VER="$(kmod_describe xpadneo || git -C "$BUILD_WORK_DIR/xpadneo" describe --tags 2>/dev/null || echo "v0.10.4")"
     echo "$XPADNEO_VER" > "$BUILD_WORK_DIR/xpadneo/VERSION"
 
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/xpadneo/hid-xpadneo/src" $LLVM_FLAGS VERSION="$XPADNEO_VER" modules
@@ -101,11 +127,11 @@ fi
 # Uses the OpenGamingCollective fork, which coexists with the in-tree xpad driver.
 # Dongle firmware comes from the xone-dongle-firmware package; mt76x2u is blacklisted via /usr/lib/modprobe.d/xone.conf.
 build_xone() {
-    git clone --depth 1 https://github.com/OpenGamingCollective/xonedo.git "$BUILD_WORK_DIR/xone" || return 1
+    fetch_kmod_src xone "$BUILD_WORK_DIR/xone" || return 1
 
     # xone sources carry a #VERSION# placeholder normally filled in by its install.sh
     local ver
-    ver="$(git -C "$BUILD_WORK_DIR/xone" describe --tags 2>/dev/null || echo "v0.5.7-ogc1")"
+    ver="$(kmod_describe xone || git -C "$BUILD_WORK_DIR/xone" describe --tags 2>/dev/null || echo "v0.5.7-ogc1")"
     find "$BUILD_WORK_DIR/xone" -type f -name '*.c' -exec sed -i "s/#VERSION#/${ver#v}/" {} + || return 1
 
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/xone" $LLVM_FLAGS modules || return 1
@@ -124,7 +150,7 @@ fi
 # 8. Build zenergy (AMD Zen CPU energy readings via hwmon, readable without root)
 # Loaded after k10temp on AMD systems via the softdep in /usr/lib/modprobe.d/zenergy.conf.
 build_zenergy() {
-    git clone --depth 1 https://github.com/BoukeHaarsma23/zenergy.git "$BUILD_WORK_DIR/zenergy" || return 1
+    fetch_kmod_src zenergy "$BUILD_WORK_DIR/zenergy" || return 1
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/zenergy" $LLVM_FLAGS modules || return 1
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/zenergy" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install || return 1
 }

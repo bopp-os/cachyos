@@ -12,14 +12,28 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Fetch Keys
         run: |
           mkdir -p files/keys
-          curl -s "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF3B607488DB35A47" > files/keys/chaotic-1.asc
-          curl -s "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB" > files/keys/chaotic-2.asc
-          curl -s "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3056513887B78AEB" > files/keys/chaotic-3.asc
+          # These keys are trusted by every build, so a refresh may only update the keys we already trust (new expiry
+          # dates, subkeys or signatures): each download must be exactly one key with this full fingerprint, or the
+          # job fails and nothing is committed.
+          fetch_key() {
+            local file=$1 fpr=$2 tmp got
+            tmp=$(mktemp)
+            curl -fsS --max-time 30 -o "$tmp" "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x$fpr"
+            got=$(gpg --with-colons --show-keys "$tmp" 2>/dev/null | awk -F: '/^pub/ {p=1; next} /^fpr/ && p {print $10; p=0}')
+            if [ "$got" != "$fpr" ]; then
+              echo "::error::$file: expected only key $fpr, got: ${got:-no key}"
+              exit 1
+            fi
+            mv "$tmp" "files/keys/$file"
+          }
+          fetch_key chaotic-1.asc 882DCFE48E2051D48E2562ABF3B607488DB35A47
+          fetch_key chaotic-2.asc 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB
+          fetch_key chaotic-3.asc EF925EA60F33D0CB85C44AD13056513887B78AEB
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add files/keys/

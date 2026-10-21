@@ -56,8 +56,14 @@ COPY files/base/usr/share/libalpm/hooks/assign-usercomponent.hook /usr/share/lib
 COPY files/base/usr/libexec/assign-usercomponent.py /usr/libexec/assign-usercomponent.py
 RUN chmod +x /usr/libexec/assign-usercomponent.py
 
+# Use the package databases that prefetch saved next to the cached packages, so this layer sees exactly the versions
+# that were downloaded and ClamAV-scanned. Without them (local builds) it syncs as before.
 RUN rm -rf /var/lib/pacman/sync/* && \
-    pacman -Syy --noconfirm && \
+    if ls /var/cache/pacman/pkg/.sync/*.db >/dev/null 2>&1; then \
+        cp -f /var/cache/pacman/pkg/.sync/*.db /var/lib/pacman/sync/; \
+    else \
+        pacman -Syy --noconfirm; \
+    fi && \
     pacman -Su --noconfirm --needed python && \
     { pkill -9 gpg-agent || true; pkill -9 dirmngr || true; pkill -9 keyboxd || true; pkill -9 scdaemon || true; }
 
@@ -91,8 +97,9 @@ RUN mkdir -p /usr/lib/dracut/dracut.conf.d && \
 # ==========================================
 # PACMAN CACHE CLEANUP
 # ==========================================
-RUN rm -f /usr/lib/sysimage/cache/pacman/pkg/lua* && \
-    rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
+# The cache holds what prefetch downloaded and scanned, and this build has no network: delete nothing from it here
+# (stale lua packages are removed before prefetch, in the workflow's "Prepare Local Cache Directory" step)
+RUN rm -f /usr/lib/sysimage/cache/pacman/pkg/*.part && \
     if ! mountpoint -q /usr/lib/sysimage/cache/pacman/pkg; then \
     pacman -Sc --noconfirm ; \
     fi
@@ -105,7 +112,7 @@ RUN --mount=type=tmpfs,dst=/run \
     pacman -Rdd --noconfirm pulseaudio pulseaudio-bluetooth || true
 
 RUN --mount=type=tmpfs,dst=/run \
-    pacman -Sy --noconfirm --ask 4 --needed \
+    pacman -S --noconfirm --ask 4 --needed \
     python python-yaml yq
 
 COPY scripts/install_packages.sh /tmp/install_packages.sh
@@ -151,9 +158,12 @@ RUN if [ -e /usr/etc ]; then \
     rm -rf /usr/etc; \
     fi
 
-# Configure Flatpak with retry logic to handle transient network issues
-RUN for i in {1..5}; do \
-    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && break || \
+# Configure Flatpak from the remote definition prefetch saved (the build has no network); local builds without a
+# prefetched cache download it, with retry logic to handle transient network issues
+RUN FLATHUB_REPO=/var/cache/pacman/pkg/.bootstrap/flathub.flatpakrepo; \
+    [ -f "$FLATHUB_REPO" ] || FLATHUB_REPO=https://flathub.org/repo/flathub.flatpakrepo; \
+    for i in {1..5}; do \
+    flatpak remote-add --if-not-exists flathub "$FLATHUB_REPO" && break || \
     echo "Flatpak remote-add failed (attempt $i), retrying in 5 seconds..." && sleep 5; \
     done && \
     find /var/lib/flatpak /etc/flatpak -type f 2>/dev/null | xargs -r sh -c \

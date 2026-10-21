@@ -1,0 +1,4 @@
+# Pinned grype version used to scan the SBOM for vulnerabilities in the build workflows.
+# This file is never built; it exists so Dependabot opens a PR for new grype releases.
+# The image is ClamAV-scanned in the prefetch step and run from that local copy (--pull=never).
+FROM docker.io/anchore/grype:v0.121.0
