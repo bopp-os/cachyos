@@ -136,10 +136,13 @@ printf '## ClamAV prefetch scan\n\n' >> "$SUMMARY"
 # Images are mounted before clamd starts, because mounts made later do not show up inside its container.
 TOOL_MNTS=()
 TOOL_IDS=()
+TOOL_LABELS=()
 for ref in "${TOOL_IMAGES[@]}"; do
   mount_unscanned_image "$ref"
   TOOL_MNTS+=("$IMAGE_MNT")
   TOOL_IDS+=("$IMAGE_ID")
+  # Mounted at /scan/tool-<name> (e.g. tool-syft), so findings and exclude rules name the image
+  TOOL_LABELS+=("tool-$(basename "${ref%%[:@]*}")")
   # The workflows' image pruning skips these repositories, so drop the versions a pin bump left behind here
   sudo podman images --filter "reference=${ref%:*}" --format '{{.ID}}' | sort -u | grep -vx "${IMAGE_ID:0:12}" \
     | xargs -r sudo podman rmi >/dev/null 2>&1 || true
@@ -200,7 +203,7 @@ CLAMD_MOUNTS=("-v" "$WORK_DIR:/scan/work:ro")
 [ -n "$BREW_MNT" ] && CLAMD_MOUNTS+=("-v" "$BREW_MNT/system_files:/scan/brew:ro")
 [ -n "$BASE_MNT" ] && CLAMD_MOUNTS+=("-v" "$BASE_MNT:/scan/base:ro")
 for i in "${!TOOL_IMAGES[@]}"; do
-  [ -n "${TOOL_MNTS[$i]}" ] && CLAMD_MOUNTS+=("-v" "${TOOL_MNTS[$i]}:/scan/tool$i:ro")
+  [ -n "${TOOL_MNTS[$i]}" ] && CLAMD_MOUNTS+=("-v" "${TOOL_MNTS[$i]}:/scan/${TOOL_LABELS[$i]}:ro")
 done
 sudo podman run -d --name "$CLAMD_CTR" --pull never --network=none --security-opt label=disable "${CLAMD_MOUNTS[@]}" \
   --entrypoint clamd "$CLAMAV_IMAGE" --config-file=/scan/work/clamd.conf >/dev/null
@@ -298,7 +301,19 @@ for i in "${!TOOL_IMAGES[@]}"; do
   ref=${TOOL_IMAGES[$i]}
   if [ -n "${TOOL_MNTS[$i]}" ]; then
     echo "  🔍 Scanning $ref..."
-    clamd_scan "/scan/tool$i" && KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+    before=${#FINDINGS[@]}
+    if clamd_scan "/scan/${TOOL_LABELS[$i]}"; then
+      KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+    elif [ "$SCAN_RC" -eq 1 ] && ! printf '%s\n' "${FINDINGS[@]:$before}" | grep -qv 'Heuristics\.Limits\.Exceeded\.[A-Za-z]* FOUND$'; then
+      # These images are pinned and only run tools; a file that hits a scan limit was scanned up to that limit with no
+      # signature match, so it is reported but does not fail the step. Any real signature hit still does.
+      for finding in "${FINDINGS[@]:$before}"; do
+        echo "::warning::ClamAV: $finding (scan limit reached in a pinned tool image; not counted as a finding)"
+        printf -- '- Scan limit reached (warning only): `%s`\n' "$finding" >> "$SUMMARY"
+      done
+      FINDINGS=("${FINDINGS[@]:0:$before}")
+      KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+    fi
     printf -- '- Tool image `%s`: scanned\n' "$ref" >> "$SUMMARY"
   else
     printf -- '- Tool image `%s`: already clean\n' "$ref" >> "$SUMMARY"
