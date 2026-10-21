@@ -108,10 +108,12 @@ mount_unscanned_image() {
 # pruning at the end.
 save_record() {
   local tmp="$WORK_DIR/clamav_scan_cache"
+  # Sorted by name, but unique by the whole entry: one name can have several entries, because the arch caches can hold
+  # different files under the same name (packages rebuilt without a version bump)
   if [ "${1:-}" = "final" ]; then
-    printf '%s\n' "${!KEEP[@]}" | sort -u -k2 > "$tmp"
+    printf '%s\n' "${!KEEP[@]}" | sort -u -k2,2 -k1,1 > "$tmp"
   else
-    printf '%s\n' "${!SCANNED[@]}" "${!KEEP[@]}" | sort -u -k2 > "$tmp"
+    printf '%s\n' "${!SCANNED[@]}" "${!KEEP[@]}" | sort -u -k2,2 -k1,1 > "$tmp"
   fi
   # The cache root is created by root, and the per-arch folders are not world-writable everywhere.
   sudo install -m 0644 "$tmp" "$CACHE_FILE"
