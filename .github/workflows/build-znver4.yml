@@ -11,7 +11,7 @@ on:
         type: boolean
         default: false
       wipe_pkg_cache:
-        description: 'Wipe package cache before build'
+        description: 'Wipe the package cache before prefetch (everything is downloaded again; files already scanned clean are not rescanned)'
         required: false
         type: boolean
         default: false
@@ -53,6 +53,11 @@ on:
 
       allow_build_network:
         description: 'Give the base and flavor image builds network access (normally none: everything is prefetched)'
+        required: false
+        type: boolean
+        default: false
+      allow_critical_vulns:
+        description: 'Publish even if grype finds critical vulnerabilities with a fix available, or cannot scan'
         required: false
         type: boolean
         default: false
@@ -151,10 +156,10 @@ jobs:
           sudo podman system prune --force || true
           sudo podman image prune --all --force --filter "until=72h" || true
           
-          # 4. Wipe the Podman package cache if the manual UI toggle was checked
+          # 4. With the manual wipe toggle, also drop all unused Podman images, volumes and build cache
+          #    (the package cache itself is emptied in "Prepare Local Cache Directory", before prefetch)
           if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Nuking Podman builder cache mount..."
-            sudo rm -rf /var/lib/containers/storage/volumes/boppos-builder-cache-* || true
+            echo "Pruning all unused Podman images, volumes and build cache..."
             sudo podman system prune --all --force --volumes --build || true
           fi
           
@@ -313,11 +318,6 @@ jobs:
             BUILD_ARGS+=("--no-cache")
           fi
 
-          # Check if the manual 'wipe_pkg_cache' toggle was checked in the GitHub UI
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
-            echo "Manual wipe package cache triggered. Appending build arg..."
-            BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true")
-          fi
 
           if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then
             echo "Manual unconfined build triggered. Appending --security-opt seccomp=unconfined..."
@@ -459,7 +459,6 @@ jobs:
           sudo mkdir -p "$CACHE_DIR"
           sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
           sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then sudo rm -rf "$CACHE_DIR"/*; fi
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
       - name: Pre-build Package Cache Security Scan
@@ -477,7 +476,6 @@ jobs:
           done <<< "$META_LABELS"
 
           if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then BUILD_ARGS+=("--no-cache"); fi
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "WIPE_PKG_CACHE=true"); fi
           if [ "${{ github.event.inputs.unconfined_build }}" == "true" ]; then BUILD_ARGS+=("--security-opt" "seccomp=unconfined"); fi
           if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "VERBOSE=true"); fi
           BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
@@ -531,11 +529,23 @@ jobs:
               -e GRYPE_DB_CACHE_DIR=/grype-db -e GRYPE_CHECK_FOR_APP_UPDATE=false \
               "$GRYPE_IMAGE" sbom:/sbom.json --config /config/.grype.yaml "$@"
           }
-          grype -o json > /tmp/grype-results.json || true
+          # Critical vulnerabilities that have a fix available (.grype.yaml sets only-fixed) fail the build before
+          # anything is pushed, and so does a scan that could not run. The allow_critical_vulns input (manual runs)
+          # turns both into warnings.
+          if [ "${{ inputs.allow_critical_vulns }}" == "true" ]; then GATE=warning; else GATE=error; fi
+          if ! grype -o json > /tmp/grype-results.json; then
+            echo "::$GATE title=Vulnerability Scan Failed::grype could not scan cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+            [ "$GATE" = error ] && exit 1
+          fi
           grype || true
           CRIT_COUNT=$(jq '[.matches[]? | select(.vulnerability.severity == "Critical")] | length' /tmp/grype-results.json 2>/dev/null || echo 0)
+          CRIT_COUNT=${CRIT_COUNT:-0}
           if [ "$CRIT_COUNT" -gt 0 ]; then
-            echo "::warning title=Critical Vulnerability Alert::Discovered $CRIT_COUNT critical vulnerability/vulnerabilities in cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+            jq -r '.matches[] | select(.vulnerability.severity == "Critical")
+              | "  \(.vulnerability.id) in \(.artifact.name) \(.artifact.version) (fixed in \(.vulnerability.fix.versions | join(", ")))"' \
+              /tmp/grype-results.json || true
+            echo "::$GATE title=Critical Vulnerability Alert::Discovered $CRIT_COUNT critical vulnerability/vulnerabilities with a fix available in cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
+            [ "$GATE" = error ] && exit 1
           fi
           echo "::endgroup::"
 

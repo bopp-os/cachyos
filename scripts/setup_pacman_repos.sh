@@ -110,7 +110,9 @@ mkdir -p /var/cache/pacman/pkg /usr/lib/sysimage/cache/pacman
 ln -sf /var/cache/pacman/pkg /usr/lib/sysimage/cache/pacman/pkg
 
 if ! grep -q '\[bopp-os\]' /etc/pacman.conf; then
-  printf "\n[bopp-os]\nSigLevel = Optional TrustAll\nServer = https://repo.ripps.me\n\n" > /tmp/bopp-os.conf
+  # Every package must carry a valid signature from a trusted key (the boppos key is signed locally above); the
+  # database signature is optional
+  printf "\n[bopp-os]\nSigLevel = Required DatabaseOptional\nServer = https://repo.ripps.me\n\n" > /tmp/bopp-os.conf
   sed -i '/^\[extra\]/i # bopp-os repo\n' /etc/pacman.conf
   awk -v repo_file="/tmp/bopp-os.conf" '/^# bopp-os repo/ { system("cat " repo_file); next } { print }' /etc/pacman.conf > /etc/pacman.conf.tmp
   mv /etc/pacman.conf.tmp /etc/pacman.conf
