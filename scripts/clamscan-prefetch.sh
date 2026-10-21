@@ -168,12 +168,34 @@ ScanArchive yes
 MaxFileSize 2000M
 MaxScanSize 4000M
 AlertExceedsMax yes
-# Per-file time limit (default 2 min) and files per archive (default 10000). Firefox's omni.ja, a large zip of browser
-# resources, exceeds both; a file that still hits either counts as a finding (Heuristics.Limits.Exceeded.*).
+# Per-file time limit (default 2 min) and files per archive (default 10000), raised for large archives such as
+# Firefox's omni.ja (now skipped, see clamav-exclude.conf); a file that still hits either counts as a finding
+# (Heuristics.Limits.Exceeded.*).
 MaxScanTime 900000
 MaxFiles 100000
 ConcurrentDatabaseReload no
 EOF
+# Paths skipped by policy: files/security/clamav-exclude.conf, one regex per line (comments and blank lines ignored)
+EXCLUDE_CONF="$(dirname "$0")/../files/security/clamav-exclude.conf"
+EXCLUDE_REGEXES=()
+if [ -f "$EXCLUDE_CONF" ]; then
+  mapfile -t EXCLUDE_REGEXES < <(grep -vE '^[[:space:]]*(#|$)' "$EXCLUDE_CONF")
+fi
+for re in "${EXCLUDE_REGEXES[@]}"; do
+  echo "ExcludePath $re" >> "$WORK_DIR/clamd.conf"
+done
+
+# Lists the files under a host folder (seen by clamd at the given container path) that the exclude rules skip, so every
+# skip shows up in the log and job summary
+log_excluded() {
+  local container_path=$1 host_path=$2 f
+  [ ${#EXCLUDE_REGEXES[@]} -gt 0 ] || return 0
+  while IFS= read -r f; do
+    echo "  ⏭️  Not scanned (clamav-exclude.conf): ${f#/scan/}"
+    printf -- '- Not scanned (clamav-exclude.conf): `%s`\n' "${f#/scan/}" >> "$SUMMARY"
+  done < <(find "$host_path" -type f | sed "s#^$host_path#$container_path#" \
+    | grep -E -f <(printf '%s\n' "${EXCLUDE_REGEXES[@]}") || true)
+}
 CLAMD_MOUNTS=("-v" "$WORK_DIR:/scan/work:ro")
 [ -n "$BREW_MNT" ] && CLAMD_MOUNTS+=("-v" "$BREW_MNT/system_files:/scan/brew:ro")
 [ -n "$BASE_MNT" ] && CLAMD_MOUNTS+=("-v" "$BASE_MNT:/scan/base:ro")
@@ -201,6 +223,7 @@ SKIPPED_PKGS=0
 scan_batch() {
   [ ${#BATCH[@]} -eq 0 ] && return 0
   echo "  🔍 Scanning batch of ${#BATCH[@]} unpacked packages..."
+  log_excluded /scan/work/pkgs "$PKG_DIR"
   if clamd_scan /scan/work/pkgs; then
     for entry in "${BATCH[@]}"; do
       KEEP["$entry"]=1

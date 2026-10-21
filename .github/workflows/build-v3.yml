@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: "30 05 */2 * *" # 05:30am UTC every other day
+    - cron: "30 03 */2 * *" # 03:30am UTC every other day; v4 and znver4 follow 3 hours apart
   workflow_dispatch:
     inputs:
       no_cache:

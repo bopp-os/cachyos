@@ -1,8 +1,8 @@
 name: Build container image (v4)
 on:
   schedule:
-    # 07:30am UTC every other day. Staggered after v3 build.
-    - cron: "30 07 */2 * *"
+    # 06:30am UTC every other day, 3 hours after v3: the builds share one queue, which holds only one waiting run
+    - cron: "30 06 */2 * *"
   workflow_dispatch:
     inputs:
       no_cache:

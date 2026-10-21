@@ -1,7 +1,7 @@
 name: Build container image (znver4)
 on:
   schedule:
-    # 09:30am UTC every other day. Staggered after v3 and v4 builds.
+    # 09:30am UTC every other day, 3 hours after v4: the builds share one queue, which holds only one waiting run
     - cron: "30 09 */2 * *"
   workflow_dispatch:
     inputs:
