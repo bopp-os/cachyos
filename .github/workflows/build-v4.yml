@@ -191,10 +191,25 @@ jobs:
           # Nothing in this workflow pushes to git; don't leave the token in .git/config for later steps and tools
           persist-credentials: false
 
-      - name: Ensure Package Intervals JSON exists
+      - name: Checkout data branch
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Bot-maintained package intervals and Chaotic-AUR keys live on the orphan data branch, off main
+          ref: data
+          path: .data
+          persist-credentials: false
+
+      - name: Stage data branch files
+        id: stage_data
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
-          if [ ! -f scripts/package-intervals.json ]; then echo "{}" > scripts/package-intervals.json; fi
+          cp .data/package-intervals.json scripts/package-intervals.json 2>/dev/null || echo "{}" > scripts/package-intervals.json
+          cp .data/keys/chaotic-*.asc files/keys/
+          rev=$(git -C .data rev-parse HEAD)
+          echo "Using data branch revision $rev"
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+          rm -rf .data
 
       - name: Get current date
         id: date
@@ -219,6 +234,7 @@ jobs:
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            boppos.data.revision=${{ steps.stage_data.outputs.rev }}
             org.opencontainers.image.description=${{ env.IMAGE_DESC }}
             org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}
@@ -405,9 +421,23 @@ jobs:
           # Nothing in this workflow pushes to git; don't leave the token in .git/config for later steps and tools
           persist-credentials: false
 
-      - name: Ensure Package Intervals JSON exists
+      - name: Checkout data branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Bot-maintained package intervals and Chaotic-AUR keys live on the orphan data branch, off main
+          ref: data
+          path: .data
+          persist-credentials: false
+
+      - name: Stage data branch files
+        id: stage_data
         run: |
-          if [ ! -f scripts/package-intervals.json ]; then echo "{}" > scripts/package-intervals.json; fi
+          cp .data/package-intervals.json scripts/package-intervals.json 2>/dev/null || echo "{}" > scripts/package-intervals.json
+          cp .data/keys/chaotic-*.asc files/keys/
+          rev=$(git -C .data rev-parse HEAD)
+          echo "Using data branch revision $rev"
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+          rm -rf .data
 
       - name: Read pinned tool images
         run: |
@@ -432,6 +462,7 @@ jobs:
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            boppos.data.revision=${{ steps.stage_data.outputs.rev }}
             org.opencontainers.image.description=${{ env.IMAGE_DESC }}
             org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/README.md
             org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}
