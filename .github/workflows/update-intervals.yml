@@ -2,7 +2,8 @@ name: Update Package Intervals
 
 on:
   schedule:
-    - cron: '0 0 * * 0' # Run weekly on Sundays
+    # 07:10 UTC every other day, ~80 min before the first scheduled build (build-v3.yml, 08:30 UTC) on the same days
+    - cron: '10 07 */2 * *'
   workflow_dispatch:
     inputs:
       max_age:

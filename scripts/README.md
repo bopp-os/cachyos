@@ -25,5 +25,5 @@ This directory contains the automation, build, and maintenance scripts for BoppO
 - **`generate-icons.py`**: Generates standard Freedesktop icon sizes (`16x16` through `512x512`) from a source PNG image and installs them into `files/base/usr/share/icons/hicolor/`.
 - **`fetch-update-intervals.py`**: Helper utility to aggregate and compute recommended update intervals for system packages into `package-intervals.json`.
 - **`scrape-netinstall.py`**: Utility to scrape and inspect CachyOS Calamares netinstall package groups.
-- **`package-intervals.json`**: Data file mapping package paths/components to their update interval policies. Lives on the `data` branch (updated weekly by `update-intervals.yml`); the build workflows and `just fetch-data` copy it here.
+- **`package-intervals.json`**: Data file mapping package paths/components to their update interval policies. Lives on the `data` branch (updated every other day by `update-intervals.yml`, before the scheduled builds); the build workflows and `just fetch-data` copy it here.
 - **`requirements.txt`**: Python dependencies required by utility scripts.
