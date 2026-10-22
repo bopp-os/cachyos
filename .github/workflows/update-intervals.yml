@@ -2,7 +2,8 @@ name: Update Package Intervals
 
 on:
   schedule:
-    - cron: '0 0 * * 0' # Run weekly on Sundays
+    # 07:10 UTC every other day, ~80 min before the first scheduled build (build-v3.yml, 08:30 UTC) on the same days
+    - cron: '10 07 */2 * *'
   workflow_dispatch:
     inputs:
       max_age:
@@ -28,6 +29,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout data branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # package-intervals.json lives on the orphan data branch so these updates don't land on main
+          ref: data
+          path: data
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -102,14 +110,15 @@ jobs:
           cat build/all-packages.txt | python scripts/fetch-update-intervals.py \
             --cachyos-packages build/cachyos-packages.txt \
             --boppos-packages build/boppos-packages.txt \
-            --cache-file scripts/package-intervals.json \
+            --cache-file data/package-intervals.json \
             --max-age-days ${{ github.event.inputs.max_age || '30' }} \
             --concurrency 10 $DRY_RUN_ARG
 
       - name: Commit and Push Package Intervals
         if: github.event.inputs.dry_run != 'true'
         run: |
+          cd data
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f scripts/package-intervals.json
+          git add package-intervals.json
           git diff --staged --exit-code || (git commit -m "chore: update package intervals" && git push)

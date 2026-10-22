@@ -13,10 +13,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The Chaotic-AUR keys live on the orphan data branch so these refreshes don't land on main
+          ref: data
 
       - name: Fetch Keys
         run: |
-          mkdir -p files/keys
+          mkdir -p keys
           # These keys are trusted by every build, so a refresh may only update the keys we already trust (new expiry
           # dates, subkeys or signatures): each download must be exactly one key with this full fingerprint, or the
           # job fails and nothing is committed.
@@ -29,12 +32,12 @@ jobs:
               echo "::error::$file: expected only key $fpr, got: ${got:-no key}"
               exit 1
             fi
-            mv "$tmp" "files/keys/$file"
+            mv "$tmp" "keys/$file"
           }
           fetch_key chaotic-1.asc 882DCFE48E2051D48E2562ABF3B607488DB35A47
           fetch_key chaotic-2.asc 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB
           fetch_key chaotic-3.asc EF925EA60F33D0CB85C44AD13056513887B78AEB
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add files/keys/
+          git add keys/
           git diff --staged --exit-code || (git commit -m "chore: refresh Chaotic-AUR GPG keys" && git push)
