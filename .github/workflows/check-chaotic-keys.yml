@@ -1,0 +1,33 @@
+name: Check Chaotic-AUR Keys
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Run weekly on Sundays
+  workflow_dispatch:
+
+jobs:
+  check-keys:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check Keys
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # These keys are trusted by every build, so they're only ever updated by hand after review. This compares
+          # them with the keyserver and with what signs Chaotic's current keyring, and opens an issue if they're stale.
+          rc=0
+          scripts/check-chaotic-keys.sh --keyserver > "$RUNNER_TEMP/chaotic-keys.txt" 2>&1 || rc=$?
+          cat "$RUNNER_TEMP/chaotic-keys.txt"
+          if [ "$rc" = 2 ]; then
+            scripts/chaotic-keys-issue.sh "$RUNNER_TEMP/chaotic-keys.txt"
+            echo "::error::Chaotic-AUR keys are out of date. Review and update files/keys/chaotic-*.asc by hand (see the issue)."
+          fi
+          exit "$rc"

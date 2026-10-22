@@ -89,6 +89,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      issues: write
 
     steps:
       - name: Prepare environment
@@ -195,7 +196,7 @@ jobs:
         if: steps.check_compatibility.outputs.should_skip != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # Bot-maintained package intervals and Chaotic-AUR keys live on the orphan data branch, off main
+          # Bot-maintained package intervals live on the orphan data branch, off main
           ref: data
           path: .data
           persist-credentials: false
@@ -205,7 +206,6 @@ jobs:
         if: steps.check_compatibility.outputs.should_skip != 'true'
         run: |
           cp .data/package-intervals.json scripts/package-intervals.json 2>/dev/null || echo "{}" > scripts/package-intervals.json
-          cp .data/keys/chaotic-*.asc files/keys/
           rev=$(git -C .data rev-parse HEAD)
           echo "Using data branch revision $rev"
           echo "rev=$rev" >> "$GITHUB_OUTPUT"
@@ -285,6 +285,23 @@ jobs:
           mkdir -p ${{ github.workspace }}/mirrors
           sudo podman run --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z ${{ env.BASE_IMAGE }} bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
           echo "::endgroup::"
+
+      - name: Check Chaotic-AUR Keys
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fail before prefetch, and report it in an issue, when Chaotic signs its keyring with a key the committed
+          # (hand-reviewed) keys don't cover. Runs in the base image for its gpg; the keys are never changed here.
+          rc=0
+          sudo podman run --rm --network=host -v ${{ github.workspace }}/scripts:/w/scripts:ro,z -v ${{ github.workspace }}/files/keys:/w/keys:ro,z \
+            ${{ env.BASE_IMAGE }} bash /w/scripts/check-chaotic-keys.sh /w/keys > "$RUNNER_TEMP/chaotic-keys.txt" 2>&1 || rc=$?
+          cat "$RUNNER_TEMP/chaotic-keys.txt"
+          if [ "$rc" = 2 ]; then
+            bash scripts/chaotic-keys-issue.sh "$RUNNER_TEMP/chaotic-keys.txt" || echo "::warning::Couldn't report this in an issue"
+            echo "::error::Chaotic-AUR keys are out of date. Review and update files/keys/chaotic-*.asc by hand (see the issue)."
+          fi
+          exit "$rc"
 
       - name: Pre-fetch & Audit Package Archives
         run: |
@@ -424,7 +441,7 @@ jobs:
       - name: Checkout data branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # Bot-maintained package intervals and Chaotic-AUR keys live on the orphan data branch, off main
+          # Bot-maintained package intervals live on the orphan data branch, off main
           ref: data
           path: .data
           persist-credentials: false
@@ -433,7 +450,6 @@ jobs:
         id: stage_data
         run: |
           cp .data/package-intervals.json scripts/package-intervals.json 2>/dev/null || echo "{}" > scripts/package-intervals.json
-          cp .data/keys/chaotic-*.asc files/keys/
           rev=$(git -C .data rev-parse HEAD)
           echo "Using data branch revision $rev"
           echo "rev=$rev" >> "$GITHUB_OUTPUT"
