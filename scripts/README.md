@@ -7,6 +7,8 @@ This directory contains the automation, build, and maintenance scripts for BoppO
 ### Core Container Build Scripts
 - **`bootc-rootfs.sh`**: Initializes the ostree/bootc sysroot structure (`/sysroot`, `/ostree`, `/var`, `/home`, etc.) and sets up system layout during container image creation.
 - **`setup_pacman_repos.sh`**: Imports repository signing keys (`/tmp/keys/*.asc`) and configures pacman mirrorlists and repository priorities.
+- **`check-chaotic-keys.sh`**: Read-only check that the committed Chaotic-AUR keys (`files/keys/chaotic-*.asc`) still cover what signs Chaotic's current keyring; `--keyserver` also compares them with the keyserver copies. Exits 2 when they're out of date. Run before every prefetch and weekly by `check-chaotic-keys.yml`.
+- **`chaotic-keys-issue.sh`**: Reports out-of-date Chaotic-AUR keys in a GitHub issue labelled `chaotic-keys` (comments on the open one if there is one). The keys are never updated automatically: the issue lists the steps to review and replace them by hand.
 - **`install_packages.sh`**: YAML-driven package installer that parses package manifests (`base.yaml`, `plasma.yaml`, `gnome.yaml`, `niri.yaml`) and executes optimized pacman installations.
 - **`generate-package-list.sh`**: Queries pacman to generate package manifests (`all-packages.txt`, `cachyos-packages.txt`, `boppos-packages.txt`) for tracking installed packages.
 - **`apply-update-intervals.py`**: High-performance script setting `user.update-interval` and `user.component` xattr tags via direct Linux kernel syscalls and clamping system cache timestamps for layer determinism.

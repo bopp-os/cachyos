@@ -23,8 +23,8 @@ if [ "$MODE" = "auto" ]; then
   fi
 fi
 
-# Full fingerprints of the Chaotic-AUR keys (files/keys/chaotic-*.asc, staged from the data branch and kept
-# current by refresh-chaotic-keys.yml, which only accepts these exact keys)
+# Full fingerprints of the committed Chaotic-AUR keys (files/keys/chaotic-*.asc). They're updated by hand after
+# review; check-chaotic-keys.sh flags when they're out of date.
 CHAOTIC_FPRS="882DCFE48E2051D48E2562ABF3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB EF925EA60F33D0CB85C44AD13056513887B78AEB"
 
 # Installs repository packages: with a sync when online, from the frozen databases and the package cache when offline.

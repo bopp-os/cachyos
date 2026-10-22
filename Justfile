@@ -19,13 +19,10 @@ build-mirrorlist arch='v3':
         $(if [ "{{arch}}" = "znver4" ]; then echo "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo "docker.io/cachyos/cachyos-{{arch}}:latest"; fi) \
         bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
 
-# Pull the bot-maintained package intervals and Chaotic-AUR keys from the data branch (they're not on main).
+# Pull the bot-maintained package intervals from the data branch (they're not on main).
 fetch-data:
     git fetch origin data
     git show origin/data:package-intervals.json > scripts/package-intervals.json
-    for key in $(git ls-tree --name-only origin/data keys/ | grep '/chaotic-.*\.asc$'); do \
-        git show "origin/data:$key" > "files/$key"; \
-    done
 
 # Pre-fetch and security audit package archives for selected flavors.
 prefetch arch='v3' plasma='true' gnome='true' niri='true' cinnamon='true': fetch-data
