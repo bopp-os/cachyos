@@ -10,3 +10,7 @@ __pycache__/
 *.pyc
 .rooignore
 .claude/settings.local.json
+# Bot-maintained, on the data branch (staged by the build workflows and just fetch-data)
+scripts/package-intervals.json
+files/keys/chaotic-*.asc
+.data/
