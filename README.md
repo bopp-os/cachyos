@@ -42,6 +42,10 @@ Some of these tools (specifically `bopp-migrate`) manipulate core system and use
 Important commands included in `boppos-tools`:
 - `boppos-update`: A comprehensive update script that seamlessly updates your OS (`bootc`), firmware, Flatpaks, Homebrew, Distroboxes, and Litterboxes.
 - `bopp-tray`: A background tray application that checks for new image updates periodically.
+- `boppos-deck` (`org.boppos.Deck`): A gamepad-first settings app for updates, kernel arguments, Flatpaks, Steam shortcuts and Decky Loader. Works with a controller in Steam Gaming Mode and with mouse and keyboard in Desktop Mode.
+- `bopp-system`: The command-line backend for updates and deployments in `boppos-deck`: status, check, upgrade, rollback, pin, image switching and a support report (`--json` for scripts).
+- `bopp-decky`: Shows the status of, installs or uninstalls Decky Loader.
+- `bopp-steam-shortcut`: Adds or removes non-Steam shortcuts (Flatpak apps, BoppOS tools) in the Steam library.
 - `bopp-diff`: Analyzes the current running system against staged or upstream `bootc` images to provide a clear package diff.
 - `bopp-kargs`: A utility to manage Boot Loader Specification (BLS) kernel arguments for atomic deployments.
 - `bopp-tpm-refresh`: Re-enroll LUKS/TPM2 decryption keys after system updates.

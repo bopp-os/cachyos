@@ -219,6 +219,9 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable docker.socket && \
     systemctl disable asusd.service || true
 
+# Apply boppos-tools' user preset (pacman does not run presets)
+RUN systemctl --global preset boppos-default-flatpaks.service bopp-steam-shortcut.service bopp-steam-pending.service
+
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
     mkdir -p /usr/lib/dracut/dracut.conf.d/ && \
