@@ -365,6 +365,7 @@ themes-aesthetics:
   - plymouth
   - cachyos-plymouth-theme
   - cachyos-plymouth-bootanimation
+  - boppos-boot-theme
   - cachyos-nord-gtk-theme-git
 media-video:
   - libdvdcss

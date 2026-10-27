@@ -219,11 +219,15 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable docker.socket && \
     systemctl disable asusd.service || true
 
+# Apply boppos-tools' user preset (pacman does not run presets)
+RUN systemctl --global preset boppos-default-flatpaks.service bopp-steam-shortcut.service bopp-steam-pending.service
+
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
     mkdir -p /usr/lib/dracut/dracut.conf.d/ && \
     printf "systemdsystemconfdir=/etc/systemd/system\nsystemdsystemunitdir=/usr/lib/systemd/system\n" | tee /usr/lib/dracut/dracut.conf.d/30-boppos-fix-bootc-module.conf && \
     printf 'reproducible="yes"\nhostonly=no\ncompress=zstd\nadd_dracutmodules+=" ostree bootc crypt systemd-cryptsetup tpm2-tss drm plymouth btrfs i18n "\nforce_drivers+=" i915 xe amdgpu nouveau "\n' | tee "/usr/lib/dracut/dracut.conf.d/30-boppos-dracut-container-build.conf" && \
+    plymouth-set-default-theme boppos && \
     bash /tmp/scripts/build_kernel_modules.sh && \
     KERNEL_DIR="$(find /usr/lib/modules -maxdepth 1 -type d | grep -v -E '\\.img$' | sort -V | tail -n 1)" && \
     KERNEL_VER="$(basename "$KERNEL_DIR")" && \
