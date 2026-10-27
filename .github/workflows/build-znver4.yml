@@ -1,9 +1,60 @@
 name: Build container image (znver4)
 on:
-  schedule:
-    # 14:30 UTC (9:30am CDT, 8:30am CST) every other day, 3 hours after v4: the builds share one queue, which holds only one waiting run
-    - cron: "30 14 */2 * *"
   workflow_dispatch:
+    inputs:
+      no_cache:
+        description: 'Force a clean build (--no-cache)'
+        required: false
+        type: boolean
+        default: false
+      wipe_pkg_cache:
+        description: 'Wipe the package cache before prefetch (everything is downloaded again; files already scanned clean are not rescanned)'
+        required: false
+        type: boolean
+        default: false
+      test_tag:
+        description: 'Append -test to the image tag'
+        required: false
+        type: boolean
+        default: false
+      build_plasma:
+        description: 'Build Plasma flavor'
+        required: false
+        type: boolean
+        default: true
+      build_gnome:
+        description: 'Build GNOME flavor'
+        required: false
+        type: boolean
+        default: true
+      build_niri:
+        description: 'Build Niri flavor'
+        required: false
+        type: boolean
+        default: true
+      build_cinnamon:
+        description: 'Build Cinnamon flavor'
+        required: false
+        type: boolean
+        default: true
+      verbose_build:
+        description: 'Enable verbose build output'
+        required: false
+        type: boolean
+        default: false
+
+      allow_build_network:
+        description: 'Give the base and flavor image builds network access (normally none: everything is prefetched)'
+        required: false
+        type: boolean
+        default: false
+      allow_critical_vulns:
+        description: 'Publish even if grype finds critical vulnerabilities with a fix available, or cannot scan'
+        required: false
+        type: boolean
+        default: false
+  # Called by schedule.yml, which runs the scheduled cycle in order
+  workflow_call:
     inputs:
       no_cache:
         description: 'Force a clean build (--no-cache)'
@@ -76,6 +127,8 @@ env:
 concurrency:
   group: boppos-build-queue
   cancel-in-progress: false
+  # Keep every waiting build (default is one, and a newer one cancels it)
+  queue: max
 
 jobs:
   build_base:
@@ -166,14 +219,14 @@ jobs:
           
           # 4. With the manual wipe toggle, also drop all other unused Podman images, volumes and build cache
           #    (the package cache itself is emptied in "Prepare Local Cache Directory", before prefetch)
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
+          if [ "${{ inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Pruning unused Podman images (except the scanner and tool images), volumes and build cache..."
             sudo podman system prune --force --volumes --build || true
             remove_images
           fi
           
           # 5. Purge local podman images if a clean build is requested to fix layer corruption
-          if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
+          if [ "${{ inputs.no_cache }}" == "true" ]; then
             echo "Removing all cached images (except the scanner and tool images) to enforce a strict clean build..."
             remove_images --force
           fi
@@ -271,7 +324,7 @@ jobs:
           sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
           
           # If the manual wipe toggle was checked, clear the cache
-          if [ "${{ github.event.inputs.wipe_pkg_cache }}" == "true" ]; then
+          if [ "${{ inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Manual wipe triggered. Clearing local pacman cache..."
             sudo rm -rf "$CACHE_DIR"/* || true
           fi
@@ -310,11 +363,11 @@ jobs:
           PREFETCH_ARGS+=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}")
           PREFETCH_ARGS+=("--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}")
           PREFETCH_ARGS+=("--build-arg" "TARGET_CPU_MARCH=${{ env.TARGET_MARCH }}")
-          PREFETCH_ARGS+=("--build-arg" "BUILD_PLASMA=${{ github.event.inputs.build_plasma != 'false' }}")
-          PREFETCH_ARGS+=("--build-arg" "BUILD_GNOME=${{ github.event.inputs.build_gnome != 'false' }}")
-          PREFETCH_ARGS+=("--build-arg" "BUILD_NIRI=${{ github.event.inputs.build_niri != 'false' }}")
-          PREFETCH_ARGS+=("--build-arg" "BUILD_CINNAMON=${{ github.event.inputs.build_cinnamon != 'false' }}")
-          PREFETCH_ARGS+=("--build-arg" "VERBOSE=${{ github.event.inputs.verbose_build == 'true' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_PLASMA=${{ format('{0}', inputs.build_plasma) != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_GNOME=${{ format('{0}', inputs.build_gnome) != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_NIRI=${{ format('{0}', inputs.build_niri) != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_CINNAMON=${{ format('{0}', inputs.build_cinnamon) != 'false' }}")
+          PREFETCH_ARGS+=("--build-arg" "VERBOSE=${{ inputs.verbose_build == true }}")
           PREFETCH_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
 
           sudo podman build "${PREFETCH_ARGS[@]}" \
@@ -352,14 +405,14 @@ jobs:
           BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
           
           # Check if the manual 'no_cache' toggle was checked in the GitHub UI
-          if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then
+          if [ "${{ inputs.no_cache }}" == "true" ]; then
             echo "Manual cache bust triggered. Appending --no-cache..."
             BUILD_ARGS+=("--no-cache")
           fi
 
 
 
-          if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then
+          if [ "${{ inputs.verbose_build }}" == "true" ]; then
             echo "Manual verbose build triggered. Appending build arg..."
             BUILD_ARGS+=("--build-arg" "VERBOSE=true")
           fi
@@ -525,8 +578,8 @@ jobs:
             if [[ -n "$label" ]]; then BUILD_ARGS+=("--label" "$label"); fi
           done <<< "$META_LABELS"
 
-          if [ "${{ github.event.inputs.no_cache }}" == "true" ]; then BUILD_ARGS+=("--no-cache"); fi
-          if [ "${{ github.event.inputs.verbose_build }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "VERBOSE=true"); fi
+          if [ "${{ inputs.no_cache }}" == "true" ]; then BUILD_ARGS+=("--no-cache"); fi
+          if [ "${{ inputs.verbose_build }}" == "true" ]; then BUILD_ARGS+=("--build-arg" "VERBOSE=true"); fi
           BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
           
           FLAVOR="${{ matrix.flavor }}"

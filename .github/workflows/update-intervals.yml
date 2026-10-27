@@ -1,14 +1,29 @@
 name: Update Package Intervals
 
 on:
-  schedule:
-    # 07:10 UTC every other day, ~80 min before the first scheduled build (build-v3.yml, 08:30 UTC) on the same days
-    - cron: '10 07 */2 * *'
   workflow_dispatch:
     inputs:
       max_age:
         description: 'Max age for cached entries in days'
         required: false
+        default: '30'
+      force_podman:
+        description: 'Force Podman extraction (ignore SBOM)'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry run (verbose output, no commit)'
+        required: false
+        type: boolean
+        default: false
+  # Called by schedule.yml, which runs the scheduled cycle in order
+  workflow_call:
+    inputs:
+      max_age:
+        description: 'Max age for cached entries in days'
+        required: false
+        type: string
         default: '30'
       force_podman:
         description: 'Force Podman extraction (ignore SBOM)'
@@ -59,7 +74,7 @@ jobs:
             IMAGE_REF="ghcr.io/${{ github.repository_owner }}/cachyos-${FLAVOR}:v3"
             USE_PODMAN=false
             
-            if [ "${{ github.event.inputs.force_podman }}" == "true" ]; then
+            if [ "${{ inputs.force_podman }}" == "true" ]; then
               USE_PODMAN=true
             else
               echo "Attempting to download SBOM for $IMAGE_REF..."
@@ -103,7 +118,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           DRY_RUN_ARG=""
-          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
             DRY_RUN_ARG="--dry-run"
           fi
           
@@ -111,11 +126,11 @@ jobs:
             --cachyos-packages build/cachyos-packages.txt \
             --boppos-packages build/boppos-packages.txt \
             --cache-file data/package-intervals.json \
-            --max-age-days ${{ github.event.inputs.max_age || '30' }} \
+            --max-age-days ${{ inputs.max_age || '30' }} \
             --concurrency 10 $DRY_RUN_ARG
 
       - name: Commit and Push Package Intervals
-        if: github.event.inputs.dry_run != 'true'
+        if: ${{ !inputs.dry_run }}
         run: |
           cd data
           git config user.name "github-actions[bot]"
