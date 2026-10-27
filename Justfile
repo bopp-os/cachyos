@@ -1,8 +1,8 @@
 # Configuration
 registry := "ghcr.io"
 user := "ripps818"
-# Pinned in .github/chunkah/Containerfile: chunkah upgrades can change every layer digest
-chunkah_image := `sed -n 's/^FROM //p' .github/chunkah/Containerfile`
+# Pinned in ci/chunkah/Containerfile: chunkah upgrades can change every layer digest
+chunkah_image := `sed -n 's/^FROM //p' ci/chunkah/Containerfile`
 
 # Default action
 default:

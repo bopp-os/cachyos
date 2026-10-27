@@ -9,15 +9,15 @@ updates:
         patterns:
           - "*"
   - package-ecosystem: "docker"
-    directory: "/.github/chunkah"
+    directory: "/ci/chunkah"
     schedule:
       interval: "weekly"
   - package-ecosystem: "docker"
-    directory: "/.github/syft"
+    directory: "/ci/syft"
     schedule:
       interval: "weekly"
   - package-ecosystem: "docker"
-    directory: "/.github/grype"
+    directory: "/ci/grype"
     schedule:
       interval: "weekly"
   # scripts/requirements.txt is compiled from requirements.in with hashes (pip-compile --generate-hashes)

@@ -327,7 +327,7 @@ jobs:
           # Scan the brew image Containerfile.base actually copies from, so the two cannot drift apart
           BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
           # Tool images the flavor jobs run with --pull=never, so they use exactly the copies scanned here
-          mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' .github/chunkah/Containerfile .github/syft/Containerfile .github/grype/Containerfile)
+          mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' ci/chunkah/Containerfile ci/syft/Containerfile ci/grype/Containerfile)
           chmod +x scripts/clamscan-prefetch.sh
           ./scripts/clamscan-prefetch.sh "${{ env.LOCAL_CACHE_DIR }}" "${{ env.BASE_IMAGE }}" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"
 
@@ -456,9 +456,9 @@ jobs:
 
       - name: Read pinned tool images
         run: |
-          echo "CHUNKAH_IMAGE=$(sed -n 's/^FROM //p' .github/chunkah/Containerfile)" >> "$GITHUB_ENV"
-          echo "SYFT_IMAGE=$(sed -n 's/^FROM //p' .github/syft/Containerfile)" >> "$GITHUB_ENV"
-          echo "GRYPE_IMAGE=$(sed -n 's/^FROM //p' .github/grype/Containerfile)" >> "$GITHUB_ENV"
+          echo "CHUNKAH_IMAGE=$(sed -n 's/^FROM //p' ci/chunkah/Containerfile)" >> "$GITHUB_ENV"
+          echo "SYFT_IMAGE=$(sed -n 's/^FROM //p' ci/syft/Containerfile)" >> "$GITHUB_ENV"
+          echo "GRYPE_IMAGE=$(sed -n 's/^FROM //p' ci/grype/Containerfile)" >> "$GITHUB_ENV"
 
       - name: Get current date
         id: date
