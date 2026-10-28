@@ -1,0 +1,139 @@
+name: Scheduled builds
+on:
+  schedule:
+    # 08:13 UTC (3:13am CDT, 2:13am CST) every other day. GitHub can start a schedule hours late, so this one
+    # workflow runs the whole cycle in order; the stages no longer rely on being spaced apart.
+    - cron: "13 08 */2 * *"
+  # Manual run: the whole cycle (package intervals, then v3, v4, znver4) with these options for every build.
+  # To build just one architecture, run that build's own workflow instead.
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: 'Force a clean build (--no-cache)'
+        required: false
+        type: boolean
+        default: false
+      wipe_pkg_cache:
+        description: 'Wipe the package cache before prefetch (everything is downloaded again; files already scanned clean are not rescanned)'
+        required: false
+        type: boolean
+        default: false
+      test_tag:
+        description: 'Append -test to the image tag'
+        required: false
+        type: boolean
+        default: false
+      build_plasma:
+        description: 'Build Plasma flavor'
+        required: false
+        type: boolean
+        default: true
+      build_gnome:
+        description: 'Build GNOME flavor'
+        required: false
+        type: boolean
+        default: true
+      build_niri:
+        description: 'Build Niri flavor'
+        required: false
+        type: boolean
+        default: true
+      build_cinnamon:
+        description: 'Build Cinnamon flavor'
+        required: false
+        type: boolean
+        default: true
+      verbose_build:
+        description: 'Enable verbose build output'
+        required: false
+        type: boolean
+        default: false
+
+      allow_build_network:
+        description: 'Give the base and flavor image builds network access (normally none: everything is prefetched)'
+        required: false
+        type: boolean
+        default: false
+      allow_critical_vulns:
+        description: 'Publish even if grype finds critical vulnerabilities with a fix available, or cannot scan'
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  intervals:
+    uses: ./.github/workflows/update-intervals.yml
+    secrets: inherit
+    permissions:
+      contents: write
+
+  v3:
+    needs: intervals
+    # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-v3.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      issues: write
+    with:
+      no_cache: ${{ inputs.no_cache == true }}
+      wipe_pkg_cache: ${{ inputs.wipe_pkg_cache == true }}
+      test_tag: ${{ inputs.test_tag == true }}
+      build_plasma: ${{ format('{0}', inputs.build_plasma) != 'false' }}
+      build_gnome: ${{ format('{0}', inputs.build_gnome) != 'false' }}
+      build_niri: ${{ format('{0}', inputs.build_niri) != 'false' }}
+      build_cinnamon: ${{ format('{0}', inputs.build_cinnamon) != 'false' }}
+      verbose_build: ${{ inputs.verbose_build == true }}
+      allow_build_network: ${{ inputs.allow_build_network == true }}
+      allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+
+  v4:
+    needs: v3
+    # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-v4.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      issues: write
+    with:
+      no_cache: ${{ inputs.no_cache == true }}
+      wipe_pkg_cache: ${{ inputs.wipe_pkg_cache == true }}
+      test_tag: ${{ inputs.test_tag == true }}
+      build_plasma: ${{ format('{0}', inputs.build_plasma) != 'false' }}
+      build_gnome: ${{ format('{0}', inputs.build_gnome) != 'false' }}
+      build_niri: ${{ format('{0}', inputs.build_niri) != 'false' }}
+      build_cinnamon: ${{ format('{0}', inputs.build_cinnamon) != 'false' }}
+      verbose_build: ${{ inputs.verbose_build == true }}
+      allow_build_network: ${{ inputs.allow_build_network == true }}
+      allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+
+  znver4:
+    needs: v4
+    # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-znver4.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      issues: write
+    with:
+      no_cache: ${{ inputs.no_cache == true }}
+      wipe_pkg_cache: ${{ inputs.wipe_pkg_cache == true }}
+      test_tag: ${{ inputs.test_tag == true }}
+      build_plasma: ${{ format('{0}', inputs.build_plasma) != 'false' }}
+      build_gnome: ${{ format('{0}', inputs.build_gnome) != 'false' }}
+      build_niri: ${{ format('{0}', inputs.build_niri) != 'false' }}
+      build_cinnamon: ${{ format('{0}', inputs.build_cinnamon) != 'false' }}
+      verbose_build: ${{ inputs.verbose_build == true }}
+      allow_build_network: ${{ inputs.allow_build_network == true }}
+      allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
