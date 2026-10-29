@@ -60,6 +60,7 @@ What a freshly installed image does, and what it deliberately leaves off:
 - **First run:** `boppos-tools` starts `boppos-deck --first-run`. On a system with no real account (uid 1000 to 59999 with a login shell), `boppos-oobe.service` runs the account setup before the login screen. It is enabled in the image and needs `gamescope`, which the image installs. After that, the welcome tour starts from `/etc/xdg/autostart/bopp-welcome.desktop` until it is finished. The BoppOS installer writes the marker `/var/lib/boppos/first-run`. `/var/lib/boppos` is created at every boot by tmpfiles. This needs boppos-tools 1.3.x plus the `claude/first-run-unified` branch, which is not released yet.
 - **sudo:** members of `wheel` can use `sudo` (`/etc/sudoers.d/10-wheel`). The installer puts the first user in `wheel`.
 - **Cloudflare WARP is optional:** the package is installed, but `warp-svc` and `warp-taskbar` are disabled. Turn it on with `sudo systemctl enable --now warp-svc` and `systemctl --user enable --now warp-taskbar`.
+- **Samba file sharing is optional:** the package is installed, but `smb` and `nmb` are disabled. Turn them on with `sudo systemctl enable --now smb nmb`. Browsing network shares (gvfs-smb) works without them.
 - **Boot splash:** the BoppOS Plymouth theme (two-step, with the firmware logo), set in `Containerfile.base` before dracut builds the initramfs.
 - **Launcher icon:** the Plasma application launcher uses `boppos-icon`.
 - **Boot menu tools:** `grub` is installed for `grub-mkconfig` and the `15_ostree` script on installs that use grub.
