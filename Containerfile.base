@@ -228,6 +228,10 @@ RUN systemctl --global preset bopp-steam-shortcut.service bopp-steam-pending.ser
 RUN systemctl disable warp-svc.service && \
     systemctl --global disable warp-taskbar.service
 
+# Samba is optional: cachyos-samba-settings' post_install enables smb and nmb. The file sharing server is a choice
+# (gvfs-smb only needs the client), so turn both off again.
+RUN systemctl disable smb.service nmb.service
+
 # First run: boppos-tools starts `boppos-deck --first-run` from two places and the image adds nothing of its own:
 #  - /etc/xdg/autostart/bopp-welcome.desktop (every sign-in; the app exits at once when nothing is pending)
 #  - boppos-oobe.service (before the display manager, only while no real account exists; needs the boppos-oobe
