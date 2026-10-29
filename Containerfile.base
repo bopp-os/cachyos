@@ -220,7 +220,7 @@ RUN systemctl enable var-opt.mount && \
     systemctl disable asusd.service || true
 
 # Apply boppos-tools' user preset (pacman does not run presets)
-RUN systemctl --global preset boppos-default-flatpaks.service bopp-steam-shortcut.service bopp-steam-pending.service
+RUN systemctl --global preset bopp-steam-shortcut.service bopp-steam-pending.service
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
