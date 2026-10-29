@@ -61,6 +61,7 @@ What a freshly installed image does, and what it deliberately leaves off:
 - **sudo:** members of `wheel` can use `sudo` (`/etc/sudoers.d/10-wheel`). The installer puts the first user in `wheel`.
 - **Cloudflare WARP is optional:** the package is installed, but `warp-svc` and `warp-taskbar` are disabled. Turn it on with `sudo systemctl enable --now warp-svc` and `systemctl --user enable --now warp-taskbar`.
 - **GNOME extensions:** the GNOME flavor turns on AppIndicator (the tray `bopp-tray` needs), Dash to Dock, Caffeine and GSConnect by default, through a dconf system default in `/etc/dconf/db/local.d`. Users can change them in Extension Manager.
+- **Samba file sharing is optional:** the package is installed, but `smb` and `nmb` are disabled. Turn them on with `sudo systemctl enable --now smb nmb`. Browsing network shares (gvfs-smb) works without them.
 - **Boot splash:** the BoppOS Plymouth theme (two-step, with the firmware logo), set in `Containerfile.base` before dracut builds the initramfs.
 - **Launcher icon:** the Plasma application launcher uses `boppos-icon`.
 - **Boot menu tools:** `grub` is installed for `grub-mkconfig` and the `15_ostree` script on installs that use grub.
