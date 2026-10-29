@@ -223,6 +223,11 @@ RUN systemctl enable var-opt.mount && \
 # Apply boppos-tools' user preset (pacman does not run presets)
 RUN systemctl --global preset bopp-steam-shortcut.service bopp-steam-pending.service
 
+# Cloudflare WARP is optional: CachyOS' cloudflare-warp-bin enables the daemon and the per-user taskbar (which
+# opens its setup window at every first login) in post_install, so turn both off again.
+RUN systemctl disable warp-svc.service && \
+    systemctl --global disable warp-taskbar.service
+
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
     mkdir -p /usr/lib/dracut/dracut.conf.d/ && \
