@@ -6,11 +6,20 @@ in `/usr/share/wayland-sessions` and `/usr/share/xsessions` of each image.
 
 ## Where first-run starts
 
-`boppos-first-run.service` (`files/base/usr/lib/systemd/user/`) is a user unit, enabled globally. It runs
-`boppos-deck --first-run` when `/var/lib/boppos/first-run` exists, after `graphical-session.target`, so after the
-login screen or the autologin session is up. The build removes `/etc/xdg/autostart/bopp-welcome.desktop` and
-masks `boppos-oobe.service`, so the unit is the only trigger. `/var/lib/boppos` (root:wheel 0775) is made at boot
-by `files/base/usr/lib/tmpfiles.d/10-boppos-state.conf`.
+boppos-tools (branch `claude/first-run-unified`, not merged) starts `boppos-deck --first-run` from two places; the
+image adds no trigger of its own:
+
+- `/etc/xdg/autostart/bopp-welcome.desktop`, at every sign-in (the app exits at once when nothing is pending).
+- `boppos-oobe.service`, before the display manager, only while no real account exists. The package ships no
+  preset for it, so `Containerfile.base` runs `systemctl enable boppos-oobe.service`. It needs the `boppos-oobe`
+  account (the package's sysusers entry; present in the image) and gamescope (`base.yaml`).
+
+`/var/lib/boppos` (root:root 0755) is made at boot by `files/base/usr/lib/tmpfiles.d/10-boppos-state.conf`. The
+marker `first-run` is written by the installer and removed by the root `oobe-helper`. Nothing in the image
+references `/var/lib/boppos/oobe-done` (gone in the new design).
+
+`/usr/share/boppos/start-in.conf` ships only in the niri flavor (SDDM is the only implemented display manager).
+Its `gaming-session` is empty because no Gaming Mode session exists, so the Start-in step stays hidden.
 
 ## Sessions that exist
 
