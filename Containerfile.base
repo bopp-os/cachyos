@@ -203,6 +203,7 @@ RUN mkdir -p /etc/containers/containers.conf.d && \
 
 # Enable required systemd services
 RUN systemctl enable var-opt.mount && \
+    systemctl enable getty@tty1.service && \
     systemctl enable NetworkManager.service && \
     systemctl enable systemd-resolved.service && \
     systemctl enable avahi-daemon.service && \
