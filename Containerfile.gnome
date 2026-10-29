@@ -7,7 +7,9 @@ ARG BASE_IMAGE_TAG=latest
 ARG VERBOSE=false
 FROM ${IMAGE_REGISTRY}/cachyos-base:${BASE_IMAGE_TAG}
 ARG VERBOSE
-ENV SOURCE_DATE_EPOCH=0
+# Build-time only (ARG, not ENV): RUN steps get reproducible timestamps, and nothing is left in the image's
+# environment, where an empty value breaks ostree commit and mkfs.fat in containers run from it.
+ARG SOURCE_DATE_EPOCH=0
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
@@ -57,5 +59,3 @@ RUN sed -i -E 's/^NAME=.*/NAME="BoppOS Linux"/; s/^PRETTY_NAME=.*/PRETTY_NAME="B
 # Update the SBOM / Package Manifest for the overlay
 RUN /usr/share/boppos/generate-package-list.sh && \
     /usr/share/boppos/bootc-cleanup.sh
-
-ENV SOURCE_DATE_EPOCH=""
