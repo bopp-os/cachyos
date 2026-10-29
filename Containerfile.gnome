@@ -28,6 +28,7 @@ RUN --mount=type=tmpfs,dst=/run \
 
 # Copy GNOME-specific configuration files
 COPY files/gnome/usr /usr/
+COPY files/gnome/etc /etc/
 
 # Enable DE services
 # We disable SDDM if it was enabled, and enable GDM
@@ -35,6 +36,15 @@ RUN systemctl disable sddm.service || true && \
     systemctl disable plasmalogin.service || true && \
     systemctl enable gdm.service && \
     systemctl enable cardwired.service
+
+# Default-enable AppIndicator (bopp-tray needs a tray), Dash to Dock, Caffeine and GSConnect (the list is in
+# files/gnome/etc/dconf/db/local.d). Fails if an extension or the compiled dconf db is missing.
+RUN for e in appindicatorsupport@rgcjonas.gmail.com dash-to-dock@micxgx.gmail.com caffeine@patapon.info \
+             gsconnect@andyholmes.github.io; do \
+        test -d "/usr/share/gnome-shell/extensions/$e" || { echo "ERROR: extension $e is not installed" >&2; exit 1; }; \
+    done && \
+    dconf update && \
+    test -s /etc/dconf/db/local
 
 # Preserve /opt contents for OverlayFS
 # (visual-studio-code-bin and others install here)

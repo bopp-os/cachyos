@@ -1,0 +1,5 @@
+# Installed GNOME Shell extensions stay off until enabled. These are on by default for every user (they can still
+# change it in Extension Manager): AppIndicator because bopp-tray needs a system tray, which GNOME lacks without it;
+# Dash to Dock, Caffeine and GSConnect as the usual desktop basics. The list is replaced as a whole once a user sets it.
+[org/gnome/shell]
+enabled-extensions=['appindicatorsupport@rgcjonas.gmail.com', 'dash-to-dock@micxgx.gmail.com', 'caffeine@patapon.info', 'gsconnect@andyholmes.github.io']
