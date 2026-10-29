@@ -62,6 +62,7 @@ bootc:
   - mkinitcpio
   - mkinitcpio-busybox
   - ostree
+  - grub
   - skopeo
   - btrfs-progs
   - e2fsprogs
