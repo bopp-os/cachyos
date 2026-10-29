@@ -1,0 +1,4 @@
+# Installed GNOME Shell extensions stay off until enabled. bopp-tray needs a system tray, which GNOME lacks
+# without AppIndicator support, so turn that one on for every user. Users can still change it in Extension Manager.
+[org/gnome/shell]
+enabled-extensions=['appindicatorsupport@rgcjonas.gmail.com']

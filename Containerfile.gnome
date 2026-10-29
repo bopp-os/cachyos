@@ -28,6 +28,7 @@ RUN --mount=type=tmpfs,dst=/run \
 
 # Copy GNOME-specific configuration files
 COPY files/gnome/usr /usr/
+COPY files/gnome/etc /etc/
 
 # Enable DE services
 # We disable SDDM if it was enabled, and enable GDM
@@ -35,6 +36,11 @@ RUN systemctl disable sddm.service || true && \
     systemctl disable plasmalogin.service || true && \
     systemctl enable gdm.service && \
     systemctl enable cardwired.service
+
+# Default-enable the AppIndicator extension (bopp-tray needs a tray). Fails if the extension or dconf db is missing.
+RUN test -d /usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com && \
+    dconf update && \
+    test -s /etc/dconf/db/local
 
 # Preserve /opt contents for OverlayFS
 # (visual-studio-code-bin and others install here)
