@@ -7,7 +7,9 @@ ARG BASE_IMAGE_TAG=latest
 ARG VERBOSE=false
 FROM ${IMAGE_REGISTRY}/cachyos-base:${BASE_IMAGE_TAG}
 ARG VERBOSE
-ENV SOURCE_DATE_EPOCH=0
+# Build-time only (ARG, not ENV): RUN steps get reproducible timestamps, and nothing is left in the image's
+# environment, where an empty value breaks ostree commit and mkfs.fat in containers run from it.
+ARG SOURCE_DATE_EPOCH=0
 
 # ==========================================
 # MASTER PACKAGE INSTALLATION
@@ -60,8 +62,12 @@ RUN chmod +x /tmp/apply-update-intervals.py && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     /tmp/apply-update-intervals.py /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
 
+# Boot menu entries (ostree titles them with PRETTY_NAME) and "About" say BoppOS and the flavor. ID stays arch.
+RUN sed -i -E 's/^NAME=.*/NAME="BoppOS Linux"/; s/^PRETTY_NAME=.*/PRETTY_NAME="BoppOS Linux (Cinnamon)"/; /^VARIANT(_ID)?=/d' \
+        /usr/lib/os-release && \
+    printf 'VARIANT="Cinnamon"\nVARIANT_ID=cinnamon\n' >> /usr/lib/os-release && \
+    touch -d "@${SOURCE_DATE_EPOCH:-0}" /usr/lib/os-release
+
 # Update the SBOM / Package Manifest for the overlay
 RUN /usr/share/boppos/generate-package-list.sh && \
     /usr/share/boppos/bootc-cleanup.sh
-
-ENV SOURCE_DATE_EPOCH=""

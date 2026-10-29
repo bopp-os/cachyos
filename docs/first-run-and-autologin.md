@@ -56,6 +56,9 @@ user later disables autologin.
 - The shadow fix: with `SOURCE_DATE_EPOCH=0`, 22 build-time accounts (including `plasmalogin`, `boppos-oobe`,
   `polkitd`, `avahi`) had lastchg `0` in the `v3-test` image. `bootc-cleanup.sh` now empties that field for locked
   accounts and fails the build if any is left. It runs last in the base and in every flavor.
+- `SOURCE_DATE_EPOCH=0` is a build `ARG`, not an `ENV`: the RUN steps keep reproducible timestamps, but the value
+  never reaches the image's environment. The accounts are created by pacman hooks (`systemd-sysusers`), so unsetting
+  it for them alone is not possible without losing reproducible output for the whole install; the cleanup above stays.
 
 ## Open items (as of 2026-10-29)
 

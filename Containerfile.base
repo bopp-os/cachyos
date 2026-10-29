@@ -20,7 +20,9 @@ ARG BASE_IMAGE_TAG
 ARG VERBOSE
 ENV LANG=en_US.UTF-8
 ENV PYTHONHASHSEED=0
-ENV SOURCE_DATE_EPOCH=0
+# Build-time only (ARG, not ENV): RUN steps get reproducible timestamps, and nothing is left in the image's
+# environment, where an empty value breaks ostree commit and mkfs.fat in containers run from it.
+ARG SOURCE_DATE_EPOCH=0
 
 # Copy Homebrew
 COPY --from=brew /system_files /
@@ -203,6 +205,7 @@ RUN mkdir -p /etc/containers/containers.conf.d && \
 
 # Enable required systemd services
 RUN systemctl enable var-opt.mount && \
+    systemctl enable getty@tty1.service && \
     systemctl enable NetworkManager.service && \
     systemctl enable systemd-resolved.service && \
     systemctl enable avahi-daemon.service && \
@@ -287,8 +290,7 @@ RUN chmod +x /usr/share/boppos/generate-package-list.sh
 
 RUN rm -f /README.md
 
-# Reset Python hashseed and build timestamps to default for runtime security
+# Reset the Python hashseed to its default for runtime security
 ENV PYTHONHASHSEED=""
-ENV SOURCE_DATE_EPOCH=""
 
 LABEL containers.bootc=1

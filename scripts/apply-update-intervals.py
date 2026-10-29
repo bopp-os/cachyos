@@ -151,7 +151,7 @@ def main():
 
     # Tag compiled system caches and normalize timestamps for layer determinism
     print("Tagging compiled system caches as user.component=system-cache...")
-    epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
+    epoch = int(os.environ.get("SOURCE_DATE_EPOCH") or "0")
     cache_targets = [
         os.path.join(rootfs, "usr/share/glib-2.0/schemas/gschemas.compiled"),
         os.path.join(rootfs, "etc/ld.so.cache"),
