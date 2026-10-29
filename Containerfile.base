@@ -9,7 +9,7 @@ ARG BASE_IMAGE_TAG=v3
 ARG BASE_IMAGE=docker.io/cachyos/cachyos-${BASE_IMAGE_TAG}
 ARG VERBOSE=false
 
-# ==========================================
+# ===================================
 # System Build
 # ==========================================
 FROM ghcr.io/ublue-os/brew:latest AS brew
@@ -227,6 +227,15 @@ RUN systemctl --global preset bopp-steam-shortcut.service bopp-steam-pending.ser
 # opens its setup window at every first login) in post_install, so turn both off again.
 RUN systemctl disable warp-svc.service && \
     systemctl --global disable warp-taskbar.service
+=======
+# First run: boppos-first-run.service (files/base/usr/lib/systemd/user) is the only trigger of the first-run app.
+# Remove the other two ways boppos-tools can start it, so it can not start twice:
+#  - bopp-welcome.desktop (XDG autostart; the user manager would run it next to the unit)
+#  - boppos-oobe.service (system unit that runs the old --oobe flow on tty1 before the login screen)
+RUN rm -f /etc/xdg/autostart/bopp-welcome.desktop && \
+    systemctl mask boppos-oobe.service && \
+    systemctl --global enable boppos-first-run.service && \
+    test -L /etc/systemd/user/graphical-session.target.wants/boppos-first-run.service
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
