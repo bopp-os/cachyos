@@ -48,6 +48,12 @@ RUN chmod +x /tmp/apply-update-intervals.py && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     /tmp/apply-update-intervals.py /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
 
+# Boot menu entries (ostree titles them with PRETTY_NAME) and "About" say BoppOS and the flavor. ID stays arch.
+RUN sed -i -E 's/^NAME=.*/NAME="BoppOS Linux"/; s/^PRETTY_NAME=.*/PRETTY_NAME="BoppOS Linux (GNOME)"/; /^VARIANT(_ID)?=/d' \
+        /usr/lib/os-release && \
+    printf 'VARIANT="GNOME"\nVARIANT_ID=gnome\n' >> /usr/lib/os-release && \
+    touch -d "@${SOURCE_DATE_EPOCH:-0}" /usr/lib/os-release
+
 # Update the SBOM / Package Manifest for the overlay
 RUN /usr/share/boppos/generate-package-list.sh && \
     /usr/share/boppos/bootc-cleanup.sh

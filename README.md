@@ -63,6 +63,7 @@ What a freshly installed image does, and what it deliberately leaves off:
 - **Boot splash:** the BoppOS Plymouth theme (two-step, with the firmware logo), set in `Containerfile.base` before dracut builds the initramfs.
 - **Launcher icon:** the Plasma application launcher uses `boppos-icon`.
 - **Boot menu tools:** `grub` is installed for `grub-mkconfig` and the `15_ostree` script on installs that use grub.
+- **Name:** `/usr/lib/os-release` says `NAME="BoppOS Linux"` and `PRETTY_NAME="BoppOS Linux (<flavor>)"`, with `VARIANT`/`VARIANT_ID` per flavor, so the ostree boot menu entries and "About" name the flavor. `ID` stays `arch`.
 - **Text consoles:** `getty@tty1` is enabled, which also gives a login on tty2 to tty6 when you switch to them (Ctrl+Alt+F2). The login screen takes over tty1.
 - **Autologin / "start in Gaming Mode or Desktop":** not available yet, because no flavor ships a Gaming Mode session. Per-flavor details and what is unverified: [docs/first-run-and-autologin.md](docs/first-run-and-autologin.md).
 
