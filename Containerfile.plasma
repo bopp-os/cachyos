@@ -44,6 +44,11 @@ RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
     systemctl enable plasmalogin.service && \
     systemctl enable cardwired.service
 
+# Application launcher icon: cachyos-kde-settings' default panel uses org.cachyos.hello (cachyos-hello is not
+# installed, so the button is blank). Use boppos-icon from boppos-artwork instead. Fails if the line moves.
+RUN sed -i 's/^icon=org\.cachyos\.hello$/icon=boppos-icon/' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc && \
+    grep -qx 'icon=boppos-icon' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc
+
 # Remove PackageKit backend for Discover to prevent crashes on our immutable OS
 RUN rm -f /usr/lib/qt6/plugins/discover/packagekit-backend.so
 

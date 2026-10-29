@@ -9,7 +9,7 @@ ARG BASE_IMAGE_TAG=v3
 ARG BASE_IMAGE=docker.io/cachyos/cachyos-${BASE_IMAGE_TAG}
 ARG VERBOSE=false
 
-# ==========================================
+# ===================================
 # System Build
 # ==========================================
 FROM ghcr.io/ublue-os/brew:latest AS brew
@@ -135,6 +135,7 @@ COPY files/base/usr/libexec /usr/libexec
 
 RUN chmod +x /usr/share/boppos/bootc-cleanup.sh && \
     chmod -R 0755 /usr/libexec && \
+    chmod 0750 /etc/sudoers.d && chmod 0440 /etc/sudoers.d/* && visudo -c && \
     find /etc /usr/share/boppos /usr/libexec -type f \
         -exec sh -c 'for f; do getfattr -h -n user.component "$f" &>/dev/null || { setfattr -h -n user.component -v "boppos-custom" "$f" && setfattr -h -n user.update-interval -v "daily" "$f"; }; done' sh {} +
 
@@ -220,7 +221,18 @@ RUN systemctl enable var-opt.mount && \
     systemctl disable asusd.service || true
 
 # Apply boppos-tools' user preset (pacman does not run presets)
-RUN systemctl --global preset boppos-default-flatpaks.service bopp-steam-shortcut.service bopp-steam-pending.service
+RUN systemctl --global preset bopp-steam-shortcut.service bopp-steam-pending.service
+
+# Cloudflare WARP is optional: CachyOS' cloudflare-warp-bin enables the daemon and the per-user taskbar (which
+# opens its setup window at every first login) in post_install, so turn both off again.
+RUN systemctl disable warp-svc.service && \
+    systemctl --global disable warp-taskbar.service
+
+# First run: boppos-tools starts `boppos-deck --first-run` from two places and the image adds nothing of its own:
+#  - /etc/xdg/autostart/bopp-welcome.desktop (every sign-in; the app exits at once when nothing is pending)
+#  - boppos-oobe.service (before the display manager, only while no real account exists; needs the boppos-oobe
+#    sysusers entry from the package and gamescope from base.yaml). The package has no preset for it, so enable it.
+RUN systemctl enable boppos-oobe.service
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \

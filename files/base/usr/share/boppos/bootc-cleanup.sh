@@ -66,6 +66,16 @@ if [ -d /usr/share/sddm/themes ] && [ ! -L /usr/share/sddm/themes ]; then
     cp -a /usr/share/sddm/themes/* /usr/share/sddm/themes-default/ 2>/dev/null || true
 fi
 
+echo "Clearing day-0 password ages on locked accounts..."
+# Accounts created during the build get lastchg 0 (useradd and systemd-sysusers honour SOURCE_DATE_EPOCH=0),
+# which PAM reads as "password must be changed now": account checks fail for service accounts such as the
+# login manager's greeter (plasmalogin, sddm, greeter, gdm), so it cannot start. An empty field turns aging off.
+sed -i -E 's/^([^:]+:[!*][^:]*):0:/\1::/' /etc/shadow
+if awk -F: '$2 ~ /^[!*]/ && $3 == "0" { found = 1 } END { exit !found }' /etc/shadow; then
+    echo "ERROR: a locked account in /etc/shadow still has lastchg 0" >&2
+    exit 1
+fi
+
 echo "Cleaning /run and /tmp..."
 rm -rf /run/* /run/.[!.]* /tmp/* /tmp/.[!.]* 2>/dev/null || true
 
