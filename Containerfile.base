@@ -227,15 +227,12 @@ RUN systemctl --global preset bopp-steam-shortcut.service bopp-steam-pending.ser
 # opens its setup window at every first login) in post_install, so turn both off again.
 RUN systemctl disable warp-svc.service && \
     systemctl --global disable warp-taskbar.service
-=======
-# First run: boppos-first-run.service (files/base/usr/lib/systemd/user) is the only trigger of the first-run app.
-# Remove the other two ways boppos-tools can start it, so it can not start twice:
-#  - bopp-welcome.desktop (XDG autostart; the user manager would run it next to the unit)
-#  - boppos-oobe.service (system unit that runs the old --oobe flow on tty1 before the login screen)
-RUN rm -f /etc/xdg/autostart/bopp-welcome.desktop && \
-    systemctl mask boppos-oobe.service && \
-    systemctl --global enable boppos-first-run.service && \
-    test -L /etc/systemd/user/graphical-session.target.wants/boppos-first-run.service
+
+# First run: boppos-tools starts `boppos-deck --first-run` from two places and the image adds nothing of its own:
+#  - /etc/xdg/autostart/bopp-welcome.desktop (every sign-in; the app exits at once when nothing is pending)
+#  - boppos-oobe.service (before the display manager, only while no real account exists; needs the boppos-oobe
+#    sysusers entry from the package and gamescope from base.yaml). The package has no preset for it, so enable it.
+RUN systemctl enable boppos-oobe.service
 
 # Bootc / Dracut Fixes
 RUN --mount=type=tmpfs,dst=/run \
