@@ -56,3 +56,22 @@ user later disables autologin.
 - The shadow fix: with `SOURCE_DATE_EPOCH=0`, 22 build-time accounts (including `plasmalogin`, `boppos-oobe`,
   `polkitd`, `avahi`) had lastchg `0` in the `v3-test` image. `bootc-cleanup.sh` now empties that field for locked
   accounts and fails the build if any is left. It runs last in the base and in every flavor.
+
+## Open items (as of 2026-10-29)
+
+- **boppos-tools first run is not released.** `boppos-deck --first-run` and the `bopp-welcome.desktop` /
+  `boppos-oobe.service` behaviour described above are on the boppos-tools branch `claude/first-run-unified`.
+  The image already enables `boppos-oobe.service`; on a bare `bootc install` with no account it starts gamescope
+  before the login screen and has nothing to run until that branch ships.
+- **Kernel arguments.** `files/base/usr/lib/bootc/kargs.d/90-boppos-optimizations.toml` only enables
+  `rd.luks.options=tpm2-device=auto` and `splash`. The tuning kargs removed from it are kept as comments in that
+  file until boppos-tools presets (`/usr/lib/bopp-kargs.d/`) replace them. Nothing in the image copies presets into
+  `/usr/lib/bootc/kargs.d/`.
+- **`sysroot.bootloader`.** `bopp-kargs` needs the target's `/ostree/repo/config` to have
+  `sysroot.bootloader=grub2` (or an `auto` that finds grub). The image cannot set it: the ostree repo is created
+  at install time, and bootc's install code runs `ostree config set sysroot.bootloader` there (the value it sets was not read). The
+  installer or `bopp-kargs` has to set it; the image ships `grub` so `grub-mkconfig` exists.
+- **Gaming Mode session.** None of the four flavors installs a Gaming Mode session entry, so `start-in.conf`
+  (niri only) leaves `gaming-session` empty and the Start-in step stays hidden.
+- **Not verified by a boot:** plasmalogin's `Session=` value format, GDM's AccountsService session, the first-run
+  flow, and the image's `bootc` ostree bootloader setting.
