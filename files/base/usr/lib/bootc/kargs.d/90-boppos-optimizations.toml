@@ -1,17 +1,20 @@
+# TEMPORARY: only the LUKS/TPM2 option stays on by default, until the hardware presets in boppos-deck --oobe can turn
+# the rest on per machine. The removed kargs are kept below so they are easy to restore or move into presets.
+#
+#   "amd_pstate=active",
+#   "amdgpu.ppfeaturemask=0xffffffff",
+#   "split_lock_detect=off",
+#   "nowatchdog",
+#   "nmi_watchdog=0",
+#   "mitigations=off",
+#   "sysrq_always_enabled=1",
+#   "usbcore.autosuspend=-1",
+#   "iommu=pt",
+#   "preempt=full",
+#   "amdgpu.gpu_recovery=1",
+#   "transparent_hugepage=madvise",
+#   "transparent_hugepage.defrag=defer+madvise",
 kargs = [
-    "amd_pstate=active",
-    "amdgpu.ppfeaturemask=0xffffffff",
-    "split_lock_detect=off",
-    "nowatchdog",
-    "nmi_watchdog=0",
-    "mitigations=off",
-    "sysrq_always_enabled=1",
-    "usbcore.autosuspend=-1",
-    "iommu=pt",
-    "preempt=full",
-    "amdgpu.gpu_recovery=1",
-    "transparent_hugepage=madvise",
-    "transparent_hugepage.defrag=defer+madvise",
     "rd.luks.options=tpm2-device=auto",
     "splash"
 ]
