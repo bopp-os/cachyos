@@ -1,0 +1,219 @@
+---
+name: Pre-fetch all architectures
+# Called by schedule.yml before the v3, v4 and znver4 builds. One job fills every arch's package cache and pulls the
+# upstream base images, then ClamAV-scans all of it, so the build workflows (called with prefetched: true) skip their
+# own prefetch and scan. Running a build workflow on its own still does its own prefetch, exactly as before.
+#
+# The arch settings below must match the env blocks of build-v3.yml, build-v4.yml and build-znver4.yml.
+on:
+  workflow_call:
+    inputs:
+      wipe_pkg_cache:
+        description: 'Wipe the package caches before prefetch'
+        required: false
+        type: boolean
+        default: false
+      build_plasma:
+        required: false
+        type: boolean
+        default: true
+      build_gnome:
+        required: false
+        type: boolean
+        default: true
+      build_niri:
+        required: false
+        type: boolean
+        default: true
+      build_cinnamon:
+        required: false
+        type: boolean
+        default: true
+      verbose_build:
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      v3:
+        description: "'true' when the v3 cache and images were prefetched and scanned clean"
+        value: ${{ jobs.prefetch.outputs.v3 }}
+      v4:
+        description: "'true' when the v4 cache and images were prefetched and scanned clean"
+        value: ${{ jobs.prefetch.outputs.v4 }}
+      znver4:
+        description: "'true' when the znver4 cache and images were prefetched and scanned clean"
+        value: ${{ jobs.prefetch.outputs.znver4 }}
+
+env:
+  HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
+  # <march> <base image tag> <base image>, one arch per line
+  ARCHES: |
+    v3 v3 docker.io/cachyos/cachyos-v3:latest
+    v4 v4 docker.io/cachyos/cachyos-v4:latest
+    znver4 v4 ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest
+
+concurrency:
+  group: boppos-build-queue
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  prefetch:
+    name: Pre-fetch & scan (all arches)
+    # The prefetch containers run each arch's base image, and the znver4 one needs a Zen 4 CPU
+    runs-on: znver4
+    permissions:
+      contents: read
+      packages: read
+      issues: write
+    outputs:
+      # An arch whose prefetch or scan failed gets 'false'; its build workflow then does its own prefetch and scan,
+      # and fails there if the problem is still there. The other arches go ahead.
+      v3: ${{ steps.scan_v3.outcome == 'success' }}
+      v4: ${{ steps.scan_v4.outcome == 'success' }}
+      znver4: ${{ steps.scan_znver4.outcome == 'success' }}
+    steps:
+      - name: Clean leftovers from earlier runs
+        run: |
+          sudo rm -rf /var/tmp/clamscan-prefetch.* || true
+          # Root-owned files from earlier runs break checkout
+          sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Login to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOGIN_USER: ${{ github.actor }}
+        run: echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+
+      - name: Pull Base Images
+        run: |
+          # Fresh copies of the upstream base images. The build workflows keep them (prefetched: true protects them
+          # from the image pruning) and build from exactly these; schedule.yml removes them when the cycle ends.
+          while read -r march _ image; do
+            [ -n "$march" ] || continue
+            echo "Pulling $image ($march)..."
+            sudo podman pull -q "$image"
+          done <<< "$ARCHES"
+
+      - name: Prepare Local Cache Directories
+        run: |
+          while read -r march _; do
+            [ -n "$march" ] || continue
+            CACHE_DIR="$HOST_PKG_CACHE_DIR/$march"
+            sudo mkdir -p "$CACHE_DIR"
+            sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
+            sudo chmod 777 "$CACHE_DIR"
+            # Delete problematic lua packages and incomplete downloads before prefetch
+            sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
+            if [ "${{ inputs.wipe_pkg_cache }}" == "true" ]; then
+              echo "Manual wipe triggered. Clearing $CACHE_DIR..."
+              sudo rm -rf "$CACHE_DIR"/* || true
+            fi
+          done <<< "$ARCHES"
+
+      - name: Generate Fastest Mirrors
+        run: |
+          # One ranking for all arches: the script writes the cachyos, cachyos-v3 and cachyos-v4 lists
+          mkdir -p ${{ github.workspace }}/mirrors
+          sudo podman run --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z docker.io/cachyos/cachyos-v3:latest bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
+
+      - name: Check Chaotic-AUR Keys
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fail before prefetch, and report it in an issue, when Chaotic signs its keyring with a key the committed
+          # (hand-reviewed) keys don't cover. The keys are never changed here.
+          rc=0
+          sudo podman run --rm --network=host -v ${{ github.workspace }}/scripts:/w/scripts:ro,z -v ${{ github.workspace }}/files/keys:/w/keys:ro,z \
+            docker.io/cachyos/cachyos-v3:latest bash /w/scripts/check-chaotic-keys.sh /w/keys > "$RUNNER_TEMP/chaotic-keys.txt" 2>&1 || rc=$?
+          cat "$RUNNER_TEMP/chaotic-keys.txt"
+          if [ "$rc" = 2 ]; then
+            bash scripts/chaotic-keys-issue.sh "$RUNNER_TEMP/chaotic-keys.txt" || echo "::warning::Couldn't report this in an issue"
+            echo "::error::Chaotic-AUR keys are out of date. Review and update files/keys/chaotic-*.asc by hand (see the issue)."
+          fi
+          exit "$rc"
+
+      - name: Pre-fetch & Audit Package Archives (all arches, in parallel)
+        id: prefetch
+        run: |
+          # The three downloads are network-bound and write to separate caches, so they run side by side. Each log is
+          # printed in its own group afterwards; an arch that fails gets a false output and its build prefetches itself.
+          LOG_DIR="$RUNNER_TEMP/prefetch-logs"
+          mkdir -p "$LOG_DIR"
+          declare -A PIDS=()
+          while read -r march tag image; do
+            [ -n "$march" ] || continue
+            ARGS=(
+              --build-arg "BASE_IMAGE=$image"
+              --build-arg "BASE_IMAGE_TAG=$tag"
+              --build-arg "TARGET_CPU_MARCH=$march"
+              --build-arg "BUILD_PLASMA=${{ format('{0}', inputs.build_plasma) != 'false' }}"
+              --build-arg "BUILD_GNOME=${{ format('{0}', inputs.build_gnome) != 'false' }}"
+              --build-arg "BUILD_NIRI=${{ format('{0}', inputs.build_niri) != 'false' }}"
+              --build-arg "BUILD_CINNAMON=${{ format('{0}', inputs.build_cinnamon) != 'false' }}"
+              --build-arg "VERBOSE=${{ inputs.verbose_build == true }}"
+              -v "$HOST_PKG_CACHE_DIR/$march:/var/cache/pacman/pkg:z"
+            )
+            # --pull=never: build from the base image pulled above
+            sudo podman build "${ARGS[@]}" --pull=never --network=host -f Containerfile.prefetch . \
+              > "$LOG_DIR/$march.log" 2>&1 &
+            PIDS[$march]=$!
+          done <<< "$ARCHES"
+
+          for march in v3 v4 znver4; do
+            rc=0
+            wait "${PIDS[$march]}" || rc=$?
+            echo "::group::Prefetch log ($march)"
+            cat "$LOG_DIR/$march.log"
+            echo "::endgroup::"
+            if [ "$rc" = 0 ]; then
+              echo "$march=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::Prefetch failed for $march (exit $rc); its build will prefetch on its own."
+              echo "$march=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+      # One scan per arch, one after another: they share the scan record one level above the arch caches, so
+      # packages and images common to several arches are scanned once. continue-on-error keeps one arch's failure
+      # from blocking the others; the job outputs report it.
+      - name: ClamAV Scan (v3)
+        id: scan_v3
+        if: steps.prefetch.outputs.v3 == 'true'
+        continue-on-error: true
+        run: |
+          BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
+          mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' ci/chunkah/Containerfile ci/syft/Containerfile ci/grype/Containerfile)
+          bash scripts/clamscan-prefetch.sh "$HOST_PKG_CACHE_DIR/v3" docker.io/cachyos/cachyos-v3:latest "$BREW_IMAGE" "${TOOL_IMAGES[@]}"
+
+      - name: ClamAV Scan (v4)
+        id: scan_v4
+        if: steps.prefetch.outputs.v4 == 'true'
+        continue-on-error: true
+        run: |
+          BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
+          mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' ci/chunkah/Containerfile ci/syft/Containerfile ci/grype/Containerfile)
+          bash scripts/clamscan-prefetch.sh "$HOST_PKG_CACHE_DIR/v4" docker.io/cachyos/cachyos-v4:latest "$BREW_IMAGE" "${TOOL_IMAGES[@]}"
+
+      - name: ClamAV Scan (znver4)
+        id: scan_znver4
+        if: steps.prefetch.outputs.znver4 == 'true'
+        continue-on-error: true
+        run: |
+          BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
+          mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' ci/chunkah/Containerfile ci/syft/Containerfile ci/grype/Containerfile)
+          bash scripts/clamscan-prefetch.sh "$HOST_PKG_CACHE_DIR/znver4" ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest "$BREW_IMAGE" "${TOOL_IMAGES[@]}"
+
+      - name: Clean Workspace
+        if: always()
+        run: |
+          sudo podman rm -af || true
+          # Only dangling layers from the prefetch builds; the pulled base images stay for the builds
+          sudo podman system prune --force || true
+          sudo rm -rf /var/tmp/clamscan-prefetch.* ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+          df -h /

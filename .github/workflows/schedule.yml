@@ -69,8 +69,27 @@ jobs:
     permissions:
       contents: write
 
-  v3:
+  # One prefetch for every arch: fills all three package caches, pulls the base images and scans everything, so the
+  # builds below skip their own prefetch. An arch whose prefetch failed falls back to its build's own prefetch.
+  prefetch:
     needs: intervals
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/prefetch.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: read
+      issues: write
+    with:
+      wipe_pkg_cache: ${{ inputs.wipe_pkg_cache == true }}
+      build_plasma: ${{ format('{0}', inputs.build_plasma) != 'false' }}
+      build_gnome: ${{ format('{0}', inputs.build_gnome) != 'false' }}
+      build_niri: ${{ format('{0}', inputs.build_niri) != 'false' }}
+      build_cinnamon: ${{ format('{0}', inputs.build_cinnamon) != 'false' }}
+      verbose_build: ${{ inputs.verbose_build == true }}
+
+  v3:
+    needs: prefetch
     # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
     if: ${{ !cancelled() }}
     uses: ./.github/workflows/build-v3.yml
@@ -91,9 +110,10 @@ jobs:
       verbose_build: ${{ inputs.verbose_build == true }}
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+      prefetched: ${{ needs.prefetch.outputs.v3 == 'true' }}
 
   v4:
-    needs: v3
+    needs: [prefetch, v3]
     # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
     if: ${{ !cancelled() }}
     uses: ./.github/workflows/build-v4.yml
@@ -114,9 +134,10 @@ jobs:
       verbose_build: ${{ inputs.verbose_build == true }}
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+      prefetched: ${{ needs.prefetch.outputs.v4 == 'true' }}
 
   znver4:
-    needs: v4
+    needs: [prefetch, v4]
     # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
     if: ${{ !cancelled() }}
     uses: ./.github/workflows/build-znver4.yml
@@ -137,3 +158,19 @@ jobs:
       verbose_build: ${{ inputs.verbose_build == true }}
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+      prefetched: ${{ needs.prefetch.outputs.znver4 == 'true' }}
+
+  # Remove the base images prefetch pulled once the cycle is over, whatever the builds' results
+  cleanup:
+    needs: [prefetch, znver4]
+    if: ${{ always() && needs.prefetch.result != 'skipped' }}
+    runs-on: znver4
+    permissions: {}
+    steps:
+      - name: Remove Prefetched Base Images
+        run: |
+          for image in docker.io/cachyos/cachyos-v3:latest docker.io/cachyos/cachyos-v4:latest \
+            ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest; do
+            sudo podman rmi "$image" 2>/dev/null && echo "Removed $image" || echo "$image not present (or in use), skipped"
+          done
+          df -h /

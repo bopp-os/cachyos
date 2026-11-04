@@ -107,6 +107,11 @@ on:
         required: false
         type: boolean
         default: false
+      prefetched:
+        description: 'prefetch.yml already filled this arch''s package cache, pulled its base image and scanned both (schedule.yml)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image (znver4)"
@@ -120,6 +125,8 @@ env:
   TARGET_MARCH: "znver4"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
   PKG_CACHE_MAX_GB: "20"
+  # Set by schedule.yml after prefetch.yml: skip this workflow's own prefetch and ClamAV scan
+  PREFETCHED: "${{ inputs.prefetched == true }}"
   # Network for the RUN steps of the base and flavor image builds. Everything they need is downloaded and ClamAV-scanned
   # in the prefetch step, so they run with none; the allow_build_network input (manual runs only) switches to host.
   BUILD_NETWORK: "${{ inputs.allow_build_network && 'host' || 'none' }}"
@@ -205,6 +212,11 @@ jobs:
           # signature database, and the pinned syft, grype and chunkah images are already ClamAV-scanned. Their old
           # versions are dropped by the ClamAV step when a newer one is pulled.
           KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah)$'
+          # After prefetch.yml, also keep the base and brew images it pulled and scanned, so this build uses exactly
+          # those (schedule.yml removes the base images when the cycle ends)
+          if [ "$PREFETCHED" == "true" ]; then
+            KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah|docker\.io/cachyos/cachyos-v[34]|ghcr\.io/bopp-os/cachyos-docker/cachyos-znver4|ghcr\.io/ublue-os/brew)$'
+          fi
           # remove_images [--force] [podman images filter...]: removes the matching images except the ones above
           remove_images() {
             local force=()
@@ -320,11 +332,15 @@ jobs:
           sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
           sudo chmod 777 "$CACHE_DIR"
           
-          # Delete problematic lua packages and incomplete downloads before build
-          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
+          # After prefetch.yml the cache is ready (it already did this cleanup and any wipe); deleting now would
+          # remove packages the offline build needs
+          if [ "$PREFETCHED" != "true" ]; then
+            # Delete problematic lua packages and incomplete downloads before build
+            sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
+          fi
           
           # If the manual wipe toggle was checked, clear the cache
-          if [ "${{ inputs.wipe_pkg_cache }}" == "true" ]; then
+          if [ "${{ inputs.wipe_pkg_cache }}" == "true" ] && [ "$PREFETCHED" != "true" ]; then
             echo "Manual wipe triggered. Clearing local pacman cache..."
             sudo rm -rf "$CACHE_DIR"/* || true
           fi
@@ -340,7 +356,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Check Chaotic-AUR Keys
-        if: steps.check_compatibility.outputs.should_skip != 'true'
+        if: steps.check_compatibility.outputs.should_skip != 'true' && env.PREFETCHED != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -357,6 +373,7 @@ jobs:
           exit "$rc"
 
       - name: Pre-fetch & Audit Package Archives
+        if: env.PREFETCHED != 'true'
         run: |
           echo "::group::Building Containerfile.prefetch..."
           PREFETCH_ARGS=()
@@ -376,6 +393,7 @@ jobs:
           echo "::endgroup::"
 
       - name: ClamAV Scan (Packages, Brew, Base & Tool Images)
+        if: env.PREFETCHED != 'true'
         run: |
           # Scan the brew image Containerfile.base actually copies from, so the two cannot drift apart
           BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
