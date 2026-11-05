@@ -111,6 +111,11 @@ on:
         required: false
         type: boolean
         default: false
+      prefetched:
+        description: 'prefetch.yml already filled this arch''s package cache, pulled its base image and scanned both (schedule.yml)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image"
@@ -124,6 +129,8 @@ env:
   TARGET_MARCH: "v3"
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
   PKG_CACHE_MAX_GB: "20"
+  # Set by schedule.yml after prefetch.yml: skip this workflow's own prefetch and ClamAV scan
+  PREFETCHED: "${{ inputs.prefetched == true }}"
   # Network for the RUN steps of the base and flavor image builds. Everything they need is downloaded and ClamAV-scanned
   # in the prefetch step, so they run with none; the allow_build_network input (manual runs only) switches to host.
   BUILD_NETWORK: "${{ inputs.allow_build_network && 'host' || 'none' }}"
@@ -141,6 +148,7 @@ jobs:
     outputs:
       should_skip: ${{ steps.check_compatibility.outputs.should_skip }}
       flavors: ${{ steps.set_flavors.outputs.flavors }}
+      sync_db: ${{ steps.sync_db.outputs.fingerprint }}
 
     permissions:
       contents: read
@@ -149,6 +157,27 @@ jobs:
       issues: write
 
     steps:
+      - name: Start Disk Usage Monitor
+        run: |
+          # Samples the root filesystem every 5 s for the whole job and keeps the highest reading, so the report at the
+          # end shows the real peak (podman layers, chunkah tarballs and scans all land on /). The runner stops this
+          # background loop when the job ends.
+          PEAK_FILE="$RUNNER_TEMP/disk-peak"
+          echo "0 0G 0G start" > "$PEAK_FILE"
+          nohup bash -c '
+            peak=0
+            while :; do
+              read -r pct used avail < <(df --output=pcent,used,avail -BG / | tail -n 1)
+              pct=${pct%\%}
+              if [ "$pct" -gt "$peak" ]; then
+                peak=$pct
+                echo "$pct $used $avail $(date -u +%H:%M:%S)" > "$0"
+              fi
+              sleep 5
+            done' "$PEAK_FILE" > /dev/null 2>&1 &
+          echo "DISK_MONITOR_PID=$!" >> "$GITHUB_ENV"
+          df -h /
+
       - name: Prepare environment
         run: |
           # Lowercase the image uri
@@ -209,6 +238,11 @@ jobs:
           # signature database, and the pinned syft, grype and chunkah images are already ClamAV-scanned. Their old
           # versions are dropped by the ClamAV step when a newer one is pulled.
           KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah)$'
+          # After prefetch.yml, also keep the base and brew images it pulled and scanned, so this build uses exactly
+          # those (schedule.yml removes the base images when the cycle ends)
+          if [ "$PREFETCHED" == "true" ]; then
+            KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah|docker\.io/cachyos/cachyos-v[34]|ghcr\.io/bopp-os/cachyos-docker/cachyos-znver4|ghcr\.io/ublue-os/brew)$'
+          fi
           # remove_images [--force] [podman images filter...]: removes the matching images except the ones above
           remove_images() {
             local force=()
@@ -324,11 +358,15 @@ jobs:
           sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
           sudo chmod 777 "$CACHE_DIR"
           
-          # Delete problematic lua packages and incomplete downloads before build
-          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
+          # After prefetch.yml the cache is ready (it already did this cleanup and any wipe); deleting now would
+          # remove packages the offline build needs
+          if [ "$PREFETCHED" != "true" ]; then
+            # Delete problematic lua packages and incomplete downloads before build
+            sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
+          fi
           
           # If the manual wipe toggle was checked, clear the cache
-          if [ "${{ inputs.wipe_pkg_cache }}" == "true" ]; then
+          if [ "${{ inputs.wipe_pkg_cache }}" == "true" ] && [ "$PREFETCHED" != "true" ]; then
             echo "Manual wipe triggered. Clearing local pacman cache..."
             sudo rm -rf "$CACHE_DIR"/* || true
           fi
@@ -344,7 +382,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Check Chaotic-AUR Keys
-        if: steps.check_compatibility.outputs.should_skip != 'true'
+        if: steps.check_compatibility.outputs.should_skip != 'true' && env.PREFETCHED != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -361,6 +399,7 @@ jobs:
           exit "$rc"
 
       - name: Pre-fetch & Audit Package Archives
+        if: env.PREFETCHED != 'true'
         run: |
           echo "::group::Building Containerfile.prefetch..."
           PREFETCH_ARGS=()
@@ -380,6 +419,7 @@ jobs:
           echo "::endgroup::"
 
       - name: ClamAV Scan (Packages, Brew, Base & Tool Images)
+        if: env.PREFETCHED != 'true'
         run: |
           # Scan the brew image Containerfile.base actually copies from, so the two cannot drift apart
           BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
@@ -387,6 +427,20 @@ jobs:
           mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' ci/chunkah/Containerfile ci/syft/Containerfile ci/grype/Containerfile)
           chmod +x scripts/clamscan-prefetch.sh
           ./scripts/clamscan-prefetch.sh "${{ env.LOCAL_CACHE_DIR }}" "${{ env.BASE_IMAGE }}" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"
+
+      - name: Record Package Snapshot
+        id: sync_db
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          # Fingerprint of the package databases prefetch froze in the cache. The flavor jobs compare it, so a re-run
+          # flavor is never built from a different snapshot than this base image.
+          if compgen -G "$LOCAL_CACHE_DIR/.sync/*.db" > /dev/null; then
+            FP=$(cd "$LOCAL_CACHE_DIR/.sync" && sha256sum ./*.db | sha256sum | cut -c1-64)
+          else
+            FP=none
+          fi
+          echo "Package snapshot: $FP"
+          echo "fingerprint=$FP" >> "$GITHUB_OUTPUT"
 
       - name: Build Base Image
         id: build_base
@@ -469,6 +523,20 @@ jobs:
           echo "📊 Final Disk Space:"
           df -h /
 
+      - name: Report Peak Disk Usage
+        if: always()
+        run: |
+          kill "${DISK_MONITOR_PID:-0}" 2>/dev/null || true
+          read -r pct used avail at < "$RUNNER_TEMP/disk-peak" || { echo "No disk samples recorded"; exit 0; }
+          echo "Peak disk usage on /: ${pct}% (${used} used, ${avail} free) at ${at} UTC"
+          echo "Disk now:"
+          df -h /
+          printf -- '- Peak disk usage on `/`: **%s%%** (%s used, %s free) at %s UTC\n' "$pct" "$used" "$avail" "$at" >> "$GITHUB_STEP_SUMMARY"
+          # Warn well before builds start failing with ENOSPC
+          if [ "$pct" -ge 85 ]; then
+            echo "::warning::Disk usage peaked at ${pct}% on / (${avail} free). Builds are close to running out of space."
+          fi
+
   build_flavors:
     name: Build ${{ matrix.flavor }} (v3)
     needs: build_base
@@ -485,6 +553,27 @@ jobs:
       id-token: write
 
     steps:
+      - name: Start Disk Usage Monitor
+        run: |
+          # Samples the root filesystem every 5 s for the whole job and keeps the highest reading, so the report at the
+          # end shows the real peak (podman layers, chunkah tarballs and scans all land on /). The runner stops this
+          # background loop when the job ends.
+          PEAK_FILE="$RUNNER_TEMP/disk-peak"
+          echo "0 0G 0G start" > "$PEAK_FILE"
+          nohup bash -c '
+            peak=0
+            while :; do
+              read -r pct used avail < <(df --output=pcent,used,avail -BG / | tail -n 1)
+              pct=${pct%\%}
+              if [ "$pct" -gt "$peak" ]; then
+                peak=$pct
+                echo "$pct $used $avail $(date -u +%H:%M:%S)" > "$0"
+              fi
+              sleep 5
+            done' "$PEAK_FILE" > /dev/null 2>&1 &
+          echo "DISK_MONITOR_PID=$!" >> "$GITHUB_ENV"
+          df -h /
+
       - name: Prepare environment
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
@@ -571,6 +660,28 @@ jobs:
           # Nothing is deleted here: this build has no network and needs everything prefetch downloaded and scanned
           sudo rm -f "$CACHE_DIR"/*.part
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
+
+      - name: Check Package Snapshot Matches Base
+        if: needs.build_base.outputs.sync_db != ''
+        env:
+          BASE_SNAPSHOT: ${{ needs.build_base.outputs.sync_db }}
+        run: |
+          # The flavor builds offline from the snapshot the base image was built from. On a re-run of just this flavor,
+          # another run or the cache prune may have replaced or wiped it since; building would then mismatch the base.
+          if compgen -G "$LOCAL_CACHE_DIR/.sync/*.db" > /dev/null; then
+            FP=$(cd "$LOCAL_CACHE_DIR/.sync" && sha256sum ./*.db | sha256sum | cut -c1-64)
+          else
+            FP=none
+          fi
+          if [ "$FP" != "$BASE_SNAPSHOT" ]; then
+            echo "::error::The package cache no longer holds the snapshot the base image was built from (base $BASE_SNAPSHOT, now $FP). Re-run all jobs for this architecture so it prefetches again."
+            exit 1
+          fi
+          if [ "$FP" != none ] && ! compgen -G "$LOCAL_CACHE_DIR/*.pkg.tar.*" > /dev/null; then
+            echo "::error::The package cache was wiped after the base build. Re-run all jobs for this architecture so it prefetches again."
+            exit 1
+          fi
+          echo "Package snapshot matches the base build: $FP"
 
       - name: Pre-build Package Cache Security Scan
         run: |
@@ -787,6 +898,20 @@ jobs:
           sudo podman rmi -f "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           sudo podman rmi -f "${IMAGE_REGISTRY}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+
+      - name: Report Peak Disk Usage
+        if: always()
+        run: |
+          kill "${DISK_MONITOR_PID:-0}" 2>/dev/null || true
+          read -r pct used avail at < "$RUNNER_TEMP/disk-peak" || { echo "No disk samples recorded"; exit 0; }
+          echo "Peak disk usage on /: ${pct}% (${used} used, ${avail} free) at ${at} UTC"
+          echo "Disk now:"
+          df -h /
+          printf -- '- Peak disk usage on `/`: **%s%%** (%s used, %s free) at %s UTC\n' "$pct" "$used" "$avail" "$at" >> "$GITHUB_STEP_SUMMARY"
+          # Warn well before builds start failing with ENOSPC
+          if [ "$pct" -ge 85 ]; then
+            echo "::warning::Disk usage peaked at ${pct}% on / (${avail} free). Builds are close to running out of space."
+          fi
 
   cleanup:
     name: Cleanup Runner Workspace (v3)

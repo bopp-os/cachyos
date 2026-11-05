@@ -69,8 +69,30 @@ jobs:
     permissions:
       contents: write
 
-  v3:
+  # Re-running failed jobs keeps the prefetch job's earlier result, but by then the arch cleanup may have pruned or
+  # wiped the cache and the cleanup job below has removed the base images. So a build only skips its own prefetch when
+  # the shared prefetch ran in the same attempt; otherwise it prefetches and scans itself, like a manual build.
+  # One prefetch for every arch: fills all three package caches, pulls the base images and scans everything, so the
+  # builds below skip their own prefetch. An arch whose prefetch failed falls back to its build's own prefetch.
+  prefetch:
     needs: intervals
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/prefetch.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: read
+      issues: write
+    with:
+      wipe_pkg_cache: ${{ inputs.wipe_pkg_cache == true }}
+      build_plasma: ${{ format('{0}', inputs.build_plasma) != 'false' }}
+      build_gnome: ${{ format('{0}', inputs.build_gnome) != 'false' }}
+      build_niri: ${{ format('{0}', inputs.build_niri) != 'false' }}
+      build_cinnamon: ${{ format('{0}', inputs.build_cinnamon) != 'false' }}
+      verbose_build: ${{ inputs.verbose_build == true }}
+
+  v3:
+    needs: prefetch
     # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
     if: ${{ !cancelled() }}
     uses: ./.github/workflows/build-v3.yml
@@ -91,9 +113,10 @@ jobs:
       verbose_build: ${{ inputs.verbose_build == true }}
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+      prefetched: ${{ needs.prefetch.outputs.v3 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
 
   v4:
-    needs: v3
+    needs: [prefetch, v3]
     # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
     if: ${{ !cancelled() }}
     uses: ./.github/workflows/build-v4.yml
@@ -114,9 +137,10 @@ jobs:
       verbose_build: ${{ inputs.verbose_build == true }}
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+      prefetched: ${{ needs.prefetch.outputs.v4 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
 
   znver4:
-    needs: v4
+    needs: [prefetch, v4]
     # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
     if: ${{ !cancelled() }}
     uses: ./.github/workflows/build-znver4.yml
@@ -137,3 +161,39 @@ jobs:
       verbose_build: ${{ inputs.verbose_build == true }}
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+      prefetched: ${{ needs.prefetch.outputs.znver4 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
+
+  # Remove the base images prefetch pulled once the cycle is over, whatever the builds' results
+  cleanup:
+    needs: [prefetch, znver4]
+    if: ${{ always() && needs.prefetch.result != 'skipped' }}
+    runs-on: znver4
+    permissions: {}
+    steps:
+      - name: Remove Prefetched Base Images
+        run: |
+          # Untagged leftovers (build layers, replaced images) first, so they do not keep a base image in use
+          sudo podman rm -af >/dev/null 2>&1 || true
+          sudo podman system prune --force --build || true
+
+          for image in docker.io/cachyos/cachyos-v3:latest docker.io/cachyos/cachyos-v4:latest \
+            ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest; do
+            if ! sudo podman image exists "$image"; then
+              echo "$image not present, nothing to remove"
+              continue
+            fi
+            if out=$(sudo podman rmi "$image" 2>&1); then
+              echo "Removed $image"
+              continue
+            fi
+            # Usually a cachyos-base image the arch cleanup kept because a flavor failed, so that flavor can be re-run.
+            # It is left alone; the next build's cleanup or the 72h image prune removes both.
+            echo "$out"
+            echo "Images built on $image:"
+            sudo podman image tree --whatrequires "$image" 2>/dev/null || true
+            echo "::warning::Kept $image: still used by the images listed in this step's log (normally a cachyos-base kept for re-running a failed flavor). It goes once that base is removed."
+          done
+
+          echo "Images left:"
+          sudo podman images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | sort
+          df -h /
