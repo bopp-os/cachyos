@@ -1,0 +1,57 @@
+# Package list for the deck flavor, installed on top of cachyos-deck-base (see Containerfile.deck).
+# Slim KDE Plasma as the Desktop half, plus the Game Mode stack. Large apps come from Flatpak (boppos-deck).
+deck-plasma:
+  - plasma-desktop
+  - plasma-workspace
+  - plasma-login-manager
+  - plasma-nm
+  - plasma-pa
+  - plasma-firewall
+  - plasma-systemmonitor
+  - plasma-keyboard
+  - powerdevil
+  - kscreen
+  - kde-cli-tools
+  - kde-gtk-config
+  - kwallet-pam
+  - bluedevil
+  - systemsettings
+  - polkit-kde-agent
+  - xdg-desktop-portal
+  - xdg-desktop-portal-kde
+  - xdg-desktop-portal-gtk
+  - qt5-wayland
+  - qt6-wayland
+  - qt6-tools
+  - kio-extras
+  - kio-fuse
+  - kdialog
+  - breeze
+  - breeze-gtk
+  - breeze-cursors
+  - qqc2-breeze-style
+  - ocean-sound-theme
+  - kimageformats
+  - qt6-imageformats
+  - ffmpegthumbs
+  - kdegraphics-thumbnailers
+  - flatpak-kcm
+  - discover
+deck-apps:
+  - dolphin
+  - konsole
+  - kate
+  - ark
+  - spectacle
+  - gwenview
+  - cachyos-kde-settings
+  - cachyos-vapor
+deck-gamemode:
+  - gamescope-session-cachyos
+  - lib32-gamescope
+  - jupiter-hw-support
+  - steamos-manager
+  - steamos-networking-tools
+  - powerbuttond
+  - inputplumber
+  - scx-scheds

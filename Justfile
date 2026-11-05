@@ -25,7 +25,7 @@ fetch-data:
     git show origin/data:package-intervals.json > scripts/package-intervals.json
 
 # Pre-fetch and security audit package archives for selected flavors.
-prefetch arch='v3' plasma='true' gnome='true' niri='true' cinnamon='true': fetch-data
+prefetch arch='v3' plasma='true' gnome='true' niri='true' cinnamon='true' deck='false': fetch-data
     @echo "Pre-fetching and security scanning package archives for {{arch}}..."
     podman build \
         --network=host \
@@ -36,21 +36,23 @@ prefetch arch='v3' plasma='true' gnome='true' niri='true' cinnamon='true': fetch
         --build-arg BUILD_GNOME={{gnome}} \
         --build-arg BUILD_NIRI={{niri}} \
         --build-arg BUILD_CINNAMON={{cinnamon}} \
+        --build-arg BUILD_DECK={{deck}} \
         -f Containerfile.prefetch \
         .
 
 # Build a specific flavor of the container image.
-# Accepts an optional architecture (v3, v4, znver4) and flavor (base, plasma, gnome, niri, cinnamon).
+# Accepts an optional architecture (v3, v4, znver4) and flavor (base, plasma, gnome, niri, cinnamon, deck-base, deck).
 build arch='v3' flavor='base': fetch-data
     @echo "Building cachyos-boppos-{{flavor}}:{{arch}}..."
-    @if [ "{{flavor}}" = "base" ]; then \
+    @if [ "{{flavor}}" = "base" ] || [ "{{flavor}}" = "deck-base" ]; then \
         podman build \
             --network=host \
             --build-arg TARGET_CPU_MARCH={{arch}} \
             --build-arg BASE_IMAGE_TAG=$(if [ "{{arch}}" = "znver4" ]; then echo "v4"; else echo "{{arch}}"; fi) \
             $(if [ "{{arch}}" = "znver4" ]; then echo "--build-arg BASE_IMAGE=ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"; else echo ""; fi) \
+            $(if [ "{{flavor}}" = "deck-base" ]; then echo "--build-arg PACKAGE_LIST=files/deck-base/deck-base.yaml --build-arg BUILD_NCT6687D=false --build-arg BUILD_IT87=false"; else echo ""; fi) \
             -f Containerfile.base \
-            -t "{{registry}}/{{user}}/cachyos-boppos-base:{{arch}}" \
+            -t "{{registry}}/{{user}}/cachyos-boppos-{{flavor}}:{{arch}}" \
             .; \
     else \
         podman build \
@@ -77,13 +79,13 @@ push arch='v3' flavor='base': (rechunk arch flavor)
 
 # Rechunk the built image(s) to optimize layers.
 rechunk arch='v3' flavor='base':
-    @if [ "{{flavor}}" = "base" ]; then \
-        echo "Rechunking cachyos-boppos-base:{{arch}}..."; \
-        podman run --rm --mount=type=image,source={{registry}}/{{user}}/cachyos-boppos-base:{{arch}},target=/chunkah \
-            -e CHUNKAH_CONFIG_STR="$$(podman inspect {{registry}}/{{user}}/cachyos-boppos-base:{{arch}})" \
+    @if [ "{{flavor}}" = "base" ] || [ "{{flavor}}" = "deck-base" ]; then \
+        echo "Rechunking cachyos-boppos-{{flavor}}:{{arch}}..."; \
+        podman run --rm --mount=type=image,source={{registry}}/{{user}}/cachyos-boppos-{{flavor}}:{{arch}},target=/chunkah \
+            -e CHUNKAH_CONFIG_STR="$$(podman inspect {{registry}}/{{user}}/cachyos-boppos-{{flavor}}:{{arch}})" \
             {{chunkah_image}} build --compressed --compression-level 2 --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ | podman load > /tmp/podman_load_output.txt; \
         IMAGE_ID=$$(cat /tmp/podman_load_output.txt | grep "Loaded image" | awk '{print $$3}'); \
-        podman tag "$$IMAGE_ID" "{{registry}}/{{user}}/cachyos-boppos-base:{{arch}}"; \
+        podman tag "$$IMAGE_ID" "{{registry}}/{{user}}/cachyos-boppos-{{flavor}}:{{arch}}"; \
     else \
         echo "Skipping rechunk for DE overlay {{flavor}}..."; \
     fi
@@ -99,7 +101,7 @@ verify arch='v3':
     #!/usr/bin/env bash
     set -euo pipefail
     REGISTRY="{{registry}}/{{user}}"
-    FLAVORS=("base" "plasma" "gnome" "niri" "cinnamon")
+    FLAVORS=("base" "plasma" "gnome" "niri" "cinnamon" "deck-base" "deck")
     
     if [ ! -f "cosign.pub" ]; then
         echo "Error: cosign.pub not found in the current directory."

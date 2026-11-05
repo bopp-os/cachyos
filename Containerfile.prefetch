@@ -11,10 +11,12 @@ ARG BASE_IMAGE=docker.io/cachyos/cachyos-${BASE_IMAGE_TAG}
 FROM ${BASE_IMAGE} AS prefetch
 
 ARG TARGET_CPU_MARCH
+ARG BUILD_BASE=true
 ARG BUILD_PLASMA=true
 ARG BUILD_GNOME=true
 ARG BUILD_NIRI=true
 ARG BUILD_CINNAMON=true
+ARG BUILD_DECK=false
 ARG VERBOSE=false
 
 ENV LANG=en_US.UTF-8
@@ -38,8 +40,10 @@ RUN chmod +x /tmp/scripts/*.sh && \
 # Install yara and python-yaml from extra repository, pre-fetch packages, and scan package cache
 RUN pacman -Sy --noconfirm yara python-yaml yq git && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
-    echo "::group::Pre-fetching base packages..." && \
-    /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml $VERBOSE_ARG && \
+    if [ "$BUILD_BASE" == "true" ]; then \
+        echo "::group::Pre-fetching base packages..."; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/base/base.yaml $VERBOSE_ARG; \
+    fi && \
     if [ "$BUILD_PLASMA" == "true" ] && [ -f "/tmp/files/plasma/plasma.yaml" ]; then \
         echo "::group::Pre-fetching plasma packages..."; \
         /tmp/scripts/install_packages.sh --download-only /tmp/files/plasma/plasma.yaml $VERBOSE_ARG; \
@@ -55,6 +59,12 @@ RUN pacman -Sy --noconfirm yara python-yaml yq git && \
     if [ "$BUILD_CINNAMON" == "true" ] && [ -f "/tmp/files/cinnamon/cinnamon.yaml" ]; then \
         echo "::group::Pre-fetching cinnamon packages..."; \
         /tmp/scripts/install_packages.sh --download-only /tmp/files/cinnamon/cinnamon.yaml $VERBOSE_ARG; \
+    fi && \
+    if [ "$BUILD_DECK" == "true" ] && [ -f "/tmp/files/deck/deck.yaml" ]; then \
+        echo "::group::Pre-fetching deck base packages..."; \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/deck-base/deck-base.yaml $VERBOSE_ARG && \
+        echo "::group::Pre-fetching deck packages..." && \
+        /tmp/scripts/install_packages.sh --download-only /tmp/files/deck/deck.yaml $VERBOSE_ARG; \
     fi && \
     echo "::group::Pre-fetching kernel module build tools and bootstrap packages..." && \
     pacman -Sw --noconfirm git make gcc clang llvm lld zstd \

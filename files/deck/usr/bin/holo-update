@@ -1,0 +1,50 @@
+#!/usr/bin/bash
+# BoppOS replacement for gamescope-session-cachyos's holo-update (Steam reaches it as steamos-update through
+# steamos-polkit-helpers/steamos-update -> holo-alias). Updates the bootc image with boppos-tools' bopp-system.
+#
+# Steam calls it as:
+#   steamos-update --supports-duplicate-detection  -- must exit 0 and do nothing
+#   steamos-update [--enable-duplicate-detection] check -- exit 0 = update available, 7 = nothing to update
+#   steamos-update [--enable-duplicate-detection]       -- apply the update, print "N%" lines for the progress bar;
+#                                                         exit 0 = applied (reboot needed), 7 = nothing/failed
+
+check=0
+for arg in "$@"; do
+    case "$arg" in
+        --supports-duplicate-detection) exit 0 ;;
+        check) check=1 ;;
+    esac
+done
+
+# A staged image is waiting for a reboot: nothing more to download, and Steam must not offer it again
+if [ -f /run/boppos/deck-update-staged ]; then
+    exit 7
+fi
+
+if [ "$check" = 1 ]; then
+    available=$(bopp-system --json check 2>/dev/null | jq -r '.os.update_available // false' 2>/dev/null)
+    [ "$available" = true ] && exit 0
+    exit 7
+fi
+
+echo "0%"
+failed=1
+while IFS= read -r line; do
+    case "$line" in
+        *'"event": "done"'*|*'"event":"done"'*)
+            case "$line" in *'"ok": true'*|*'"ok":true'*) failed=0 ;; esac ;;
+        *'"event": "step"'*|*'"event":"step"'*)
+            idx=$(printf '%s' "$line" | jq -r '.index // empty' 2>/dev/null)
+            total=$(printf '%s' "$line" | jq -r '.total // empty' 2>/dev/null)
+            if [ -n "$idx" ] && [ -n "$total" ] && [ "$total" -gt 0 ] 2>/dev/null; then
+                echo "$(( (idx - 1) * 100 / total ))%"
+            fi ;;
+    esac
+done < <(bopp-system --json upgrade --only os 2>/dev/null)
+
+if [ "$failed" = 0 ]; then
+    mkdir -p /run/boppos && touch /run/boppos/deck-update-staged
+    echo "100%"
+    exit 0
+fi
+exit 7

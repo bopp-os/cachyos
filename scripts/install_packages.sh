@@ -72,10 +72,14 @@ fi
 ALL_PKGS=$(echo "$SECTIONS_OUTPUT" | sed 's/SECTION::[^:]*:://' | tr '\n' ' ')
 
 # Kernel, modules and initramfs are built in the base layer; flavor layers must not upgrade them
+# (the base installs linux-cachyos, or linux-cachyos-deckify for the deck base: hold whichever is installed)
 IGNORE_ARG=""
-if [[ " $ALL_PKGS " != *" linux-cachyos "* ]]; then
-    IGNORE_ARG="--ignore linux-cachyos,linux-cachyos-headers"
-    echo "Holding kernel packages at base-layer version: linux-cachyos linux-cachyos-headers"
+if [[ " $ALL_PKGS " != *" linux-cachyos "* && " $ALL_PKGS " != *" linux-cachyos-deckify "* ]]; then
+    HELD_KERNELS=$(pacman -Qq linux-cachyos linux-cachyos-headers linux-cachyos-deckify linux-cachyos-deckify-headers 2>/dev/null | paste -sd, - || true)
+    if [ -n "$HELD_KERNELS" ]; then
+        IGNORE_ARG="--ignore $HELD_KERNELS"
+        echo "Holding kernel packages at base-layer version: ${HELD_KERNELS//,/ }"
+    fi
 fi
 
 # Determine network-isolated execution wrapper if unshare is available
