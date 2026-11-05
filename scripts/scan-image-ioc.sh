@@ -1,18 +1,19 @@
 #!/bin/bash
 set -euo pipefail
+# Mounting an image needs the rootless user namespace (a real root already has it)
+[ "$(id -u)" -eq 0 ] || exec podman unshare bash "$0" "$@"
 IMAGE_REF=$1
 
 echo "::group::Post-build Image IOC Scan for $IMAGE_REF"
 echo "Scanning image filesystem for known IOCs..."
 
-CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
-MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
-trap "sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
+MNT_DIR=$(podman image mount "$IMAGE_REF")
+trap 'podman image unmount "$IMAGE_REF" >/dev/null 2>&1 || true' EXIT
 
 # Build file listing once in memory from the mount — completely avoids disk I/O
 echo "Building file listing from mount..."
 # sed strips the mount prefix so paths match the expected relative format
-FILE_LIST=$(sudo find "$MNT_DIR" -type f 2>/dev/null | sed "s|^$MNT_DIR/||")
+FILE_LIST=$(find "$MNT_DIR" -type f 2>/dev/null | sed "s|^$MNT_DIR/||")
 
 FILE_COUNT=$(echo "$FILE_LIST" | wc -l)
 echo "Scanning $FILE_COUNT files..."
@@ -36,7 +37,7 @@ if [[ -n "$BPF_result" ]]; then
 fi
 
 # --- Payload size fingerprint (deps ELF is exactly 3,040,376 bytes) ---
-SUSPICIOUS_FILES=$(sudo find "$MNT_DIR" -type f -size 3040376c 2>/dev/null | sed "s|^$MNT_DIR/||" || true)
+SUSPICIOUS_FILES=$(find "$MNT_DIR" -type f -size 3040376c 2>/dev/null | sed "s|^$MNT_DIR/||" || true)
 if [[ -n "$SUSPICIOUS_FILES" ]]; then
   FINDINGS+=("SUSPICIOUS_SIZE(3040376 - known deps payload): $SUSPICIOUS_FILES")
   FOUND=1
@@ -44,7 +45,7 @@ fi
 
 # --- Package .install & ALPM Scriptlet Heuristics ---
 echo "Auditing pacman package .install scriptlets for heuristics..."
-INSTALL_HOOKS=$(sudo find "$MNT_DIR/var/lib/pacman/local" -type f \( -name "install" -o -name "*.install" \) 2>/dev/null || true)
+INSTALL_HOOKS=$(find "$MNT_DIR/var/lib/pacman/local" -type f \( -name "install" -o -name "*.install" \) 2>/dev/null || true)
 
 if [[ -n "$INSTALL_HOOKS" ]]; then
   while IFS= read -r file; do
@@ -53,7 +54,7 @@ if [[ -n "$INSTALL_HOOKS" ]]; then
     pkg_name=$(echo "$clean_name" | cut -d'/' -f5 || echo "$clean_name")
 
     # Read content stripping comment lines
-    HOOK_CONTENT=$(sudo grep -vE '^\s*#' "$file" 2>/dev/null || true)
+    HOOK_CONTENT=$(grep -vE '^\s*#' "$file" 2>/dev/null || true)
 
     # 1. Obfuscation & Dynamic Evaluation
     if echo "$HOOK_CONTENT" | grep -qE '(base64\s+(-d|--decode)|eval\s+(\$|`)|openssl\s+enc|xxd\s+-r|\\x63|\\141\\x6e|nextfile|lockfile|js-digest|atomic-lockfile)'; then
@@ -83,7 +84,7 @@ fi
 
 # --- Leftover / Drop Directory Check ---
 echo "Auditing temp drop directories (/tmp, /var/tmp, /dev/shm)..."
-SUSPICIOUS_DROPS=$(sudo find "$MNT_DIR/tmp" "$MNT_DIR/var/tmp" "$MNT_DIR/dev/shm" -type f 2>/dev/null | sed "s|^$MNT_DIR||" || true)
+SUSPICIOUS_DROPS=$(find "$MNT_DIR/tmp" "$MNT_DIR/var/tmp" "$MNT_DIR/dev/shm" -type f 2>/dev/null | sed "s|^$MNT_DIR||" || true)
 if [[ -n "$SUSPICIOUS_DROPS" ]]; then
   FINDINGS+=("UNEXPECTED_TEMP_DROPS found in built image: $SUSPICIOUS_DROPS")
   FOUND=1
@@ -91,7 +92,7 @@ fi
 
 # --- Systemd Service Persistence Audit ---
 echo "Auditing systemd service units for suspicious execution..."
-SVC_UNITS=$(sudo find "$MNT_DIR/etc/systemd/system" "$MNT_DIR/usr/lib/systemd/system" -type f -name "*.service" 2>/dev/null || true)
+SVC_UNITS=$(find "$MNT_DIR/etc/systemd/system" "$MNT_DIR/usr/lib/systemd/system" -type f -name "*.service" 2>/dev/null || true)
 if [[ -n "$SVC_UNITS" ]]; then
   while IFS= read -r svc; do
     [[ -z "$svc" ]] && continue
@@ -102,7 +103,7 @@ if [[ -n "$SVC_UNITS" ]]; then
       continue
     fi
 
-    if sudo grep -qE 'ExecStart\s*=\s*(/tmp/|/var/tmp/|/dev/shm/|curl\s|wget\s|sh\s+-c\s+.*https?://)' "$svc" 2>/dev/null; then
+    if grep -qE 'ExecStart\s*=\s*(/tmp/|/var/tmp/|/dev/shm/|curl\s|wget\s|sh\s+-c\s+.*https?://)' "$svc" 2>/dev/null; then
       FINDINGS+=("SUSPICIOUS_SYSTEMD_SERVICE: suspicious ExecStart path or network call in $clean_svc")
       FOUND=1
     fi
