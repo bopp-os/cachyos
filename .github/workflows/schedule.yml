@@ -163,36 +163,48 @@ jobs:
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
       prefetched: ${{ needs.prefetch.outputs.znver4 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
 
-  # Remove the base images prefetch pulled once the cycle is over, whatever the builds' results
+  # Once the cycle is over, whatever the builds' results: free replaced images, and remove the base images prefetch
+  # pulled only if the disk is getting full
   cleanup:
     needs: [prefetch, znver4]
     if: ${{ always() && needs.prefetch.result != 'skipped' }}
     runs-on: znver4
     permissions: {}
     steps:
-      - name: Remove Prefetched Base Images
+      - name: Clean Up Prefetched Base Images
         run: |
           # Untagged leftovers (build layers, replaced images) first, so they do not keep a base image in use
           podman rm -af >/dev/null 2>&1 || true
           podman system prune --force --build || true
 
-          for image in docker.io/cachyos/cachyos-v3:latest docker.io/cachyos/cachyos-v4:latest \
-            ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest; do
-            if ! podman image exists "$image"; then
-              echo "$image not present, nothing to remove"
-              continue
-            fi
-            if out=$(podman rmi "$image" 2>&1); then
-              echo "Removed $image"
-              continue
-            fi
-            # Usually a cachyos-base image the arch cleanup kept because a flavor failed, so that flavor can be re-run.
-            # It is left alone; the next build's cleanup or the 72h image prune removes both.
-            echo "$out"
-            echo "Images built on $image:"
-            podman image tree --whatrequires "$image" 2>/dev/null || true
-            echo "::warning::Kept $image: still used by the images listed in this step's log (normally a cachyos-base kept for re-running a failed flavor). It goes once that base is removed."
-          done
+          # The base images are kept for the next cycle, which then pulls only the layers that changed. They are
+          # removed only when the disk holding the Podman storage is at or above this percentage. Replaced versions
+          # lose their tag when the new one is pulled, so the prune above frees them.
+          KEEP_MAX_PCT=70
+          GRAPHROOT=$(podman info --format '{{.Store.GraphRoot}}')
+          USED_PCT=$(df --output=pcent "$GRAPHROOT" | tail -n 1 | tr -dc '0-9')
+          if [ "${USED_PCT:-100}" -lt "$KEEP_MAX_PCT" ]; then
+            echo "Storage is at ${USED_PCT}% (limit ${KEEP_MAX_PCT}%): keeping the base images for the next cycle"
+          else
+            echo "Storage is at ${USED_PCT}% (limit ${KEEP_MAX_PCT}%): removing the base images"
+            for image in docker.io/cachyos/cachyos-v3:latest docker.io/cachyos/cachyos-v4:latest \
+              ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest; do
+              if ! podman image exists "$image"; then
+                echo "$image not present, nothing to remove"
+                continue
+              fi
+              if out=$(podman rmi "$image" 2>&1); then
+                echo "Removed $image"
+                continue
+              fi
+              # Usually a cachyos-base image the arch cleanup kept because a flavor failed, so that flavor can be re-run.
+              # It is left alone; the next build's cleanup or the 72h image prune removes both.
+              echo "$out"
+              echo "Images built on $image:"
+              podman image tree --whatrequires "$image" 2>/dev/null || true
+              echo "::warning::Kept $image: still used by the images listed in this step's log (normally a cachyos-base kept for re-running a failed flavor). It goes once that base is removed."
+            done
+          fi
 
           echo "Images left:"
           podman images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | sort
