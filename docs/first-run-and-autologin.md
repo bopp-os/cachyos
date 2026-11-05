@@ -29,13 +29,16 @@ Its `gaming-session` is empty because no Gaming Mode session exists, so the Star
 | gnome    | gdm                    | wayland: `gnome.desktop`                                                       |
 | niri     | sddm                   | wayland: `niri.desktop`, `weston.desktop`                                      |
 | cinnamon | greetd + regreet (cage)| wayland: `cinnamon-wayland.desktop`; x11: `cinnamon.desktop`, `cinnamon2d.desktop` |
+| deck     | plasmalogin            | wayland: `gamescope-session.desktop` (default), `plasma.desktop`               |
 
-**No flavor has a Gaming Mode session.** There is no `gamescope-session-steam.desktop` (or any gamescope or steam
-entry) in any of the four images. Only `gamescope-session-git` (the generic `gamescope-session-plus`, which has no
-session entry of its own) is installed. `oobe_helper.py` in boppos-tools 1.3.1 maps "gaming" to
-`gamescope-session-steam` and marks it UNVERIFIED: it does not exist here. Something has to ship the session
-entry before "start in Gaming Mode" can be implemented (a package such as `gamescope-session-steam-git`, or an
-entry we write). That is a decision for the boppos-tools session.
+**Only the deck flavor has a Gaming Mode session.** It ships `gamescope-session-cachyos`, whose
+`/usr/share/wayland-sessions/gamescope-session.desktop` is the session, and `steamos-session-select` switches between
+it and Plasma (`steam-set-session` writes `/etc/plasmalogin.conf.d/zz-steamos-autologin.conf`). The image's
+`boppos-deck-autologin.service` runs before the display manager on every boot and writes the autologin user
+(`/etc/plasmalogin.conf.d/00-boppos-autologin.conf`, the account with UID 1000, falling back to the first `wheel`
+member) and points `/var/home/deck` at that home, so Decky plugins with hard-coded `/home/deck` paths work. With no
+account yet (first boot before OOBE) it does nothing. The desktop flavors (plasma, gnome, niri, cinnamon) have no
+Gaming Mode session: `start-in.conf` leaves `gaming-session` empty there.
 
 ## Turning autologin on (user + session), per flavor
 

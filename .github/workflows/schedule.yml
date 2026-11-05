@@ -115,8 +115,27 @@ jobs:
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
       prefetched: ${{ needs.prefetch.outputs.v3 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
 
-  v4:
+  # The deck image (slim base + Game Mode, v3 only for now). It prefetches its own package lists, so it runs after the
+  # v3 desktop build and before the v4 stage; it never wipes the cache the v3 build just used.
+  deck:
     needs: [prefetch, v3]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-deck.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      issues: write
+    with:
+      no_cache: ${{ inputs.no_cache == true }}
+      test_tag: ${{ inputs.test_tag == true }}
+      verbose_build: ${{ inputs.verbose_build == true }}
+      allow_build_network: ${{ inputs.allow_build_network == true }}
+      allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
+
+  v4:
+    needs: [prefetch, v3, deck]
     # Each stage runs once the previous one finishes, whether it passed or failed, unless the run is cancelled
     if: ${{ !cancelled() }}
     uses: ./.github/workflows/build-v4.yml

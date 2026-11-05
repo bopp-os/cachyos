@@ -401,7 +401,6 @@ gaming-core:
   - lib32-systemd
   - winboat
   - gamescope
-  - gamescope-session-git
   - sunshine
   - lact
   - coolercontrol

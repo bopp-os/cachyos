@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Return to Gaming Mode
+Comment=Log out and start Steam Game Mode
+Exec=steamos-session-select gamescope
+Icon=steam
+Terminal=false
+Categories=Game;

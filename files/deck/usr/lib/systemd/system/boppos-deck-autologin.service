@@ -1,0 +1,11 @@
+[Unit]
+Description=Set the plasmalogin autologin user and the /home/deck compatibility link
+After=boppos-oobe.service local-fs.target
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/boppos/deck-autologin
+
+[Install]
+WantedBy=multi-user.target

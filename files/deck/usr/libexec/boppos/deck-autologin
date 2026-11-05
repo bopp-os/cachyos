@@ -1,0 +1,54 @@
+#!/usr/bin/bash
+# Runs every boot before the display manager (the pattern Bazzite's bazzite-autologin uses).
+#  1. Autologin: the account the installer (or boppos-oobe) created, written to a plasmalogin drop-in. Session choice
+#     lives in zz-steamos-autologin.conf, written by steam-set-session, which sorts after this file and wins.
+#  2. /home/deck: points at that account's home so Decky plugins with hard-coded /home/deck paths work.
+# With no real account yet (first boot before OOBE) it does nothing and the next boot finishes the job.
+set -u
+
+CONF_DIR=/etc/plasmalogin.conf.d
+CONF="$CONF_DIR/00-boppos-autologin.conf"
+
+# First regular account: the installer's useradd takes UID 1000. Fall back to the lowest wheel member from 1000 up.
+user=$(id -nu 1000 2>/dev/null || true)
+if [ -z "$user" ]; then
+    user=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "boppos-oobe" && $7 !~ /(nologin|false)$/ {print $3 ":" $1}' |
+        sort -n | cut -d: -f2 | while read -r u; do
+            if id -nG "$u" | tr ' ' '\n' | grep -qx wheel; then echo "$u"; break; fi
+        done)
+fi
+if [ -z "$user" ] || [ "$user" = boppos-oobe ]; then
+    echo "No regular account yet, leaving autologin alone" >&2
+    exit 0
+fi
+
+mkdir -p "$CONF_DIR"
+tmp=$(mktemp "$CONF_DIR/.00-boppos-autologin.XXXXXX")
+cat > "$tmp" <<CFG
+[Autologin]
+User=$user
+Relogin=true
+Session=gamescope-session.desktop
+CFG
+chmod 0644 "$tmp"
+mv -f "$tmp" "$CONF"
+
+# Drop a stale session choice that names a session this image does not ship (e.g. left over from another image)
+zz="$CONF_DIR/zz-steamos-autologin.conf"
+if [ -f "$zz" ]; then
+    sess=$(sed -n 's/^Session=//p' "$zz" | head -n1)
+    if [ -n "$sess" ] && [ ! -e "/usr/share/wayland-sessions/$sess" ] && [ ! -e "/usr/share/xsessions/$sess" ]; then
+        rm -f "$zz"
+    fi
+fi
+
+home=$(getent passwd "$user" | cut -d: -f6)
+if [ -n "$home" ] && [ "$user" != deck ] && [ "$home" != /home/deck ] && [ "$home" != /var/home/deck ]; then
+    # /home is /var/home on bootc; only ever replace a symlink, never a real directory
+    link=/var/home/deck
+    if [ ! -e "$link" ] || [ -L "$link" ]; then
+        ln -sfn "$home" "$link"
+    else
+        echo "$link exists and is not a link, leaving it alone" >&2
+    fi
+fi

@@ -1,0 +1,86 @@
+# BoppOS Containerfile.deck
+#
+# Console/handheld flavor: boots into Steam Game Mode (gamescope-session-cachyos), with a slim KDE Plasma as the Desktop
+# half. Built on cachyos-deck-base (Containerfile.base with files/deck-base/deck-base.yaml and the deckify kernel).
+
+ARG IMAGE_REGISTRY=ghcr.io/bopp-os
+ARG BASE_IMAGE_TAG=latest
+ARG VERBOSE=false
+FROM ${IMAGE_REGISTRY}/cachyos-deck-base:${BASE_IMAGE_TAG}
+ARG VERBOSE
+# Build-time only (ARG, not ENV): RUN steps get reproducible timestamps, and nothing is left in the image's
+# environment, where an empty value breaks ostree commit and mkfs.fat in containers run from it.
+ARG SOURCE_DATE_EPOCH=0
+
+# ==========================================
+# MASTER PACKAGE INSTALLATION
+# ==========================================
+
+COPY scripts/package-intervals.json /tmp/package-intervals.json
+COPY scripts/install_packages.sh /tmp/install_packages.sh
+COPY files/deck/deck.yaml /tmp/deck.yaml
+
+# Track package states to apply xattrs only to newly added or upgraded packages
+RUN --mount=type=tmpfs,dst=/run \
+    pacman -Q | sort > /tmp/base_pkgs.txt && \
+    chmod +x /tmp/install_packages.sh && \
+    if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
+    /tmp/install_packages.sh /tmp/deck.yaml $VERBOSE_ARG && \
+    pacman -Q | sort > /tmp/all_pkgs.txt && \
+    comm -13 /tmp/base_pkgs.txt /tmp/all_pkgs.txt | awk '{print $1}' > /tmp/modified_pkgs.txt
+
+# Deck overlay: start-in.conf, autologin service and script, holo-update (steamos-update) shim, shortcuts.
+# Copied after the packages so holo-update replaces the gamescope-session-cachyos one.
+COPY files/deck/usr/ /usr/
+RUN chmod 0755 /usr/bin/holo-update /usr/libexec/boppos/deck-autologin
+
+# Remove SDDM components/KCM (plasma-login-manager is the display manager here)
+RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
+    rm -f /usr/lib/qt6/plugins/plasma/kcms/systemsettings/kcm_sddm.so \
+          /usr/share/applications/kcm_sddm.desktop \
+          /usr/share/kservices6/kcm_sddm.desktop \
+          /usr/share/knsrcfiles/sddmtheme.knsrc \
+          /usr/bin/sddmthemeinstaller 2>/dev/null || true
+
+# Services. gamescope-session-cachyos ships its user units already enabled (graphical-session.target.wants).
+# The package has no presets, so enable the system daemons here. plasmalogin autologins into Game Mode via
+# boppos-deck-autologin (user) and steam-set-session (session).
+RUN systemctl disable sddm.service || true && \
+    systemctl disable gdm.service || true && \
+    systemctl enable plasmalogin.service && \
+    systemctl enable boppos-deck-autologin.service && \
+    systemctl enable inputplumber.service && \
+    systemctl enable steamos-manager.service && \
+    systemctl enable cardwired.service || true
+
+# powerbuttond ships a unit with a different name per package version: enable whichever exists
+RUN for unit in powerbuttond.service steamos-powerbuttond.service; do \
+        if [ -e "/usr/lib/systemd/system/$unit" ]; then systemctl enable "$unit"; fi; \
+    done
+
+# Application launcher icon: cachyos-kde-settings' default panel uses org.cachyos.hello (not installed). Use boppos-icon.
+RUN sed -i 's/^icon=org\.cachyos\.hello$/icon=boppos-icon/' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc && \
+    grep -qx 'icon=boppos-icon' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc
+
+# Remove PackageKit backend for Discover to prevent crashes on our immutable OS
+RUN rm -f /usr/lib/qt6/plugins/discover/packagekit-backend.so
+
+# Preserve /opt contents for OverlayFS
+RUN if [ -d /opt ] && [ "$(ls -A /opt)" ]; then \
+        mkdir -p /usr/lib/opt && cp -r /opt/* /usr/lib/opt/ && rm -rf /opt/* ; \
+    fi
+
+COPY scripts/apply-update-intervals.py /tmp/apply-update-intervals.py
+RUN chmod +x /tmp/apply-update-intervals.py && \
+    if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
+    /tmp/apply-update-intervals.py /tmp/package-intervals.json / /tmp/modified_pkgs.txt $VERBOSE_ARG
+
+# Boot menu entries (ostree titles them with PRETTY_NAME) and "About" say BoppOS and the flavor. ID stays arch.
+RUN sed -i -E 's/^NAME=.*/NAME="BoppOS Linux"/; s/^PRETTY_NAME=.*/PRETTY_NAME="BoppOS Linux (Deck)"/; /^VARIANT(_ID)?=/d' \
+        /usr/lib/os-release && \
+    printf 'VARIANT="Deck"\nVARIANT_ID=deck\n' >> /usr/lib/os-release && \
+    touch -d "@${SOURCE_DATE_EPOCH:-0}" /usr/lib/os-release
+
+# Update the SBOM / Package Manifest for the overlay
+RUN /usr/share/boppos/generate-package-list.sh && \
+    /usr/share/boppos/bootc-cleanup.sh
