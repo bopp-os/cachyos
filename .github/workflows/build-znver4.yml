@@ -144,6 +144,7 @@ jobs:
     outputs:
       should_skip: ${{ steps.check_compatibility.outputs.should_skip }}
       flavors: ${{ steps.set_flavors.outputs.flavors }}
+      sync_db: ${{ steps.sync_db.outputs.fingerprint }}
 
     permissions:
       contents: read
@@ -423,6 +424,20 @@ jobs:
           chmod +x scripts/clamscan-prefetch.sh
           ./scripts/clamscan-prefetch.sh "${{ env.LOCAL_CACHE_DIR }}" "${{ env.BASE_IMAGE }}" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"
 
+      - name: Record Package Snapshot
+        id: sync_db
+        if: steps.check_compatibility.outputs.should_skip != 'true'
+        run: |
+          # Fingerprint of the package databases prefetch froze in the cache. The flavor jobs compare it, so a re-run
+          # flavor is never built from a different snapshot than this base image.
+          if compgen -G "$LOCAL_CACHE_DIR/.sync/*.db" > /dev/null; then
+            FP=$(cd "$LOCAL_CACHE_DIR/.sync" && sha256sum ./*.db | sha256sum | cut -c1-64)
+          else
+            FP=none
+          fi
+          echo "Package snapshot: $FP"
+          echo "fingerprint=$FP" >> "$GITHUB_OUTPUT"
+
       - name: Build Base Image
         id: build_base
         timeout-minutes: 60
@@ -637,6 +652,28 @@ jobs:
           # Nothing is deleted here: this build has no network and needs everything prefetch downloaded and scanned
           sudo rm -f "$CACHE_DIR"/*.part
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
+
+      - name: Check Package Snapshot Matches Base
+        if: needs.build_base.outputs.sync_db != ''
+        env:
+          BASE_SNAPSHOT: ${{ needs.build_base.outputs.sync_db }}
+        run: |
+          # The flavor builds offline from the snapshot the base image was built from. On a re-run of just this flavor,
+          # another run or the cache prune may have replaced or wiped it since; building would then mismatch the base.
+          if compgen -G "$LOCAL_CACHE_DIR/.sync/*.db" > /dev/null; then
+            FP=$(cd "$LOCAL_CACHE_DIR/.sync" && sha256sum ./*.db | sha256sum | cut -c1-64)
+          else
+            FP=none
+          fi
+          if [ "$FP" != "$BASE_SNAPSHOT" ]; then
+            echo "::error::The package cache no longer holds the snapshot the base image was built from (base $BASE_SNAPSHOT, now $FP). Re-run all jobs for this architecture so it prefetches again."
+            exit 1
+          fi
+          if [ "$FP" != none ] && ! compgen -G "$LOCAL_CACHE_DIR/*.pkg.tar.*" > /dev/null; then
+            echo "::error::The package cache was wiped after the base build. Re-run all jobs for this architecture so it prefetches again."
+            exit 1
+          fi
+          echo "Package snapshot matches the base build: $FP"
 
       - name: Pre-build Package Cache Security Scan
         run: |

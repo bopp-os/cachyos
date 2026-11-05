@@ -43,6 +43,9 @@ on:
       znver4:
         description: "'true' when the znver4 cache and images were prefetched and scanned clean"
         value: ${{ jobs.prefetch.outputs.znver4 }}
+      attempt:
+        description: "The run attempt that did this prefetch; on a re-run of failed jobs it stays at the earlier attempt"
+        value: ${{ jobs.prefetch.outputs.attempt }}
 
 env:
   HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
@@ -72,6 +75,7 @@ jobs:
       v3: ${{ steps.scan_v3.outcome == 'success' }}
       v4: ${{ steps.scan_v4.outcome == 'success' }}
       znver4: ${{ steps.scan_znver4.outcome == 'success' }}
+      attempt: ${{ github.run_attempt }}
     steps:
       - name: Start Disk Usage Monitor
         run: |
