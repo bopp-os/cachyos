@@ -173,16 +173,16 @@ jobs:
       - name: Remove Prefetched Base Images
         run: |
           # Untagged leftovers (build layers, replaced images) first, so they do not keep a base image in use
-          sudo podman rm -af >/dev/null 2>&1 || true
-          sudo podman system prune --force --build || true
+          podman rm -af >/dev/null 2>&1 || true
+          podman system prune --force --build || true
 
           for image in docker.io/cachyos/cachyos-v3:latest docker.io/cachyos/cachyos-v4:latest \
             ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest; do
-            if ! sudo podman image exists "$image"; then
+            if ! podman image exists "$image"; then
               echo "$image not present, nothing to remove"
               continue
             fi
-            if out=$(sudo podman rmi "$image" 2>&1); then
+            if out=$(podman rmi "$image" 2>&1); then
               echo "Removed $image"
               continue
             fi
@@ -190,10 +190,10 @@ jobs:
             # It is left alone; the next build's cleanup or the 72h image prune removes both.
             echo "$out"
             echo "Images built on $image:"
-            sudo podman image tree --whatrequires "$image" 2>/dev/null || true
+            podman image tree --whatrequires "$image" 2>/dev/null || true
             echo "::warning::Kept $image: still used by the images listed in this step's log (normally a cachyos-base kept for re-running a failed flavor). It goes once that base is removed."
           done
 
           echo "Images left:"
-          sudo podman images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | sort
+          podman images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | sort
           df -h /

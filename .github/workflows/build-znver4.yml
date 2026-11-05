@@ -211,24 +211,14 @@ jobs:
         run: |
           echo "🧹 Sweeping the runner for free space..."
           
-          # 1. Clean up package cache (Apt for Debian/Ubuntu, Dnf for RHEL/Fedora, Pacman for Arch/CachyOS)
-          if command -v apt-get &> /dev/null; then
-            echo "Detected apt. Cleaning cache..."
-            sudo apt-get clean || true
-          elif command -v dnf &> /dev/null; then
-            echo "Detected dnf. Cleaning cache..."
-            sudo dnf clean all || true
-          elif command -v pacman &> /dev/null; then
-            echo "Detected pacman. Cleaning cache..."
-            sudo pacman -Scc --noconfirm || true
-          fi
+          # 1. (The host's own package-manager cache is not cleaned here: that needs root.)
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/clamscan-prefetch.* || true
+          podman unshare rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/clamscan-prefetch.* || true
           
           # Ensure local base tags are cleared at the very beginning of a new pipeline run
-          sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
-          sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           
           # Images the scan steps reuse from run to run are never pruned here: the ClamAV image carries its ~1 GB
           # signature database, and the pinned syft, grype and chunkah images are already ClamAV-scanned. Their old
@@ -243,19 +233,19 @@ jobs:
           remove_images() {
             local force=()
             if [ "${1:-}" = "--force" ]; then force=(--force); shift; fi
-            sudo podman images "$@" --format '{{.ID}} {{.Repository}}' | grep -vE "$KEEP_IMAGES" | awk '{print $1}' \
-              | sort -u | xargs -r sudo podman rmi "${force[@]}" >/dev/null 2>&1 || true
+            podman images "$@" --format '{{.ID}} {{.Repository}}' | grep -vE "$KEEP_IMAGES" | awk '{print $1}' \
+              | sort -u | xargs -r podman rmi "${force[@]}" >/dev/null 2>&1 || true
           }
 
           # 3. Prune dangling Podman data (Preserve recent build cache for speed)
-          sudo podman system prune --force || true
+          podman system prune --force || true
           remove_images --filter "until=72h"
           
           # 4. With the manual wipe toggle, also drop all other unused Podman images, volumes and build cache
           #    (the package cache itself is emptied in "Prepare Local Cache Directory", before prefetch)
           if [ "${{ inputs.wipe_pkg_cache }}" == "true" ]; then
             echo "Pruning unused Podman images (except the scanner and tool images), volumes and build cache..."
-            sudo podman system prune --force --volumes --build || true
+            podman system prune --force --volumes --build || true
             remove_images
           fi
           
@@ -267,7 +257,7 @@ jobs:
           
           # 6. Clean leftover root-owned workspace files from previous runs to prevent checkout permission errors
           echo "Nuking leftover workspace files..."
-          sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+          podman unshare rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           
           echo "📊 Disk space after cleanup:"
           df -h /
@@ -344,27 +334,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LOGIN_USER: ${{ github.actor }}
         run: |
-          echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+          echo "${GITHUB_TOKEN}" | podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
 
       - name: Prepare Local Cache Directory
         run: |
           CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
-          sudo mkdir -p "$CACHE_DIR"
-          sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
-          sudo chmod 777 "$CACHE_DIR"
+          mkdir -p "$CACHE_DIR"
+          chmod 777 "$CACHE_DIR"
           
           # After prefetch.yml the cache is ready (it already did this cleanup and any wipe); deleting now would
           # remove packages the offline build needs
           if [ "$PREFETCHED" != "true" ]; then
             # Delete problematic lua packages and incomplete downloads before build
-            sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
+            podman unshare rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
           fi
           
           # If the manual wipe toggle was checked, clear the cache
           if [ "${{ inputs.wipe_pkg_cache }}" == "true" ] && [ "$PREFETCHED" != "true" ]; then
             echo "Manual wipe triggered. Clearing local pacman cache..."
-            sudo rm -rf "$CACHE_DIR"/* || true
+            podman unshare rm -rf "$CACHE_DIR"/* || true
           fi
           
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
@@ -374,7 +363,7 @@ jobs:
         run: |
           echo "::group::Generating fastest mirrors"
           mkdir -p ${{ github.workspace }}/mirrors
-          sudo podman run --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z ${{ env.BASE_IMAGE }} bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
+          podman run --rm --network=host -v ${{ github.workspace }}/mirrors:/workspace-mirrors:z -v ${{ github.workspace }}/scripts:/workspace-scripts:ro,z ${{ env.BASE_IMAGE }} bash /workspace-scripts/rate_mirrors.sh /workspace-mirrors
           echo "::endgroup::"
 
       - name: Check Chaotic-AUR Keys
@@ -385,7 +374,7 @@ jobs:
           # Fail before prefetch, and report it in an issue, when Chaotic signs its keyring with a key the committed
           # (hand-reviewed) keys don't cover. Runs in the base image for its gpg; the keys are never changed here.
           rc=0
-          sudo podman run --rm --network=host -v ${{ github.workspace }}/scripts:/w/scripts:ro,z -v ${{ github.workspace }}/files/keys:/w/keys:ro,z \
+          podman run --rm --network=host -v ${{ github.workspace }}/scripts:/w/scripts:ro,z -v ${{ github.workspace }}/files/keys:/w/keys:ro,z \
             ${{ env.BASE_IMAGE }} bash /w/scripts/check-chaotic-keys.sh /w/keys > "$RUNNER_TEMP/chaotic-keys.txt" 2>&1 || rc=$?
           cat "$RUNNER_TEMP/chaotic-keys.txt"
           if [ "$rc" = 2 ]; then
@@ -409,7 +398,7 @@ jobs:
           PREFETCH_ARGS+=("--build-arg" "VERBOSE=${{ inputs.verbose_build == true }}")
           PREFETCH_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
 
-          sudo podman build "${PREFETCH_ARGS[@]}" \
+          podman build "${PREFETCH_ARGS[@]}" \
             --network=host \
             -f Containerfile.prefetch .
           echo "::endgroup::"
@@ -476,12 +465,12 @@ jobs:
           DOCKERFILE="Containerfile.base"
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}" "--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
 
-          sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
+          podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
             --network=${{ env.BUILD_NETWORK }} \
             --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
 
           # Ensure the local base image is tagged properly so the DE overlays can layer onto it!
-          sudo podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
+          podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           echo "::endgroup::"
 
       - name: Verify Package Cache Was Fully Scanned
@@ -496,21 +485,21 @@ jobs:
           echo "🧹 Sweeping up the heavy Podman assets..."
           
           # 1. Force stop and remove any leftover containers from cancelled runs
-          sudo podman rm -af || true
+          podman rm -af || true
           
           # 2. Prune dangling (<none>) images but preserve the tagged base image
-          sudo podman system prune --force --volumes --build || true
+          podman system prune --force --volumes --build || true
           
           # 3. Obliterate orphaned Podman extraction directories (The 128GB Silent Killer)
-          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/buildah* /var/tmp/stereoscope-* /var/tmp/sbom-*
+          podman unshare rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/buildah* /var/tmp/stereoscope-* /var/tmp/sbom-*
           
           # 4. Delete the massive chunkah tarballs
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_* || true
+          podman unshare rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_* || true
           
           # 5. Handle the GitHub workspace based on job status
           if [ "${{ job.status }}" == "success" ]; then
             echo "✨ Build succeeded. Wiping workspace source files..."
-            sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+            podman unshare rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           else
             echo "⚠️ Build failed. Leaving workspace source files intact for debugging."
           fi
@@ -641,16 +630,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LOGIN_USER: ${{ github.actor }}
         run: |
-          echo "${GITHUB_TOKEN}" | sudo podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+          echo "${GITHUB_TOKEN}" | podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
           echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
 
       - name: Prepare Local Cache Directory
         run: |
           CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
-          sudo mkdir -p "$CACHE_DIR"
-          sudo chown -R $(id -u):$(id -g) "$CACHE_DIR"
+          mkdir -p "$CACHE_DIR"
           # Nothing is deleted here: this build has no network and needs everything prefetch downloaded and scanned
-          sudo rm -f "$CACHE_DIR"/*.part
+          podman unshare rm -f "$CACHE_DIR"/*.part
           echo "LOCAL_CACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
 
       - name: Check Package Snapshot Matches Base
@@ -699,7 +687,7 @@ jobs:
           DOCKERFILE="Containerfile.${FLAVOR}"
           FLAVOR_ARGS=("--build-arg" "BASE_IMAGE_TAG=$DEFAULT_TAG")
 
-          sudo podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=${{ env.BUILD_NETWORK }} --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
+          podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" --network=${{ env.BUILD_NETWORK }} --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
           echo "::endgroup::"
 
       - name: Verify Package Cache Was Fully Scanned
@@ -715,29 +703,19 @@ jobs:
       - name: Syft & Grype Vulnerability Scan
         run: |
           IMAGE_REF="localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}"
-          CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
-          MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
-          trap "sudo umount -l $MNT_DIR/var/opt >/dev/null 2>&1 || true; sudo podman unmount $CONTAINER_ID >/dev/null 2>&1 || true; sudo podman rm $CONTAINER_ID >/dev/null 2>&1" EXIT
-
-          # Mirror booted system: bind-mount /usr/lib/opt to /var/opt so /opt has its files populated
-          if [ -d "$MNT_DIR/usr/lib/opt" ] && [ -d "$MNT_DIR/var/opt" ]; then
-            sudo mount --bind "$MNT_DIR/usr/lib/opt" "$MNT_DIR/var/opt"
-          fi
-
+          # Mounting an image needs the rootless user namespace, so Syft runs from a script under `podman unshare`.
+          # Pinned syft image, ClamAV-scanned in the build_base job; the rootfs is mounted read-only.
           echo "::group::Generating SBOM with Syft from podman mount"
-          # Pinned syft image, ClamAV-scanned in the build_base job; the rootfs is mounted read-only
-          sudo podman run --rm --pull=never --network=none --security-opt label=disable \
-            -v "$MNT_DIR":/rootfs:ro -v "$PWD/.syft.yaml":/config/.syft.yaml:ro -e SYFT_CHECK_FOR_APP_UPDATE=false \
-            "$SYFT_IMAGE" dir:/rootfs --config /config/.syft.yaml --source-name "cachyos-${{ matrix.flavor }}" --source-version "${{ env.DEFAULT_TAG }}" --override-default-catalogers alpm-db-cataloger -o json > /tmp/sbom.json
+          podman unshare bash scripts/syft-sbom.sh "$IMAGE_REF" "cachyos-${{ matrix.flavor }}" "${{ env.DEFAULT_TAG }}" /tmp/sbom.json
           echo "::endgroup::"
 
           echo "::group::Scanning SBOM with Grype"
           # Pinned grype image, ClamAV-scanned in the build_base job. It downloads its vulnerability database, so it
           # needs the network; the database is kept between runs in a host folder.
           GRYPE_DB_DIR="${{ env.HOST_PKG_CACHE_DIR }}/.grype-db"
-          sudo mkdir -p "$GRYPE_DB_DIR"
+          mkdir -p "$GRYPE_DB_DIR"
           grype() {
-            sudo podman run --rm --pull=never --network=host --security-opt label=disable \
+            podman run --rm --pull=never --network=host --security-opt label=disable \
               -v /tmp/sbom.json:/sbom.json:ro -v "$PWD/.grype.yaml":/config/.grype.yaml:ro -v "$GRYPE_DB_DIR":/grype-db \
               -e GRYPE_DB_CACHE_DIR=/grype-db -e GRYPE_CHECK_FOR_APP_UPDATE=false \
               "$GRYPE_IMAGE" sbom:/sbom.json --config /config/.grype.yaml "$@"
@@ -766,9 +744,9 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "Extracting package list from image..."
-          CONTAINER_ID=$(sudo podman create localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
-          sudo podman cp ${CONTAINER_ID}:/usr/share/boppos/packages.json packages-${{ matrix.flavor }}-${{ github.sha }}.json
-          sudo podman rm ${CONTAINER_ID}
+          CONTAINER_ID=$(podman create localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }})
+          podman cp ${CONTAINER_ID}:/usr/share/boppos/packages.json packages-${{ matrix.flavor }}-${{ github.sha }}.json
+          podman rm ${CONTAINER_ID}
 
       - name: Rechunk Flavor Image (PR Dry Run)
         if: github.event_name == 'pull_request'
@@ -780,10 +758,10 @@ jobs:
           
           
           echo "Rechunking $FLAVOR (PR Dry Run)..."
-          sudo podman run --rm --network=none \
+          podman run --rm --network=none \
             --mount=type=image,source=$IMAGE_REF,target=/chunkah \
             -e SOURCE_DATE_EPOCH=0 \
-            -e CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)" \
+            -e CHUNKAH_CONFIG_STR="$(podman inspect $IMAGE_REF)" \
             --pull=never "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
 
       - name: Rechunk & Push Flavor Image to GHCR
@@ -801,7 +779,7 @@ jobs:
           DEFAULT_DEST="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           
           
-          export CHUNKAH_CONFIG_STR="$(sudo podman inspect $IMAGE_REF)"
+          export CHUNKAH_CONFIG_STR="$(podman inspect $IMAGE_REF)"
           export IMAGE_REF
           export DEFAULT_DEST
           
@@ -815,14 +793,14 @@ jobs:
           for i in $(seq "${MAX_RETRIES}"); do
             echo "Attempt $i: Building and streaming directly to registry via FIFO..."
             
-            sudo podman run --rm --network=none \
+            podman run --rm --network=none \
                 --mount=type=image,source=$IMAGE_REF,target=/chunkah \
                 -e SOURCE_DATE_EPOCH=0 \
                 -e CHUNKAH_CONFIG_STR="$CHUNKAH_CONFIG_STR" \
                 --pull=never "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > "$FIFO_PATH" &
             PODMAN_PID=$!
             
-            if sudo skopeo copy \
+            if skopeo copy \
                 --dest-creds="${{ github.actor }}:${GITHUB_TOKEN}" \
                 --dest-compress-format zstd:chunked \
                 --dest-compress-level 6 \
@@ -833,7 +811,7 @@ jobs:
               break
             fi
             
-            sudo kill $PODMAN_PID 2>/dev/null || true
+            kill $PODMAN_PID 2>/dev/null || true
             wait $PODMAN_PID 2>/dev/null || true
             echo "Push failed, retrying in $((5 * i)) seconds..."; sleep $((5 * i))
           done
@@ -845,7 +823,7 @@ jobs:
           for tag in $IMAGE_TAGS; do
             if [ "$tag" != "${DEFAULT_TAG}" ]; then
               DEST_IMAGE="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"
-              sudo skopeo copy --dest-creds="${{ github.actor }}:${GITHUB_TOKEN}" "$DEFAULT_DEST" "$DEST_IMAGE"
+              skopeo copy --dest-creds="${{ github.actor }}:${GITHUB_TOKEN}" "$DEFAULT_DEST" "$DEST_IMAGE"
             fi
           done
           echo "::endgroup::"
@@ -878,10 +856,10 @@ jobs:
         if: always()
         run: |
           echo "🧹 Cleaning up flavor-specific residual files..."
-          sudo rm -f packages-${{ matrix.flavor }}-${{ github.sha }}.json digests.env
-          sudo podman rmi -f "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
-          sudo podman rmi -f "${IMAGE_REGISTRY}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
-          sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+          rm -f packages-${{ matrix.flavor }}-${{ github.sha }}.json digests.env
+          podman rmi -f "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          podman rmi -f "${IMAGE_REGISTRY}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          podman unshare rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
 
       - name: Report Peak Disk Usage
         if: always()
@@ -916,23 +894,23 @@ jobs:
 
           # cachyos-base has updated keyrings; fall back to the upstream image if the base build failed
           PRUNE_IMAGE="localhost/cachyos-base:${{ env.DEFAULT_TAG }}"
-          sudo podman image exists "$PRUNE_IMAGE" || PRUNE_IMAGE="${{ env.BASE_IMAGE }}"
+          podman image exists "$PRUNE_IMAGE" || PRUNE_IMAGE="${{ env.BASE_IMAGE }}"
 
 
           # Isolate the host cache mount to prevent PGP/keyring conflicts when installing pacman-contrib
-          sudo podman run --rm --network=host -v "$CACHE_DIR":/host-cache:z \
+          podman run --rm --network=host -v "$CACHE_DIR":/host-cache:z \
             "$PRUNE_IMAGE" \
             bash -c "pacman -Sy --noconfirm pacman-contrib && paccache -c /host-cache -rk1" \
             || echo "::warning::paccache prune failed, package cache was not pruned"
 
           # Ensure problematic packages are purged after pruning too
-          sudo rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
+          podman unshare rm -f "$CACHE_DIR"/lua* "$CACHE_DIR"/*.part || true
 
           # paccache keeps one version of every package ever fetched, including ones no longer used
           CACHE_GB=$(du -s --block-size=1G "$CACHE_DIR" | cut -f1)
           if [ "$CACHE_GB" -gt "${{ env.PKG_CACHE_MAX_GB }}" ]; then
             echo "Cache is ${CACHE_GB}G (limit ${{ env.PKG_CACHE_MAX_GB }}G). Wiping it; the next prefetch re-downloads."
-            sudo rm -rf "$CACHE_DIR"/* "$CACHE_DIR"/.pkg_scan_cache
+            podman unshare rm -rf "$CACHE_DIR"/* "$CACHE_DIR"/.pkg_scan_cache
           fi
 
           echo "Pacman cache size after pruning:"
@@ -941,15 +919,15 @@ jobs:
       - name: Clean Workspace & Podman Storage
         run: |
           echo "🧹 Sweeping up the heavy Podman assets..."
-          sudo podman rm -af || true
-          sudo podman system prune --force --build || true
-          sudo rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/buildah* /var/tmp/stereoscope-* /var/tmp/sbom-*
-          sudo rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
+          podman rm -af || true
+          podman system prune --force --build || true
+          podman unshare rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/buildah* /var/tmp/stereoscope-* /var/tmp/sbom-*
+          podman unshare rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt ${{ github.workspace }}/rechunked_*
           if [ "${{ needs.build_flavors.result }}" == "success" ]; then
             echo "✨ All flavors built successfully. Removing local base images and workspace..."
-            sudo podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
-            sudo podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
-            sudo rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
+            podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+            podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+            podman unshare rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
           else
             echo "⚠️ Some flavors failed. Preserving base image and workspace for partial re-runs."
           fi

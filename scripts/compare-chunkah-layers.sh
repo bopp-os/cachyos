@@ -18,14 +18,14 @@ PODMAN_OPTS=${PODMAN_OPTS:-}
 WORK_DIR=$(mktemp -d)
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-CONFIG_STR=$(sudo podman inspect "$IMAGE_REF")
+CONFIG_STR=$(podman inspect "$IMAGE_REF")
 
 # Print "<digest> <size>" for each layer chunkah builds, in manifest order
 list_layers() {
     local chunkah_image=$1 out_dir=$2
     mkdir -p "$out_dir"
     # shellcheck disable=SC2086 # PODMAN_OPTS holds multiple arguments
-    sudo podman run $PODMAN_OPTS --rm --network=none \
+    podman run $PODMAN_OPTS --rm --network=none \
         --mount=type=image,source="$IMAGE_REF",target=/chunkah \
         -e SOURCE_DATE_EPOCH=0 \
         -e CHUNKAH_CONFIG_STR="$CONFIG_STR" \
