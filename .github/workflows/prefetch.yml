@@ -73,6 +73,27 @@ jobs:
       v4: ${{ steps.scan_v4.outcome == 'success' }}
       znver4: ${{ steps.scan_znver4.outcome == 'success' }}
     steps:
+      - name: Start Disk Usage Monitor
+        run: |
+          # Samples the root filesystem every 5 s for the whole job and keeps the highest reading, so the report at the
+          # end shows the real peak (podman layers, chunkah tarballs and scans all land on /). The runner stops this
+          # background loop when the job ends.
+          PEAK_FILE="$RUNNER_TEMP/disk-peak"
+          echo "0 0G 0G start" > "$PEAK_FILE"
+          nohup bash -c '
+            peak=0
+            while :; do
+              read -r pct used avail < <(df --output=pcent,used,avail -BG / | tail -n 1)
+              pct=${pct%\%}
+              if [ "$pct" -gt "$peak" ]; then
+                peak=$pct
+                echo "$pct $used $avail $(date -u +%H:%M:%S)" > "$0"
+              fi
+              sleep 5
+            done' "$PEAK_FILE" > /dev/null 2>&1 &
+          echo "DISK_MONITOR_PID=$!" >> "$GITHUB_ENV"
+          df -h /
+
       - name: Clean leftovers from earlier runs
         run: |
           sudo rm -rf /var/tmp/clamscan-prefetch.* || true
@@ -217,3 +238,17 @@ jobs:
           sudo podman system prune --force || true
           sudo rm -rf /var/tmp/clamscan-prefetch.* ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
           df -h /
+
+      - name: Report Peak Disk Usage
+        if: always()
+        run: |
+          kill "${DISK_MONITOR_PID:-0}" 2>/dev/null || true
+          read -r pct used avail at < "$RUNNER_TEMP/disk-peak" || { echo "No disk samples recorded"; exit 0; }
+          echo "Peak disk usage on /: ${pct}% (${used} used, ${avail} free) at ${at} UTC"
+          echo "Disk now:"
+          df -h /
+          printf -- '- Peak disk usage on `/`: **%s%%** (%s used, %s free) at %s UTC\n' "$pct" "$used" "$avail" "$at" >> "$GITHUB_STEP_SUMMARY"
+          # Warn well before builds start failing with ENOSPC
+          if [ "$pct" -ge 85 ]; then
+            echo "::warning::Disk usage peaked at ${pct}% on / (${avail} free). Builds are close to running out of space."
+          fi
