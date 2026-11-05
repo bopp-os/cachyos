@@ -118,7 +118,7 @@ jobs:
       - name: Pull Base Images
         run: |
           # Fresh copies of the upstream base images. The build workflows keep them (prefetched: true protects them
-          # from the image pruning) and build from exactly these; schedule.yml keeps them for the next cycle unless the disk is nearly full.
+          # from the image pruning) and build from exactly these; schedule.yml keeps them for the next cycle unless free disk space is low.
           while read -r march _ image; do
             [ -n "$march" ] || continue
             echo "Pulling $image ($march)..."

@@ -164,7 +164,7 @@ jobs:
       prefetched: ${{ needs.prefetch.outputs.znver4 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
 
   # Once the cycle is over, whatever the builds' results: free replaced images, and remove the base images prefetch
-  # pulled only if the disk is getting full
+  # pulled only if free disk space is low
   cleanup:
     needs: [prefetch, znver4]
     if: ${{ always() && needs.prefetch.result != 'skipped' }}
@@ -178,14 +178,17 @@ jobs:
           podman system prune --force --build || true
 
           # The base images are kept for the next cycle, which then pulls only the layers that changed. They are
-          # removed only when the disk holding the Podman storage is at or above this percentage. Replaced versions
-          # lose their tag when the new one is pulled, so the prune above frees them.
-          KEEP_MAX_PCT=70
+          # removed when the disk holding the Podman storage has less than this much free space (GB). A cycle
+          # needs about 60 GB between a clean disk and its low point, so below this floor the next cycle would end
+          # up under roughly 25 GB free. The check runs with the base images still on disk, so it counts them.
+          # Replaced versions lose their tag when the new one is pulled; the prune above frees them.
+          KEEP_MIN_FREE_GB=85
           GRAPHROOT=$(podman info --format '{{.Store.GraphRoot}}')
-          USED_PCT=$(df --output=pcent "$GRAPHROOT" | tail -n 1 | tr -dc '0-9')
-          if [ "${USED_PCT:-100}" -lt "$KEEP_MAX_PCT" ]; then
-            echo "Storage is at ${USED_PCT}% (limit ${KEEP_MAX_PCT}%): keeping the base images for the next cycle"
+          FREE_GB=$(df --output=avail -BG "$GRAPHROOT" | tail -n 1 | tr -dc '0-9')
+          if [ "${FREE_GB:-0}" -ge "$KEEP_MIN_FREE_GB" ]; then
+            echo "${FREE_GB} GB free (floor ${KEEP_MIN_FREE_GB} GB): keeping the base images for the next cycle"
           else
+            echo "${FREE_GB:-unknown} GB free (floor ${KEEP_MIN_FREE_GB} GB): removing the base images"
             echo "Storage is at ${USED_PCT}% (limit ${KEEP_MAX_PCT}%): removing the base images"
             for image in docker.io/cachyos/cachyos-v3:latest docker.io/cachyos/cachyos-v4:latest \
               ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest; do

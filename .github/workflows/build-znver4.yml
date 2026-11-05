@@ -225,7 +225,7 @@ jobs:
           # versions are dropped by the ClamAV step when a newer one is pulled.
           KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah)$'
           # After prefetch.yml, also keep the base and brew images it pulled and scanned, so this build uses exactly
-          # those (schedule.yml keeps them after the cycle unless the disk is nearly full)
+          # those (schedule.yml keeps them after the cycle unless free disk space is low)
           if [ "$PREFETCHED" == "true" ]; then
             KEEP_IMAGES=' (docker\.io/clamav/clamav|docker\.io/anchore/syft|docker\.io/anchore/grype|quay\.io/coreos/chunkah|docker\.io/cachyos/cachyos-v[34]|ghcr\.io/bopp-os/cachyos-docker/cachyos-znver4|ghcr\.io/ublue-os/brew)$'
           fi
