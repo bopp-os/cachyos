@@ -52,7 +52,7 @@ deck-gamemode:
   - jupiter-hw-support
   - steamos-manager
   - steamos-networking-tools
-  - powerbuttond
+  - steamos-powerbuttond
   - inputplumber
   - scx-scheds
 # Steam Deck hardware support (LCD/OLED). Harmless on other handhelds: the fan service is gated to Valve boards by
