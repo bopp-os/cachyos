@@ -1,0 +1,131 @@
+---
+name: Promote deck image
+# The scheduled builds push cachyos-deck as <arch>-daily and <arch>-YYYYMMDD. Once a week this points the stable tag
+# (v3, v4, znver4; and latest for v3) at the newest recent build that is signed and has no critical vulnerability with
+# a fix available. It never promotes a build older than 7 days, and never rolls back on its own.
+on:
+  schedule:
+    # Mondays 14:00 UTC, after the every-other-day build cycle has had its night (the concurrency group below also
+    # keeps this from running while a build is)
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: 'Architecture to promote'
+        required: false
+        type: choice
+        options: [all, v3, v4, znver4]
+        default: all
+      tag:
+        description: 'Promote this dated tag (e.g. v3-20261105) instead of the newest clean one. It is still verified and scanned.'
+        required: false
+        type: string
+        default: ''
+      window_days:
+        description: 'How many days back a build may be to be promoted'
+        required: false
+        type: string
+        default: '7'
+      dry_run:
+        description: 'Only report what would be promoted'
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+env:
+  IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
+  HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
+
+concurrency:
+  group: boppos-build-queue
+  cancel-in-progress: false
+  # Keep every waiting run (default is one, and a newer one cancels it)
+  queue: max
+
+jobs:
+  promote:
+    name: Promote deck (${{ matrix.arch }})
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        arch: [v3, v4, znver4]
+    permissions:
+      contents: read
+      packages: write
+      issues: write
+
+    steps:
+      - name: Select architecture
+        id: pick
+        env:
+          WANTED: ${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'all' }}
+        run: |
+          # Scheduled runs and arch=all promote every arch; a manual run can pick one
+          if [ "$WANTED" = all ] || [ "$WANTED" = "${{ matrix.arch }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping ${{ matrix.arch }} (asked for $WANTED)"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare environment
+        if: steps.pick.outputs.run == 'true'
+        run: |
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
+
+      - name: Checkout
+        if: steps.pick.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Read pinned tool images
+        if: steps.pick.outputs.run == 'true'
+        run: |
+          # The same copies the builds scan with. They were ClamAV-scanned in the prefetch step and are kept on the
+          # runner between builds, so they are never pulled here.
+          SYFT_IMAGE=$(sed -n 's/^FROM //p' ci/syft/Containerfile)
+          GRYPE_IMAGE=$(sed -n 's/^FROM //p' ci/grype/Containerfile)
+          for img in "$SYFT_IMAGE" "$GRYPE_IMAGE"; do
+            if ! podman image exists "$img"; then
+              echo "::error::$img is not on this runner. Run the scheduled build once so prefetch pulls and scans it, then promote again."
+              exit 1
+            fi
+          done
+          echo "SYFT_IMAGE=$SYFT_IMAGE" >> "$GITHUB_ENV"
+          echo "GRYPE_IMAGE=$GRYPE_IMAGE" >> "$GITHUB_ENV"
+
+      - name: Install Cosign
+        if: steps.pick.outputs.run == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Login to GitHub Container Registry
+        if: steps.pick.outputs.run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOGIN_USER: ${{ github.actor }}
+        run: |
+          echo "${GITHUB_TOKEN}" | podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+          echo "${GITHUB_TOKEN}" | docker login -u "${LOGIN_USER}" --password-stdin "ghcr.io" # For cosign
+
+      - name: Promote
+        if: steps.pick.outputs.run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+          EXPLICIT_TAG: ${{ inputs.tag }}
+          WINDOW_DAYS: ${{ inputs.window_days || '7' }}
+          DRY_RUN: ${{ inputs.dry_run == true }}
+        run: ./scripts/promote-deck.sh "${{ matrix.arch }}"
+
+      - name: Clean up
+        if: always() && steps.pick.outputs.run == 'true'
+        run: |
+          podman rm -af >/dev/null 2>&1 || true
+          podman system prune --force --build >/dev/null 2>&1 || true
+          podman unshare rm -rf /var/tmp/container_images_* /var/tmp/podman* /var/tmp/stereoscope-* /var/tmp/sbom-* 2>/dev/null || true
