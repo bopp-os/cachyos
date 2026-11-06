@@ -37,6 +37,11 @@ on:
         required: false
         type: boolean
         default: true
+      build_deck:
+        description: 'Build Deck flavor (Steam Game Mode; pushed as -daily, promote-deck.yml makes it stable)'
+        required: false
+        type: boolean
+        default: true
       verbose_build:
         description: 'Enable verbose build output'
         required: false
@@ -91,6 +96,11 @@ on:
         required: false
         type: boolean
         default: true
+      build_deck:
+        description: 'Build Deck flavor (Steam Game Mode; pushed as -daily, promote-deck.yml makes it stable)'
+        required: false
+        type: boolean
+        default: true
       verbose_build:
         description: 'Enable verbose build output'
         required: false
@@ -119,7 +129,7 @@ env:
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/267760384?s=200&v=4"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "${{ inputs.test_tag && 'znver4-test' || 'znver4' }}"
-  FLAVORS: "plasma gnome niri cinnamon"
+  FLAVORS: "plasma gnome niri cinnamon deck"
   BASE_TAG: "v4"
   BASE_IMAGE: "ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest"
   TARGET_MARCH: "znver4"
@@ -144,6 +154,8 @@ jobs:
     outputs:
       should_skip: ${{ steps.check_compatibility.outputs.should_skip }}
       flavors: ${{ steps.set_flavors.outputs.flavors }}
+      has_desktop: ${{ steps.set_flavors.outputs.has_desktop }}
+      has_deck: ${{ steps.set_flavors.outputs.has_deck }}
       sync_db: ${{ steps.sync_db.outputs.fingerprint }}
 
     permissions:
@@ -195,17 +207,25 @@ jobs:
             echo "flavors=[]" >> $GITHUB_OUTPUT
             exit 0
           fi
+          FLAVORS=()
           if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "flavors=[\"plasma\", \"gnome\", \"niri\", \"cinnamon\"]" >> $GITHUB_OUTPUT
+            FLAVORS=('"plasma"' '"gnome"' '"niri"' '"cinnamon"' '"deck"')
           else
-            FLAVORS=()
             [ "${{ inputs.build_plasma }}" == "true" ] && FLAVORS+=('"plasma"')
             [ "${{ inputs.build_gnome }}" == "true" ] && FLAVORS+=('"gnome"')
             [ "${{ inputs.build_niri }}" == "true" ] && FLAVORS+=('"niri"')
             [ "${{ inputs.build_cinnamon }}" == "true" ] && FLAVORS+=('"cinnamon"')
-            JOINED=$(IFS=, ; echo "${FLAVORS[*]}")
-            echo "flavors=[$JOINED]" >> $GITHUB_OUTPUT
+            [ "${{ inputs.build_deck }}" == "true" ] && FLAVORS+=('"deck"')
           fi
+          JOINED=$(IFS=, ; echo "${FLAVORS[*]}")
+          echo "flavors=[$JOINED]" >> $GITHUB_OUTPUT
+          # The desktop flavors share cachyos-base; deck has its own slim base (cachyos-deck-base)
+          HAS_DECK=false; HAS_DESKTOP=false
+          for f in "${FLAVORS[@]}"; do
+            if [ "$f" == '"deck"' ]; then HAS_DECK=true; else HAS_DESKTOP=true; fi
+          done
+          echo "has_desktop=$HAS_DESKTOP" >> $GITHUB_OUTPUT
+          echo "has_deck=$HAS_DECK" >> $GITHUB_OUTPUT
 
       - name: Free Disk Space (Self-Hosted)
         run: |
@@ -214,11 +234,13 @@ jobs:
           # 1. (The host's own package-manager cache is not cleaned here: that needs root.)
           
           # 2. Nuke leftover /tmp files and orphaned Podman extraction directories
-          podman unshare rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/clamscan-prefetch.* || true
+          podman unshare rm -rf /tmp/chunked_image.tar /tmp/podman_load_output.txt /tmp/tmp.* /var/tmp/container_images_* /var/tmp/podman* /var/tmp/cachyos-base-*.tar /var/tmp/cachyos-deck-base-*.tar /var/tmp/stereoscope-* /var/tmp/sbom-* /var/tmp/clamscan-prefetch.* || true
           
           # Ensure local base tags are cleared at the very beginning of a new pipeline run
           podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          podman rmi -f "localhost/cachyos-deck-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-deck-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           
           # Images the scan steps reuse from run to run are never pruned here: the ClamAV image carries its ~1 GB
           # signature database, and the pinned syft, grype and chunkah images are already ClamAV-scanned. Their old
@@ -391,6 +413,8 @@ jobs:
           PREFETCH_ARGS+=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}")
           PREFETCH_ARGS+=("--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}")
           PREFETCH_ARGS+=("--build-arg" "TARGET_CPU_MARCH=${{ env.TARGET_MARCH }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_BASE=${{ steps.set_flavors.outputs.has_desktop }}")
+          PREFETCH_ARGS+=("--build-arg" "BUILD_DECK=${{ steps.set_flavors.outputs.has_deck }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_PLASMA=${{ format('{0}', inputs.build_plasma) != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_GNOME=${{ format('{0}', inputs.build_gnome) != 'false' }}")
           PREFETCH_ARGS+=("--build-arg" "BUILD_NIRI=${{ format('{0}', inputs.build_niri) != 'false' }}")
@@ -430,7 +454,7 @@ jobs:
       - name: Build Base Image
         id: build_base
         timeout-minutes: 60
-        if: steps.check_compatibility.outputs.should_skip != 'true'
+        if: steps.check_compatibility.outputs.should_skip != 'true' && steps.set_flavors.outputs.has_desktop == 'true'
         env:
           META_LABELS: ${{ steps.metadata.outputs.labels }}
         run: |
@@ -470,6 +494,50 @@ jobs:
             --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
 
           # Ensure the local base image is tagged properly so the DE overlays can layer onto it!
+          podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
+          echo "::endgroup::"
+
+      # The deck flavor builds on its own slim base: the same Containerfile.base with the deck package list, the
+      # deckify kernel and only the kernel modules a handheld needs. Local only, like cachyos-base.
+      - name: Build Deck Base Image
+        id: build_deck_base
+        timeout-minutes: 60
+        if: steps.check_compatibility.outputs.should_skip != 'true' && steps.set_flavors.outputs.has_deck == 'true'
+        env:
+          META_LABELS: ${{ steps.metadata.outputs.labels }}
+        run: |
+          set -x
+
+          MARCH="${{ env.TARGET_MARCH }}"
+
+          while IFS= read -r label; do
+            if [[ -n "$label" ]]; then
+              BUILD_ARGS+=("--label" "$label")
+            fi
+          done <<< "$META_LABELS"
+
+          BUILD_ARGS+=("-v" "${{ env.LOCAL_CACHE_DIR }}:/var/cache/pacman/pkg:z")
+
+          if [ "${{ inputs.no_cache }}" == "true" ]; then
+            echo "Manual cache bust triggered. Appending --no-cache..."
+            BUILD_ARGS+=("--no-cache")
+          fi
+
+          if [ "${{ inputs.verbose_build }}" == "true" ]; then
+            echo "Manual verbose build triggered. Appending build arg..."
+            BUILD_ARGS+=("--build-arg" "VERBOSE=true")
+          fi
+
+          echo "::group::Building deck base"
+          CURRENT_IMAGE_NAME="cachyos-deck-base"
+          DOCKERFILE="Containerfile.base"
+          FLAVOR_ARGS=("--build-arg" "BASE_IMAGE=${{ env.BASE_IMAGE }}" "--build-arg" "BASE_IMAGE_TAG=${{ env.BASE_TAG }}" "--build-arg" "TARGET_CPU_MARCH=$MARCH")
+          FLAVOR_ARGS+=("--build-arg" "PACKAGE_LIST=files/deck-base/deck-base.yaml" "--build-arg" "BUILD_NCT6687D=false" "--build-arg" "BUILD_IT87=false")
+
+          podman build "${BUILD_ARGS[@]}" "${FLAVOR_ARGS[@]}" \
+            --network=${{ env.BUILD_NETWORK }} \
+            --tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" -f "$DOCKERFILE" .
+
           podman tag "localhost/$CURRENT_IMAGE_NAME:$DEFAULT_TAG" "${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
           echo "::endgroup::"
 
@@ -530,6 +598,10 @@ jobs:
       fail-fast: false
       matrix:
         flavor: ${{ fromJson(needs.build_base.outputs.flavors) }}
+    env:
+      # The tag this job pushes first. The deck image is only ever pushed as <arch>-daily (plus the dated tag); the
+      # stable <arch> tag and latest are moved by promote-deck.yml after a scan
+      PUSH_TAG: ${{ (matrix.flavor == 'deck' && !inputs.test_tag) && 'znver4-daily' || (inputs.test_tag && 'znver4-test' || 'znver4') }}
 
     permissions:
       contents: read
@@ -601,7 +673,7 @@ jobs:
         id: metadata
         with:
           tags: |
-            type=raw,value=${{ env.DEFAULT_TAG }}
+            type=raw,value=${{ env.PUSH_TAG }}
             type=raw,value=${{ env.DEFAULT_TAG }}-{{date 'YYYYMMDD'}}
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
@@ -667,6 +739,16 @@ jobs:
         run: |
           chmod +x scripts/scan-pkg-cache.sh
           ./scripts/scan-pkg-cache.sh "${{ env.LOCAL_CACHE_DIR }}"
+
+      - name: Check Base Image Exists
+        run: |
+          # Flavors build on a base image the build_base job left in this runner's local storage (nothing is pulled)
+          BASE_NAME=cachyos-base
+          if [ "${{ matrix.flavor }}" == "deck" ]; then BASE_NAME=cachyos-deck-base; fi
+          if ! podman image exists "${IMAGE_REGISTRY}/${BASE_NAME}:${DEFAULT_TAG}"; then
+            echo "::error::${BASE_NAME}:${DEFAULT_TAG} is not in local storage. Re-run all jobs for this architecture so the base image is built again."
+            exit 1
+          fi
 
       - name: Build Flavor Image
         env:
@@ -776,7 +858,7 @@ jobs:
           FLAVOR="${{ matrix.flavor }}"
           CURRENT_IMAGE_NAME="cachyos-${FLAVOR}"
           IMAGE_REF="localhost/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
-          DEFAULT_DEST="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"
+          DEFAULT_DEST="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${PUSH_TAG}"
           
           
           export CHUNKAH_CONFIG_STR="$(podman inspect $IMAGE_REF)"
@@ -821,7 +903,7 @@ jobs:
           if [ "$SUCCESS" = "false" ]; then exit 1; fi
           
           for tag in $IMAGE_TAGS; do
-            if [ "$tag" != "${DEFAULT_TAG}" ]; then
+            if [ "$tag" != "${PUSH_TAG}" ]; then
               DEST_IMAGE="docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${tag}"
               skopeo copy --dest-creds="${{ github.actor }}:${GITHUB_TOKEN}" "$DEFAULT_DEST" "$DEST_IMAGE"
             fi
@@ -830,7 +912,7 @@ jobs:
 
           SUCCESS_DIGEST=false
           for i in $(seq "${MAX_RETRIES}"); do
-            if REMOTE_DIGEST=$(skopeo inspect --creds="${{ github.actor }}:${GITHUB_TOKEN}" --format '{{.Digest}}' "docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${DEFAULT_TAG}"); then SUCCESS_DIGEST=true; break; fi
+            if REMOTE_DIGEST=$(skopeo inspect --creds="${{ github.actor }}:${GITHUB_TOKEN}" --format '{{.Digest}}' "docker://${IMAGE_REGISTRY}/${CURRENT_IMAGE_NAME}:${PUSH_TAG}"); then SUCCESS_DIGEST=true; break; fi
             echo "Failed to fetch remote digest, retrying..."; sleep $((5 * i))
           done
           if [ "$SUCCESS_DIGEST" = "false" ]; then exit 1; fi
@@ -844,8 +926,8 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           while IFS='=' read -r img digest; do
-            cosign attach sbom --sbom packages-${{ matrix.flavor }}-${{ github.sha }}.json "${IMAGE_REGISTRY}/${img}:${DEFAULT_TAG}@${digest}"
-            cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY "${IMAGE_REGISTRY}/${img}:${DEFAULT_TAG}@${digest}" < /dev/null
+            cosign attach sbom --sbom packages-${{ matrix.flavor }}-${{ github.sha }}.json "${IMAGE_REGISTRY}/${img}:${PUSH_TAG}@${digest}"
+            cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY "${IMAGE_REGISTRY}/${img}:${PUSH_TAG}@${digest}" < /dev/null
           done < digests.env
         env:
           COSIGN_EXPERIMENTAL: false
@@ -859,6 +941,7 @@ jobs:
           rm -f packages-${{ matrix.flavor }}-${{ github.sha }}.json digests.env
           podman rmi -f "localhost/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
           podman rmi -f "${IMAGE_REGISTRY}/cachyos-${{ matrix.flavor }}:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+          podman rmi -f "${IMAGE_REGISTRY}/cachyos-${{ matrix.flavor }}:${{ env.PUSH_TAG }}" 2>/dev/null || true
           podman unshare rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
 
       - name: Report Peak Disk Usage
@@ -927,6 +1010,8 @@ jobs:
             echo "✨ All flavors built successfully. Removing local base images and workspace..."
             podman rmi -f "localhost/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
             podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+            podman rmi -f "localhost/cachyos-deck-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
+            podman rmi -f "${{ env.IMAGE_REGISTRY }}/cachyos-deck-base:${{ env.DEFAULT_TAG }}" 2>/dev/null || true
             podman unshare rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* || true
           else
             echo "⚠️ Some flavors failed. Preserving base image and workspace for partial re-runs."

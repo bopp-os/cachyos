@@ -15,7 +15,7 @@ This is all very experimental. So use at your own risk.
 - **High-Performance Base**: Built on [CachyOS](https://cachyos.org/), an Arch-based distribution with performance-tuned kernels and repositories.
 - **Atomic & Immutable**: Uses [bootc](https://bootc-dev.github.io/) for an atomic, image-based system that offers incredible stability and easy rollbacks.
 - **Desktop Choice**: Choose your preferred flavor: KDE Plasma, GNOME, Cinnamon, or the Niri Wayland compositor.
-- **Deck (console/handheld)**: `cachyos-deck` boots straight into Steam Game Mode (`gamescope-session-cachyos`, InputPlumber, steamos-manager) on the CachyOS handheld kernel, with a slim KDE Plasma as the Desktop half. It is built on its own slim base, `cachyos-deck-base`; large apps come from Flatpak.
+- **Deck (console/handheld)**: `cachyos-deck` boots straight into Steam Game Mode (`gamescope-session-cachyos`, InputPlumber, steamos-manager) on the CachyOS handheld kernel, with a slim KDE Plasma as the Desktop half. It is built on its own slim base, `cachyos-deck-base`; large apps come from Flatpak. Tags: `v3` (Steam Deck and older hardware), `v4` and `znver4` (Zen 4 handhelds such as the Legion Go and ROG Ally Z1). The stable tags move once a week, after a signed build from the last 7 days passes a vulnerability scan (`promote-deck.yml`); the every-other-day builds are `<arch>-daily` and `<arch>-YYYYMMDD` for anyone who wants them sooner.
 - **Modern Hardware Support**: Includes build-time support for `znver4` CPU optimizations for AMD Ryzen 7000 series processors.
 - **Gaming Ready**: Comes with a suite of pre-installed gaming software and utilities:
   - `cachyos-gaming-applications`, `proton-cachyos`, `wine-cachyos`

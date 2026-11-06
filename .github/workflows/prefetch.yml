@@ -29,6 +29,10 @@ on:
         required: false
         type: boolean
         default: true
+      build_deck:
+        required: false
+        type: boolean
+        default: true
       verbose_build:
         required: false
         type: boolean
@@ -180,6 +184,7 @@ jobs:
               --build-arg "BUILD_GNOME=${{ format('{0}', inputs.build_gnome) != 'false' }}"
               --build-arg "BUILD_NIRI=${{ format('{0}', inputs.build_niri) != 'false' }}"
               --build-arg "BUILD_CINNAMON=${{ format('{0}', inputs.build_cinnamon) != 'false' }}"
+              --build-arg "BUILD_DECK=${{ format('{0}', inputs.build_deck) != 'false' }}"
               --build-arg "VERBOSE=${{ inputs.verbose_build == true }}"
               -v "$HOST_PKG_CACHE_DIR/$march:/var/cache/pacman/pkg:z"
             )

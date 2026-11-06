@@ -52,6 +52,13 @@ deck-gamemode:
   - jupiter-hw-support
   - steamos-manager
   - steamos-networking-tools
-  - powerbuttond
+  - steamos-powerbuttond
   - inputplumber
   - scx-scheds
+# Steam Deck hardware support (LCD/OLED). Harmless on other handhelds: the fan service is gated to Valve boards by
+# a drop-in in files/deck/usr/lib/systemd/system/jupiter-fan-control.service.d/.
+deck-steamdeck:
+  - steamdeck-dsp
+  - steamdeck-firmware
+  - jupiter-fan-control
+  - galileo-mura

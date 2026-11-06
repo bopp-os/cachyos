@@ -245,6 +245,9 @@ themes-aesthetics:
   - cachyos-plymouth-theme
   - cachyos-plymouth-bootanimation
   - boppos-boot-theme
+  # On-screen keyboard for the LUKS passphrase when TPM2 unlock fails (see boppos-tools docs/unl0kr-unlock.md).
+  # Containerfile.base enables the dracut module when both this and a boppos-tools that ships it are installed.
+  - unl0kr
 media-video:
   - libdvdcss
   - gst-libav
