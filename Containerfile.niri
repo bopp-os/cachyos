@@ -39,6 +39,21 @@ RUN mkdir -p /etc/niri /etc/xdg/niri && \
         cp -a /etc/skel/.config/niri/* /etc/xdg/niri/ 2>/dev/null || true ; \
     fi
 
+# Default GTK3/GTK4 icon theme to Adwaita (niri has no desktop session that sets one, and GTK4 only falls back
+# to hicolor, which has no symbolic icons). Adds the key only if missing; per-user settings still win.
+RUN for f in /etc/gtk-3.0/settings.ini /etc/gtk-4.0/settings.ini; do \
+        mkdir -p "$(dirname "$f")"; \
+        if [ ! -f "$f" ]; then \
+            printf '[Settings]\ngtk-icon-theme-name=Adwaita\n' > "$f"; \
+        elif grep -q '^[[:space:]]*gtk-icon-theme-name[[:space:]]*=' "$f"; then \
+            :; \
+        elif grep -q '^\[Settings\]' "$f"; then \
+            sed -i '/^\[Settings\]/a gtk-icon-theme-name=Adwaita' "$f"; \
+        else \
+            printf '\n[Settings]\ngtk-icon-theme-name=Adwaita\n' >> "$f"; \
+        fi; \
+    done
+
 RUN find /etc /usr -type f -exec sh -c \
     'for f; do getfattr -h -n user.component "$f" &>/dev/null || { setfattr -h -n user.component -v "de-niri" "$f" && setfattr -h -n user.update-interval -v "weekly" "$f"; }; done' sh {} +
 
