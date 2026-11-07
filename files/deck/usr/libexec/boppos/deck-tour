@@ -1,0 +1,58 @@
+#!/usr/bin/bash
+# boppos-deck-tour.service: opens the BoppOS welcome tour from Steam while the installer's first-run marker exists.
+# Once per Game Mode session; the tour removes the marker when it is finished, so a tour left early opens again on
+# the next boot.
+#
+# Steam's own setup (Wi-Fi, sign-in) comes first. The tour is a non-Steam shortcut (bopp-steam-shortcut): in Game
+# Mode only windows that Steam starts are shown. Steam's library can only be written while Steam is closed, and
+# before the first sign-in there is no library, so on the first boot:
+#  1. wait for the sign-in (Steam has a library),
+#  2. restart Steam once; deck-before-steam adds the shortcut while it is closed,
+#  3. launch the shortcut with steam://rungameid.
+set -u
+
+MARKER=/var/lib/boppos/first-run
+log() { echo "deck-tour: $*" >&2; }
+status() { bopp-steam-shortcut status 2> /dev/null; }
+has() { status | grep -qw "$1"; }
+
+command -v bopp-steam-shortcut > /dev/null || {
+    log "bopp-steam-shortcut is not installed"
+    exit 0
+}
+
+# Steam's id for a non-Steam shortcut: crc32 of the quoted exe plus the name, top bit set, shifted into a game id.
+# Must match bopp-steam-shortcut's entry (exe /usr/bin/boppos-deck, name BoppOS).
+gameid=$(python3 -c 'import zlib; a = zlib.crc32(b"\"/usr/bin/boppos-deck\"BoppOS") | 0x80000000; print(a << 32 | 0x02000000)')
+
+# 1. Steam's sign-in: it has a library (userdata) once someone signed in.
+while has files=0; do
+    [ -e "$MARKER" ] || exit 0
+    sleep 10
+done
+
+# 2. No shortcut yet: restart Steam so deck-before-steam can add it. Give Steam time to finish its first sign-in.
+if ! has offered=True; then
+    sleep 30
+    log "restarting Steam to add the BoppOS shortcut"
+    steam -shutdown
+    for _ in $(seq 60); do
+        has offered=True && break
+        sleep 5
+    done
+    has offered=True || {
+        log "the shortcut was not added, not opening the tour"
+        exit 0
+    }
+fi
+
+# 3. Steam is running again: open the tour. Wait for its library view to load first.
+for _ in $(seq 60); do
+    has steam_running=True && break
+    sleep 5
+done
+sleep 20
+[ -e "$MARKER" ] || exit 0
+log "opening the welcome tour (steam://rungameid/$gameid)"
+steam "steam://rungameid/$gameid"
+exit 0

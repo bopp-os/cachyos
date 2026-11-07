@@ -1,22 +1,19 @@
 #!/usr/bin/bash
 # Runs at the start of the Game Mode session, before its gamescope (boppos-deck-first-boot.service, a user unit
-# ordered before gamescope-session.service). When something Steam needs is missing it opens boppos-deck as the only
-# app in a gamescope of its own, so a fresh install never sits on a black screen while Steam fails offline or
-# downloads its client.
+# ordered before gamescope-session.service). A fallback only: normally it exits at once and Steam starts.
 #
-# Something is missing when:
-#  - the installer's first-run marker is still there (the welcome tour has not been finished), or
-#  - Steam has not downloaded its client yet (no steamui.so), and then also when there is no network.
-# Being offline alone is fine once Steam is installed: Steam has an offline mode, so a handheld on a plane is not
-# stopped every boot.
+# The first boot is Steam's own: the installer preloads the Steam client and copies the Wi-Fi connection, Steam's
+# setup (Wi-Fi, sign-in) runs first, and the BoppOS welcome tour opens from Steam afterwards (deck-tour). That is how
+# SteamOS, ChimeraOS and Bazzite do it; a window of ours before Steam fights gamescope's Steam mode.
 #
-# What boppos-deck shows is its own business. It gets the list of what is missing in BOPPOS_FIRST_BOOT_MISSING
-# (space-separated: first-run, network, steam). If the network is still down when it exits (a boppos-tools without
-# a network step), the Plasma network settings open as a fallback so the user can connect.
+# The one case Steam cannot handle: no Steam client yet (no steamui.so: the preload failed) and no network, so Steam
+# could only show a black screen. Then boppos-deck opens as the only app in a gamescope of its own, with
+# BOPPOS_FIRST_BOOT_MISSING="steam network", to join a network. If the network is still down when it exits (a
+# boppos-tools without a network step), the Plasma network settings open as a fallback.
+# Offline with Steam installed is fine: Steam has an offline mode.
 # It always exits 0: Steam starts afterwards whatever happened here.
 set -u
 
-MARKER=/var/lib/boppos/first-run
 STEAM_DIR="$HOME/.local/share/Steam"
 log() { echo "deck-first-boot: $*" >&2; }
 
@@ -32,9 +29,9 @@ online() {
 
 inside() {
     if [ -x /usr/bin/boppos-deck ]; then
-        # --first-run picks the flow itself while the marker exists; without it, force the welcome tour.
+        # The tour itself opens later from Steam; BOPPOS_FIRST_BOOT_MISSING (no first-run in it) asks only for
+        # the network and Steam steps.
         flow=--welcome
-        [ -e "$MARKER" ] && flow=--first-run
         # PYTHONFAULTHANDLER: a crash prints the Python stack to the journal (boppos-deck is Python + GTK4).
         # ADW_DEBUG_COLOR_SCHEME: dark, like Game Mode. There is no settings portal before Steam, so libadwaita
         # would otherwise fall back to light.
@@ -80,16 +77,9 @@ if [ "${1:-}" = --inside ]; then
     exit 0
 fi
 
-missing=()
-[ -e "$MARKER" ] && missing+=(first-run)
-if ! steam_installed; then
-    missing+=(steam)
-    online || missing+=(network)
-fi
-
-if [ ${#missing[@]} -eq 0 ]; then
-    exit 0
-fi
+steam_installed && exit 0
+online && exit 0
+missing=(steam network)
 log "missing: ${missing[*]}"
 
 # boppos-deck gets a gamescope of its own, as the only app, like boppos-oobe.service: the session's gamescope
