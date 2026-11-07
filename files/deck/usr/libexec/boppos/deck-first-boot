@@ -45,7 +45,10 @@ if [ -x /usr/bin/boppos-deck ]; then
     # --first-run picks the flow itself while the marker exists; without it, force the welcome tour.
     flow=--welcome
     [ -e "$MARKER" ] && flow=--first-run
-    run_deck() { BOPPOS_FIRST_BOOT_MISSING="${missing[*]}" GDK_BACKEND=x11 "$@" /usr/bin/boppos-deck "$flow"; }
+    # PYTHONFAULTHANDLER: a crash prints the Python stack to the journal (boppos-deck is Python + GTK4).
+    run_deck() {
+        BOPPOS_FIRST_BOOT_MISSING="${missing[*]}" GDK_BACKEND=x11 PYTHONFAULTHANDLER=1 "$@" /usr/bin/boppos-deck "$flow"
+    }
     run_deck env
     rc=$?
     # Killed by a signal (GTK's GL renderer has segfaulted under gamescope's Xwayland): retry once without GL.
