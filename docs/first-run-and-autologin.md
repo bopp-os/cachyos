@@ -14,6 +14,18 @@ image adds no trigger of its own:
   preset for it, so `Containerfile.base` runs `systemctl enable boppos-oobe.service`. It needs the `boppos-oobe`
   account (the package's sysusers entry; present in the image) and gamescope (`base.yaml`).
 
+**Deck (Game Mode).** XDG autostart never runs in the gamescope session, so the deck image adds its own trigger:
+the user unit `boppos-deck-first-boot.service`, which `gamescope-session.service` waits for (drop-in
+`gamescope-session.service.d/10-boppos-first-boot.conf`). It runs `/usr/libexec/boppos/deck-first-boot` once per
+session. When the first-run marker exists, or Steam has no client yet (no `steamui.so`, and then also when there
+is no network), it opens `boppos-deck` (`--first-run` with the marker, otherwise `--welcome`) as the only app in a
+gamescope of its own (`--backend drm`, not Steam mode), with `BOPPOS_FIRST_BOOT_MISSING` set to what is missing
+(`first-run`, `steam`, `network`). Not the session's gamescope: that one runs in Steam mode and only shows the
+windows Steam picks, so nothing started before Steam appears there (seen on a Legion Go: a frozen frame). If Steam is
+still missing and the system is still offline afterwards, it opens the Plasma network settings
+(`kcmshell6 kcm_networkmanagement`). Then Steam starts. Offline with Steam installed is not a problem: Steam has
+an offline mode.
+
 `/var/lib/boppos` (root:root 0755) is made at boot by `files/base/usr/lib/tmpfiles.d/10-boppos-state.conf`. The
 marker `first-run` is written by the installer and removed by the root `oobe-helper`. Nothing in the image
 references `/var/lib/boppos/oobe-done` (gone in the new design).
