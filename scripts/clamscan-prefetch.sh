@@ -58,6 +58,14 @@ for f in "$CACHE_FILE" "$LEGACY_CACHE_FILE"; do
 done
 declare -A KEEP=()
 FINDINGS=()
+# Accepted scan-limit findings: "<sha256> <finding name>" from files/security/clamav-limit-allow.conf
+declare -A LIMIT_ALLOW=()
+LIMIT_ALLOW_CONF="$(dirname "$0")/../files/security/clamav-limit-allow.conf"
+if [ -f "$LIMIT_ALLOW_CONF" ]; then
+  while read -r hash name _; do
+    [[ $hash =~ ^[0-9a-f]{64}$ && $name == Heuristics.Limits.Exceeded.* ]] && LIMIT_ALLOW["$hash $name"]=1
+  done < "$LIMIT_ALLOW_CONF"
+fi
 
 # Scans the given paths inside the clamd container (WORK_DIR is /scan/work there) with clamdscan --multiscan; clamdscan
 # options such as --file-list=/scan/work/<list> can be passed too.
@@ -75,10 +83,23 @@ clamd_scan() {
   case $rc in
     0) return 0 ;;
     1)
+      local path name hash
       while IFS= read -r line; do
+        path=${line%%: *}
+        name=${line##*: }
+        name=${name% FOUND}
+        # A scan-limit finding on a file pinned in clamav-limit-allow.conf is accepted (warning only)
+        if [[ $name == Heuristics.Limits.Exceeded.* ]] &&
+          hash=$(podman exec "$CLAMD_CTR" sha256sum "$path" 2> /dev/null | awk '{print $1}') &&
+          [[ -n $hash && -n "${LIMIT_ALLOW["$hash $name"]:-}" ]]; then
+          echo "::warning::ClamAV: ${line#/scan/} (sha256 $hash, accepted in clamav-limit-allow.conf)"
+          printf -- '- Scan limit accepted (pinned in clamav-limit-allow.conf): `%s` sha256 `%s`\n' "${line#/scan/}" "$hash" >> "$SUMMARY"
+          continue
+        fi
         FINDINGS+=("${line#/scan/}")
-        FLAGGED_PATHS+=("${line%%: *}")
+        FLAGGED_PATHS+=("$path")
       done < <(echo "$out" | grep 'FOUND$')
+      [ ${#FLAGGED_PATHS[@]} -eq 0 ] && SCAN_RC=0 && return 0
       ;;
     *)
       echo "$out"
