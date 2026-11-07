@@ -15,11 +15,13 @@ image adds no trigger of its own:
   account (the package's sysusers entry; present in the image) and gamescope (`base.yaml`).
 
 **Deck (Game Mode).** XDG autostart never runs in the gamescope session, so the deck image adds its own trigger:
-the user unit `boppos-deck-first-boot.service`, which `steam-launcher.service` waits for (drop-in
-`steam-launcher.service.d/10-boppos-first-boot.conf`). It runs `/usr/libexec/boppos/deck-first-boot` once per
+the user unit `boppos-deck-first-boot.service`, which `gamescope-session.service` waits for (drop-in
+`gamescope-session.service.d/10-boppos-first-boot.conf`). It runs `/usr/libexec/boppos/deck-first-boot` once per
 session. When the first-run marker exists, or Steam has no client yet (no `steamui.so`, and then also when there
-is no network), it opens `boppos-deck` (`--first-run` with the marker, otherwise `--welcome`) in the running
-gamescope, with `BOPPOS_FIRST_BOOT_MISSING` set to what is missing (`first-run`, `steam`, `network`). If Steam is
+is no network), it opens `boppos-deck` (`--first-run` with the marker, otherwise `--welcome`) as the only app in a
+gamescope of its own (`--backend drm`, not Steam mode), with `BOPPOS_FIRST_BOOT_MISSING` set to what is missing
+(`first-run`, `steam`, `network`). Not the session's gamescope: that one runs in Steam mode and only shows the
+windows Steam picks, so nothing started before Steam appears there (seen on a Legion Go: a frozen frame). If Steam is
 still missing and the system is still offline afterwards, it opens the Plasma network settings
 (`kcmshell6 kcm_networkmanagement`). Then Steam starts. Offline with Steam installed is not a problem: Steam has
 an offline mode.

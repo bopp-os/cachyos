@@ -1,7 +1,8 @@
 #!/usr/bin/bash
-# Runs in Game Mode before Steam starts (boppos-deck-first-boot.service, a user unit ordered before
-# steam-launcher.service). When something Steam needs is missing it opens boppos-deck in the running gamescope,
-# so a fresh install never sits on a black screen while Steam fails offline or downloads its client.
+# Runs at the start of the Game Mode session, before its gamescope (boppos-deck-first-boot.service, a user unit
+# ordered before gamescope-session.service). When something Steam needs is missing it opens boppos-deck as the only
+# app in a gamescope of its own, so a fresh install never sits on a black screen while Steam fails offline or
+# downloads its client.
 #
 # Something is missing when:
 #  - the installer's first-run marker is still there (the welcome tour has not been finished), or
@@ -29,6 +30,53 @@ online() {
     nm-online -q -t "${1:-20}"
 }
 
+inside() {
+    if [ -x /usr/bin/boppos-deck ]; then
+        # --first-run picks the flow itself while the marker exists; without it, force the welcome tour.
+        flow=--welcome
+        [ -e "$MARKER" ] && flow=--first-run
+        # PYTHONFAULTHANDLER: a crash prints the Python stack to the journal (boppos-deck is Python + GTK4).
+        run_deck() {
+            BOPPOS_FIRST_BOOT_MISSING="${missing[*]}" GDK_BACKEND=x11 PYTHONFAULTHANDLER=1 "$@" /usr/bin/boppos-deck "$flow"
+        }
+        run_deck env
+        rc=$?
+        # Killed by a signal (GTK's GL renderer has segfaulted under gamescope's Xwayland): retry once without GL.
+        if [ "$rc" -gt 128 ]; then
+            log "boppos-deck crashed ($rc), retrying with GSK_RENDERER=cairo"
+            run_deck env GSK_RENDERER=cairo
+            rc=$?
+        fi
+        [ "$rc" -eq 0 ] || log "boppos-deck exited with $rc"
+    else
+        log "boppos-deck is not installed"
+    fi
+
+    # Fallback: still offline and Steam still missing, so Steam would only show a black screen. Give the user the
+    # network settings (plasma-nm), one window in gamescope.
+    if ! steam_installed && ! online 3 && command -v kcmshell6 > /dev/null; then
+        log "still offline, opening the network settings"
+        # Never blocks Steam for good: stop it once a connection is up,
+        # and after 10 minutes at the most.
+        QT_QPA_PLATFORM=xcb kcmshell6 kcm_networkmanagement &
+        kcm=$!
+        for _ in $(seq 120); do
+            kill -0 "$kcm" 2> /dev/null || break
+            if online 1; then log "connected"; break; fi
+            sleep 5
+        done
+        kill "$kcm" 2> /dev/null && log "closed the network settings"
+        wait "$kcm" 2> /dev/null
+    fi
+}
+
+# Inside our own gamescope (see the end of this file): show the setup, then return to the session.
+if [ "${1:-}" = --inside ]; then
+    read -r -a missing <<< "${BOPPOS_FIRST_BOOT_MISSING:-}"
+    inside
+    exit 0
+fi
+
 missing=()
 [ -e "$MARKER" ] && missing+=(first-run)
 if ! steam_installed; then
@@ -41,41 +89,11 @@ if [ ${#missing[@]} -eq 0 ]; then
 fi
 log "missing: ${missing[*]}"
 
-if [ -x /usr/bin/boppos-deck ]; then
-    # --first-run picks the flow itself while the marker exists; without it, force the welcome tour.
-    flow=--welcome
-    [ -e "$MARKER" ] && flow=--first-run
-    # PYTHONFAULTHANDLER: a crash prints the Python stack to the journal (boppos-deck is Python + GTK4).
-    run_deck() {
-        BOPPOS_FIRST_BOOT_MISSING="${missing[*]}" GDK_BACKEND=x11 PYTHONFAULTHANDLER=1 "$@" /usr/bin/boppos-deck "$flow"
-    }
-    run_deck env
-    rc=$?
-    # Killed by a signal (GTK's GL renderer has segfaulted under gamescope's Xwayland): retry once without GL.
-    if [ "$rc" -gt 128 ]; then
-        log "boppos-deck crashed ($rc), retrying with GSK_RENDERER=cairo"
-        run_deck env GSK_RENDERER=cairo
-        rc=$?
-    fi
-    [ "$rc" -eq 0 ] || log "boppos-deck exited with $rc"
-else
-    log "boppos-deck is not installed"
-fi
-
-# Fallback: still offline and Steam still missing, so Steam would only show a black screen. Give the user the
-# network settings (plasma-nm), one window in gamescope.
-if ! steam_installed && ! online 3 && command -v kcmshell6 > /dev/null; then
-    log "still offline, opening the network settings"
-    # Never blocks Steam for good: the window may not show in gamescope, so stop it once a connection is up,
-    # and after 10 minutes at the most.
-    QT_QPA_PLATFORM=xcb kcmshell6 kcm_networkmanagement &
-    kcm=$!
-    for _ in $(seq 120); do
-        kill -0 "$kcm" 2> /dev/null || break
-        if online 1; then log "connected"; break; fi
-        sleep 5
-    done
-    kill "$kcm" 2> /dev/null && log "closed the network settings"
-    wait "$kcm" 2> /dev/null
-fi
+# boppos-deck gets a gamescope of its own, as the only app, like boppos-oobe.service: the session's gamescope
+# runs in Steam mode and only shows the windows Steam tells it to, so nothing appears there before Steam.
+# No -e (Steam mode) here for the same reason. Game Mode's gamescope starts after this one exits.
+export BOPPOS_FIRST_BOOT_MISSING="${missing[*]}"
+gamescope --backend drm --force-windows-fullscreen -- "$0" --inside ||
+    log "gamescope exited with $?"
 exit 0
+
