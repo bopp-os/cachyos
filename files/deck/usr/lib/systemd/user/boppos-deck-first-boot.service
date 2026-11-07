@@ -1,0 +1,18 @@
+[Unit]
+Description=BoppOS first-boot check before Steam (network, Steam client, welcome tour)
+Documentation=file:///usr/libexec/boppos/deck-first-boot
+# Pulled in and waited for by steam-launcher.service (see its drop-in), inside the gamescope session.
+After=gamescope-session.service graphical-session.target
+Before=steam-launcher.service
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+# Once per session: a Steam restart does not run the check again
+RemainAfterExit=yes
+# The user may take as long as they like in the setup
+TimeoutStartSec=infinity
+# DISPLAY and friends of the running gamescope, written by gamescope-session before it signals ready
+EnvironmentFile=%t/gamescope-environment
+ExecStart=/usr/libexec/boppos/deck-first-boot
+Slice=session.slice
