@@ -36,8 +36,11 @@ inside() {
         flow=--welcome
         [ -e "$MARKER" ] && flow=--first-run
         # PYTHONFAULTHANDLER: a crash prints the Python stack to the journal (boppos-deck is Python + GTK4).
+        # ADW_DEBUG_COLOR_SCHEME: dark, like Game Mode. There is no settings portal before Steam, so libadwaita
+        # would otherwise fall back to light.
         run_deck() {
-            BOPPOS_FIRST_BOOT_MISSING="${missing[*]}" GDK_BACKEND=x11 PYTHONFAULTHANDLER=1 "$@" /usr/bin/boppos-deck "$flow"
+            BOPPOS_FIRST_BOOT_MISSING="${missing[*]}" GDK_BACKEND=x11 PYTHONFAULTHANDLER=1 \
+                ADW_DEBUG_COLOR_SCHEME=prefer-dark "$@" /usr/bin/boppos-deck "$flow"
         }
         run_deck env
         rc=$?
