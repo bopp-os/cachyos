@@ -28,6 +28,7 @@ niri-applets-integration:
   - kdeconnect
 niri-themes-aesthetics:
   - cachyos-nord-gtk-theme-git
+  - adwaita-icon-theme
   - papirus-icon-theme
   - librsvg
   - hicolor-icon-theme
