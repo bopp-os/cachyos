@@ -95,10 +95,8 @@ log "missing: ${missing[*]}"
 # boppos-deck gets a gamescope of its own, as the only app, like boppos-oobe.service: the session's gamescope
 # runs in Steam mode and only shows the windows Steam tells it to, so nothing appears there before Steam.
 # No -e (Steam mode) here for the same reason. Game Mode's gamescope starts after this one exits.
-# --default-touch-mode 4 (passthrough): the app gets real touch events, so a finger drag scrolls. The default turns
-# touches into mouse clicks, and GTK does not scroll on a mouse drag.
 export BOPPOS_FIRST_BOOT_MISSING="${missing[*]}"
-gamescope --backend drm --force-windows-fullscreen --default-touch-mode 4 -- "$0" --inside ||
+gamescope --backend drm --force-windows-fullscreen -- "$0" --inside ||
     log "gamescope exited with $?"
 exit 0
 
