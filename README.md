@@ -88,7 +88,23 @@ Your system will download the new image and stage it for the next boot.
 
 **Note on Signature Verification**: For a secure transition, you may need to configure your system to trust the signature of the new image. The `Containerfile` includes a `cosign.pub` key and `policy.json`, which you may need to adapt for your registry and signing setup.
 
-### 2. Fresh Installation
+### 2. Installer ISO
+
+Download the newest `iso-YYYYMMDD` file set from [Releases](https://github.com/bopp-os/cachyos/releases): the ISO, `SHA256SUMS` and `SHA256SUMS.sigstore.json`. It is a UEFI net installer: it downloads the image you pick during the install. In the download folder, check the signature first, then the ISO:
+
+```bash
+cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity https://github.com/bopp-os/cachyos/.github/workflows/build-iso.yml@refs/heads/main \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+```bash
+sha256sum -c SHA256SUMS
+```
+
+The ISO is built by [build-iso.yml](.github/workflows/build-iso.yml), after each scheduled deck promotion or by hand. Each release lists the exact commits it was built from.
+
+### 3. Fresh Installation with `bootc install`
 
 After building the container image, you can:
 
