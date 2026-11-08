@@ -3,7 +3,7 @@
 # ordered before gamescope-session.service). A fallback only: normally it exits at once and Steam starts.
 #
 # The first boot is Steam's own: the installer preloads the Steam client and copies the Wi-Fi connection, Steam's
-# setup (Wi-Fi, sign-in) runs first, and the BoppOS welcome tour opens from Steam afterwards (deck-tour). That is how
+# setup (Wi-Fi, sign-in) runs first, and BoppOS is a shortcut in the Steam library (deck-before-steam). That is how
 # SteamOS, ChimeraOS and Bazzite do it; a window of ours before Steam fights gamescope's Steam mode.
 #
 # The one case Steam cannot handle: no Steam client yet (no steamui.so: the preload failed) and no network, so Steam

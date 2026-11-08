@@ -16,22 +16,22 @@ image adds no trigger of its own:
 
 **Deck (Game Mode).** XDG autostart never runs in the gamescope session. The first boot is Steam's own, as on
 SteamOS, ChimeraOS and Bazzite: the installer preloads the Steam client and copies the Wi-Fi connection, Steam's
-setup (Wi-Fi, sign-in) runs first, and the BoppOS tour opens from Steam afterwards. A window of ours before Steam
-fought gamescope's Steam mode on a Legion Go (invisible, frozen frames, no gamepad or touch).
+setup (Wi-Fi, sign-in) runs first, and BoppOS is a shortcut in the Steam library; started from there while the
+first-run marker exists, boppos-deck opens the welcome tour. A window of ours before Steam fought gamescope's Steam
+mode on a Legion Go (invisible, frozen frames, no gamepad or touch). Nothing opens the tour automatically: an
+attempt to restart Steam after the sign-in and launch the shortcut with `steam://rungameid` ended on Steam offering
+to stream BoppOS from another PC (the shortcut id is the same on every BoppOS machine), so it was removed.
 
 - While Steam starts, updates or unpacks itself, its update screen shows
   `/usr/share/plymouth/themes/steamos/steamos.png` (gamescope-session-cachyos sets `STEAM_UPDATEUI_PNG_BACKGROUND`
   to it on non-Valve hardware; no package ships it). The image ships a BoppOS one ("Getting Steam ready"), rendered
   from `files/deck/steam-update-background.svg`, so the first start is not a black screen.
 - `steam-launcher.service.d/10-boppos.conf` runs `/usr/libexec/boppos/deck-before-steam` before every Steam
-  start (Steam is closed then, the only time its library can be written): `bopp-steam-shortcut add` (the BoppOS
-  shortcut, once per user, after the first sign-in) and `apply-pending` (queued library changes). It also pulls in
-  `boppos-deck-tour.service`.
-- `boppos-deck-tour.service` (`/usr/libexec/boppos/deck-tour`, once per session, only while the first-run marker
-  exists) waits for the Steam sign-in, restarts Steam once if the shortcut is missing so it gets added, then opens
-  the shortcut with `steam://rungameid/<id>`. The tour removes the marker when it is finished, so a tour left early
-  opens again on the next boot. Needs boppos-deck to open the tour when started with no options while the marker
-  exists.
+  start (Steam is closed then, the only time its library can be written): when `bopp-steam-shortcut apps` shows
+  the BoppOS shortcut missing, `bopp-steam-shortcut add --force` (every time it is missing: it is the only way to
+  BoppOS in Game Mode), and `apply-pending` (queued library changes). On the first boot
+  there is no Steam user yet when Steam starts, so the shortcut appears from the next Steam start (a reboot, or
+  leaving and re-entering Game Mode).
 - Fallback: `boppos-deck-first-boot.service`, which `gamescope-session.service` waits for (drop-in
   `gamescope-session.service.d/10-boppos-first-boot.conf`), runs `/usr/libexec/boppos/deck-first-boot`. Only when
   Steam has no client (no `steamui.so`: the preload failed) and there is no network, it opens `boppos-deck --welcome`

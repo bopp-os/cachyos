@@ -1,13 +1,20 @@
 #!/usr/bin/bash
 # ExecStartPre of steam-launcher.service (drop-in 10-boppos.conf): runs every time Game Mode starts Steam, while
 # Steam is closed. That is the only time Steam's library files can be written: a running Steam overwrites them.
-#  - adds the BoppOS shortcut once Steam has a signed-in user (once per user: delete it in Steam and it stays gone),
+#  - makes sure the BoppOS shortcut is in the library. It is the only way to reach the BoppOS settings and the
+#    welcome tour in Game Mode, so it is added again whenever it is missing (also after Steam overwrote the file, or
+#    the user removed it). Before the first Steam sign-in there is no library yet; it is added on the next start.
 #  - applies library changes boppos-deck queued while Steam was running.
 # Never stops Steam from starting: always exits 0, and each step gives up after 20 seconds.
 set -u
+log() { echo "deck-before-steam: $*" >&2; }
 
 command -v bopp-steam-shortcut > /dev/null || exit 0
-timeout 20 bopp-steam-shortcut add >&2
+
+if timeout 20 bopp-steam-shortcut apps 2> /dev/null | grep -q '^\[ \] .*(boppos-deck)$'; then
+    log "the BoppOS shortcut is not in the Steam library, adding it"
+    timeout 20 bopp-steam-shortcut add --force >&2
+fi
 if [ -e "${XDG_STATE_HOME:-$HOME/.local/state}/boppos-deck/steam-pending.json" ]; then
     timeout 20 bopp-steam-shortcut apply-pending >&2
 fi
