@@ -136,6 +136,8 @@ jobs:
         env:
           FROM_SOURCE: ${{ inputs.from_source }}
         run: |
+          # build.sh ran as root and leaves only the ISO itself owned by this user
+          sudo chown -R "$(id -u):$(id -g)" "$ISO_OUT"
           shopt -s nullglob
           isos=("$ISO_OUT"/*.iso)
           [ "${#isos[@]}" = 1 ] || { echo "::error::expected one ISO, found ${#isos[@]}"; exit 1; }
