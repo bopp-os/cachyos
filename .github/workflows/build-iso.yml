@@ -1,0 +1,262 @@
+---
+name: Build installer ISO
+# Builds the BoppOS installer ISO from bopp-os/boppos-installer, with the installer packages from the signed [bopp-os]
+# repository (or from source, on request), and publishes it as a signed pre-release of this repository. The ISO is a net installer: it downloads the chosen image at
+# install time, so it does not go stale with every image build.
+#
+# Runs on GitHub-hosted runners: mkarchiso needs root in a privileged container, and the self-hosted runners stay
+# rootless with no sudo on purpose.
+on:
+  workflow_dispatch:
+    inputs:
+      installer_ref:
+        description: 'bopp-os/boppos-installer ref (the ISO recipe)'
+        required: false
+        type: string
+        default: 'ostree-backend'
+      from_source:
+        description: 'Build the installer packages from the two refs below instead of using the [bopp-os] repository'
+        required: false
+        type: boolean
+        default: false
+      bootc_installer_ref:
+        description: 'bopp-os/bootc-installer ref (only with from_source)'
+        required: false
+        type: string
+        default: 'boppos'
+      fisherman_ref:
+        description: 'bopp-os/fisherman ref (only with from_source)'
+        required: false
+        type: string
+        default: 'boppos'
+      publish:
+        description: 'Publish a signed pre-release (only from main)'
+        required: false
+        type: boolean
+        default: false
+  workflow_run:
+    workflows: ["Promote deck image"]
+    types: [completed]
+  pull_request:
+    paths:
+      - '.github/workflows/build-iso.yml'
+
+permissions: {}
+
+# Separate from boppos-build-queue: this does not use the self-hosted runners.
+concurrency:
+  group: build-iso-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build ISO
+    # After a promotion, only the weekly scheduled one: a manual promotion can be a dry run or a single architecture.
+    # Forked pull requests get no access to the private recipe repository.
+    if: >-
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'schedule') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: read
+    env:
+      ISO_OUT: /mnt/boppos-iso
+    steps:
+      - name: Prepare the runner
+        run: |
+          # Rootless podman (image/dev.sh) needs user namespaces, which Ubuntu's AppArmor default restricts
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          # The package build happens on /, the ISO work directory on the much larger /mnt
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          sudo mkdir -p "$ISO_OUT"
+          df -h / /mnt
+
+      - name: Checkout boppos-installer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          repository: bopp-os/boppos-installer
+          ref: ${{ inputs.installer_ref || 'ostree-backend' }}
+          # The repository is private. BOPPOS_INSTALLER_TOKEN is a read-only token for it; the fallback works if it
+          # is ever made public.
+          token: ${{ secrets.BOPPOS_INSTALLER_TOKEN || github.token }}
+          path: boppos-installer
+          persist-credentials: false
+
+      - name: Checkout bootc-installer
+        if: inputs.from_source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          repository: bopp-os/bootc-installer
+          ref: ${{ inputs.bootc_installer_ref || 'boppos' }}
+          path: bootc-installer
+          persist-credentials: false
+
+      - name: Checkout fisherman
+        if: inputs.from_source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          repository: bopp-os/fisherman
+          ref: ${{ inputs.fisherman_ref || 'boppos' }}
+          path: fisherman
+          persist-credentials: false
+
+      - name: Checkout pkgbuilds
+        if: inputs.from_source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # image/dev.sh reads the package recipe from origin/main here
+          repository: bopp-os/pkgbuilds
+          ref: main
+          path: pkgbuilds
+          persist-credentials: false
+
+      - name: Build the installer packages
+        if: inputs.from_source
+        env:
+          INSTALLER_SRC: ${{ github.workspace }}/bootc-installer
+          FISHERMAN_SRC: ${{ github.workspace }}/fisherman
+          PKGBUILDS_SRC: ${{ github.workspace }}/pkgbuilds
+        run: boppos-installer/image/dev.sh packages
+
+      - name: Build the ISO
+        env:
+          FROM_SOURCE: ${{ inputs.from_source }}
+        run: |
+          # build.sh starts its own privileged Arch container with podman, so it needs root here
+          if [ "$FROM_SOURCE" = true ]; then
+            sudo env LOCAL_PKGS="$GITHUB_WORKSPACE/boppos-installer/.dev/pkgs" \
+              boppos-installer/image/build.sh "$ISO_OUT"
+          else
+            sudo boppos-installer/image/build.sh "$ISO_OUT"
+          fi
+
+      - name: Check the size and write checksum and notes
+        env:
+          FROM_SOURCE: ${{ inputs.from_source }}
+        run: |
+          # build.sh ran as root and leaves only the ISO itself owned by this user
+          sudo chown -R "$(id -u):$(id -g)" "$ISO_OUT"
+          shopt -s nullglob
+          isos=("$ISO_OUT"/*.iso)
+          [ "${#isos[@]}" = 1 ] || { echo "::error::expected one ISO, found ${#isos[@]}"; exit 1; }
+          iso=$(basename "${isos[0]}")
+          size=$(stat -c %s "${isos[0]}")
+          # GitHub refuses release files of 2 GiB or more
+          if [ "$size" -ge 2147483648 ]; then
+            echo "::error::$iso is $size bytes, over GitHub's 2 GiB release-file limit"
+            exit 1
+          fi
+          (cd "$ISO_OUT" && sha256sum "$iso" > "$iso.sha256")
+
+          default_image=$(jq -r .imgref boppos-installer/image/airootfs/etc/bootc-installer/recipe.json)
+          {
+            echo "BoppOS installer ISO: \`$iso\` ($(numfmt --to=iec-i --suffix=B "$size"))."
+            echo
+            echo "Default image offered by the installer: \`$default_image\`"
+            echo
+            echo "Built from:"
+            echo
+            repos=(boppos-installer)
+            if [ "$FROM_SOURCE" = true ]; then repos+=(bootc-installer fisherman pkgbuilds); fi
+            for repo in "${repos[@]}"; do
+              commit=$(git -C "$repo" rev-parse HEAD)
+              echo "- [bopp-os/$repo@$commit](https://github.com/bopp-os/$repo/commit/$commit)"
+            done
+            if [ "$FROM_SOURCE" != true ]; then
+              # archiso records every installed package in the ISO
+              sudo apt-get install -y -qq libarchive-tools >/dev/null
+              echo
+              echo "Installer packages from the signed \`[bopp-os]\` repository:"
+              echo
+              bsdtar -xOf "${isos[0]}" boppos/pkglist.x86_64.txt | grep -E '^boppos-(bootc-installer|fisherman) ' | sed 's/^/- /'
+            fi
+            echo
+            echo "This is a pre-release: Keep my files and the Steam preload are not yet tested on hardware."
+            echo
+            echo "Verify the download:"
+            echo
+            echo '```bash'
+            echo "cosign verify-blob $iso.sha256 --bundle $iso.sha256.sigstore.json \\"
+            echo "  --certificate-identity https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build-iso.yml@refs/heads/main \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo "sha256sum -c $iso.sha256"
+            echo '```'
+          } > "$ISO_OUT/release-notes.md"
+          cat "$ISO_OUT/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh "$ISO_OUT"
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: iso-build-log
+          path: boppos-installer/probe-logs/iso-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the ISO
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: boppos-installer-iso
+          path: |
+            ${{ env.ISO_OUT }}/*.iso
+            ${{ env.ISO_OUT }}/*.iso.sha256
+            ${{ env.ISO_OUT }}/release-notes.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    name: Sign and publish
+    needs: build
+    # Never on a pull request. Only main, so that every release has the signing identity the README documents.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.publish) || github.event_name == 'workflow_run')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Download the ISO
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: boppos-installer-iso
+          path: dist
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the checksums
+        working-directory: dist
+        env:
+          IDENTITY: https://github.com/${{ github.workflow_ref }}
+        run: |
+          sum=$(echo ./*.iso.sha256)
+          sha256sum -c "$sum"
+          # Keyless, with this workflow's GitHub OIDC identity, so the image signing key stays off the hosted runners.
+          # The checksum file covers the ISO, so one signature is enough.
+          cosign sign-blob --yes --bundle "$sum.sigstore.json" "$sum"
+          cosign verify-blob "$sum" --bundle "$sum.sigstore.json" \
+            --certificate-identity "$IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+      - name: Publish the release
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base="iso-$(date -u +%Y.%m.%d)"
+          tag="$base"
+          n=1
+          while gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; do
+            n=$((n + 1))
+            tag="$base-$n"
+          done
+          gh release create "$tag" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "BoppOS installer $tag" --notes-file release-notes.md \
+            ./*.iso ./*.iso.sha256 ./*.iso.sha256.sigstore.json
+          echo "Published [$tag]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag)" >> "$GITHUB_STEP_SUMMARY"
