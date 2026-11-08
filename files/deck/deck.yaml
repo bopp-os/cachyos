@@ -61,8 +61,10 @@ deck-gamemode:
   - cachyos-handheld
 # Steam Deck hardware support (LCD/OLED). Harmless on other handhelds: the fan service is gated to Valve boards by
 # a drop-in in files/deck/usr/lib/systemd/system/jupiter-fan-control.service.d/.
+# No steamdeck-firmware (Deck OLED Wi-Fi/Bluetooth, QCA206X): cachyos-handheld replaces
+# /usr/lib/firmware/ath11k/QCA206X with a link to linux-firmware's QCA2066, as CachyOS Handheld ships it, and the two
+# cannot both be installed (a directory vs. a link).
 deck-steamdeck:
   - steamdeck-dsp
-  - steamdeck-firmware
   - jupiter-fan-control
   - galileo-mura
