@@ -32,8 +32,9 @@ RUN --mount=type=tmpfs,dst=/run \
 # Deck overlay: start-in.conf, autologin service and script, holo-update (steamos-update) shim, shortcuts.
 # Copied after the packages so holo-update replaces the gamescope-session-cachyos one.
 COPY files/deck/usr/ /usr/
+COPY files/deck/etc/ /etc/
 RUN chmod 0755 /usr/bin/holo-update /usr/libexec/boppos/deck-autologin /usr/libexec/boppos/deck-first-boot \
-    /usr/libexec/boppos/deck-before-steam
+    /usr/libexec/boppos/deck-before-steam /usr/libexec/boppos/deck-desktop-icons
 
 # Remove SDDM components/KCM (plasma-login-manager is the display manager here)
 RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \

@@ -72,6 +72,15 @@ drops one naming a session the image lacks. With no
 account yet (first boot before OOBE) it does nothing. The desktop flavors (plasma, gnome, niri, cinnamon) have no
 Gaming Mode session: `start-in.conf` leaves `gaming-session` empty there.
 
+**Deck desktop (Plasma), like SteamOS and CachyOS Handheld.** Plasma defaults otherwise.
+- "Return to Gaming Mode" (`/usr/share/applications/steamos-gamemode.desktop`, runs `steamos-session-select
+  gamescope`) is in the menu, and `/usr/libexec/boppos/deck-desktop-icons` (XDG autostart, once per account) puts an
+  executable copy in `~/Desktop`, which Plasma's default desktop shows. Deleted, it stays gone.
+- `/etc/xdg/autostart/steam.desktop` starts `steam -silent` at desktop login, as SteamOS does: Steam's desktop
+  controller layout is what makes the handheld's controls work as a mouse and keyboard ("lizard mode"). Same name as
+  the file Steam's own "Run Steam when my computer starts" writes, so that setting or Plasma's Autostart page
+  overrides it.
+
 ## Turning autologin on (user + session), per flavor
 
 | Flavor   | File | Content | Verified how |
