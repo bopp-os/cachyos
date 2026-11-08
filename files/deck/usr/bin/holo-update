@@ -22,7 +22,8 @@ if [ -f /run/boppos/deck-update-staged ]; then
 fi
 
 if [ "$check" = 1 ]; then
-    available=$(bopp-system --json check 2>/dev/null | jq -r '.os.update_available // false' 2>/dev/null)
+    # .os.monitor is the registry check bopp-system just ran; .os.update_available only means an image is staged.
+    available=$(bopp-system --json check 2>/dev/null | jq -r '.os.monitor.update_available // false' 2>/dev/null)
     [ "$available" = true ] && exit 0
     exit 7
 fi
