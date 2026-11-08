@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=BoppOS desktop setup
-Comment=Put Return to Gaming Mode on the desktop (once)
+Comment=Default KDE wallet and Return to Gaming Mode on the desktop (once)
 Exec=/usr/libexec/boppos/deck-desktop-setup
 OnlyShowIn=KDE;
 NoDisplay=true

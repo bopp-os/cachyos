@@ -3,7 +3,18 @@
 # account, so a deleted icon stays gone. Accounts created after the image shipped it get it from /etc/skel/Desktop;
 # this covers older ones. (Steam's autostart and the KWin setting that lets it control input without a prompt,
 # XwaylandEisNoPrompt, come from cachyos-handheld.)
+#
+# Also gives an account without a KDE wallet SteamOS's default one (empty password, /usr/share/boppos/kwalletd), as
+# SteamOS's holo-setup-kwallet does. After autologin there is no login password to unlock a wallet with, so
+# without it the first app that stores a secret (e.g. Bazaar) opens KWallet's setup wizard instead.
 set -u
+
+wallet_dir="${XDG_DATA_HOME:-$HOME/.local/share}/kwalletd"
+if [ ! -e "$wallet_dir/kdewallet.kwl" ]; then
+    mkdir -p "$wallet_dir"
+    install -m 0600 /usr/share/boppos/kwalletd/kdewallet.kwl /usr/share/boppos/kwalletd/kdewallet.salt "$wallet_dir/"
+    kwriteconfig6 --file kwalletrc --group Wallet --key "First Use" false
+fi
 
 state="${XDG_STATE_HOME:-$HOME/.local/state}/boppos"
 mkdir -p "$state"

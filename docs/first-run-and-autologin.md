@@ -92,6 +92,11 @@ Its install script sets things up for the user at install time; an image is buil
   runs `steamos-session-select gamescope` (followed by `boppos-deck-session-sync.path`), keeping its
   `steamdeck-gaming-return` icon. `deck-desktop-setup` (XDG autostart, once per account) copies it to `~/Desktop`
   for accounts made before the image shipped it.
+- KDE wallet: after autologin there is no login password to unlock one with, so the first app storing a secret
+  (Bazaar on a Legion Go) opened KWallet's setup wizard ("no keys suitable for encryption"). `deck-desktop-setup`
+  gives an account without `~/.local/share/kwalletd/kdewallet.kwl` SteamOS's default wallet (empty password, from
+  Valve's `steamdeck-kde-presets`, GPL-2.0, in `/usr/share/boppos/kwalletd`) and sets `First Use=false`, as SteamOS's
+  `holo-setup-kwallet` does. Trade-off, same as SteamOS: secrets in it are not protected by a password.
 
 ## Turning autologin on (user + session), per flavor
 
