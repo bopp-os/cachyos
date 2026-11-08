@@ -1,0 +1,36 @@
+#!/usr/bin/bash
+# XDG autostart in Plasma (boppos-deck-desktop-setup.desktop), before Steam's autostart. Each step runs once per
+# account, so what the user removes or revokes stays that way.
+#  1. "Return to Gaming Mode" on the desktop, as SteamOS and CachyOS Handheld do. New and existing accounts alike.
+#  2. Lets Steam control input on the desktop without asking. Steam's desktop controller layout ("lizard mode") goes
+#     through the remote-desktop portal, and Plasma otherwise asks "allow control" first. Pre-authorized in KDE's
+#     kde-authorized permission table (Plasma 6.3+, develop.kde.org/docs/administration/portal-permissions) for the
+#     app id "steam" only: what Steam gets when Plasma starts it from steam.desktop. Revocable in System Settings >
+#     Application Permissions.
+set -u
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/boppos"
+mkdir -p "$state"
+
+if [ ! -e "$state/desktop-icons-offered" ]; then
+    desktop=$(xdg-user-dir DESKTOP 2> /dev/null || echo "$HOME/Desktop")
+    [ -n "$desktop" ] && [ "$desktop" != "$HOME" ] || desktop="$HOME/Desktop"
+    mkdir -p "$desktop"
+    if [ ! -e "$desktop/steamos-gamemode.desktop" ]; then
+        # Executable, so Plasma runs it without asking whether to trust it
+        install -m 0755 /usr/share/applications/steamos-gamemode.desktop "$desktop/steamos-gamemode.desktop"
+    fi
+    touch "$state/desktop-icons-offered"
+fi
+
+if [ ! -e "$state/steam-input-authorized" ]; then
+    if gdbus call --session --dest org.freedesktop.impl.portal.PermissionStore \
+        --object-path /org/freedesktop/impl/portal/PermissionStore \
+        --method org.freedesktop.impl.portal.PermissionStore.SetPermission \
+        kde-authorized true remote-desktop steam "['yes']" > /dev/null; then
+        touch "$state/steam-input-authorized"
+    else
+        echo "deck-desktop-setup: could not pre-authorize Steam's input control (retrying next login)" >&2
+    fi
+fi
+exit 0

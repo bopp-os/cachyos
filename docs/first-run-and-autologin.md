@@ -74,12 +74,17 @@ Gaming Mode session: `start-in.conf` leaves `gaming-session` empty there.
 
 **Deck desktop (Plasma), like SteamOS and CachyOS Handheld.** Plasma defaults otherwise.
 - "Return to Gaming Mode" (`/usr/share/applications/steamos-gamemode.desktop`, runs `steamos-session-select
-  gamescope`) is in the menu, and `/usr/libexec/boppos/deck-desktop-icons` (XDG autostart, once per account) puts an
+  gamescope`) is in the menu, and `/usr/libexec/boppos/deck-desktop-setup` (XDG autostart, once per account) puts an
   executable copy in `~/Desktop`, which Plasma's default desktop shows. Deleted, it stays gone.
 - `/etc/xdg/autostart/steam.desktop` starts `steam -silent` at desktop login, as SteamOS does: Steam's desktop
   controller layout is what makes the handheld's controls work as a mouse and keyboard ("lizard mode"). Same name as
   the file Steam's own "Run Steam when my computer starts" writes, so that setting or Plasma's Autostart page
   overrides it.
+- Steam's desktop controls go through the remote-desktop portal, and Plasma asks "allow control" first.
+  `deck-desktop-setup` pre-authorizes it once per account in KDE's `kde-authorized` permission table (Plasma 6.3+,
+  [KDE docs](https://develop.kde.org/docs/administration/portal-permissions/)) for the app id `steam` only (Steam
+  started by Plasma from `steam.desktop`), not the empty app id Nobara uses, which would cover every host app.
+  Revocable in System Settings > Application Permissions.
 
 ## Turning autologin on (user + session), per flavor
 

@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=BoppOS desktop icons
-Comment=Put Return to Gaming Mode on the desktop once
-Exec=/usr/libexec/boppos/deck-desktop-icons
-OnlyShowIn=KDE;
-NoDisplay=true
-X-KDE-autostart-phase=1

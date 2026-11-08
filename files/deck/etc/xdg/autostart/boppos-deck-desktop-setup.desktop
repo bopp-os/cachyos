@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=BoppOS desktop setup
+Comment=Return to Gaming Mode on the desktop, and let Steam use the controls on the desktop (once)
+Exec=/usr/libexec/boppos/deck-desktop-setup
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-phase=1
