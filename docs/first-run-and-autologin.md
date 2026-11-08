@@ -19,6 +19,10 @@ SteamOS, ChimeraOS and Bazzite: the installer preloads the Steam client and copi
 setup (Wi-Fi, sign-in) runs first, and the BoppOS tour opens from Steam afterwards. A window of ours before Steam
 fought gamescope's Steam mode on a Legion Go (invisible, frozen frames, no gamepad or touch).
 
+- While Steam starts, updates or unpacks itself, its update screen shows
+  `/usr/share/plymouth/themes/steamos/steamos.png` (gamescope-session-cachyos sets `STEAM_UPDATEUI_PNG_BACKGROUND`
+  to it on non-Valve hardware; no package ships it). The image ships a BoppOS one ("Getting Steam ready"), rendered
+  from `files/deck/steam-update-background.svg`, so the first start is not a black screen.
 - `steam-launcher.service.d/10-boppos.conf` runs `/usr/libexec/boppos/deck-before-steam` before every Steam
   start (Steam is closed then, the only time its library can be written): `bopp-steam-shortcut add` (the BoppOS
   shortcut, once per user, after the first sign-in) and `apply-pending` (queued library changes). It also pulls in
