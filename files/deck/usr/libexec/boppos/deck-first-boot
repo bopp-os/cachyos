@@ -17,8 +17,14 @@ set -u
 STEAM_DIR="$HOME/.local/share/Steam"
 log() { echo "deck-first-boot: $*" >&2; }
 
+BOOTSTRAP=/usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz
+
+# Steam can start without the network: its client is unpacked in the home, or the image's bootstrap is the whole
+# client (steam-jupiter-stable: ~400 MB, unpacked into the home on Steam's first start; the plain steam package's
+# bootstrap is a few MB and downloads the client).
 steam_installed() {
-    [ -e "$STEAM_DIR/ubuntu12_64/steamui.so" ] || [ -e "$STEAM_DIR/ubuntu12_32/steamui.so" ]
+    [ -e "$STEAM_DIR/ubuntu12_64/steamui.so" ] || [ -e "$STEAM_DIR/ubuntu12_32/steamui.so" ] ||
+        [ "$(stat -c %s "$BOOTSTRAP" 2> /dev/null || echo 0)" -gt 100000000 ]
 }
 
 # A connection is up (Wi-Fi joined or a cable). Waits a little, since the first boot can still be joining.

@@ -34,7 +34,7 @@ to stream BoppOS from another PC (the shortcut id is the same on every BoppOS ma
   leaving and re-entering Game Mode).
 - Fallback: `boppos-deck-first-boot.service`, which `gamescope-session.service` waits for (drop-in
   `gamescope-session.service.d/10-boppos-first-boot.conf`), runs `/usr/libexec/boppos/deck-first-boot`. Only when
-  Steam has no client (no `steamui.so`: the preload failed) and there is no network, it opens `boppos-deck --welcome`
+  Steam has no client (no `steamui.so` in the home, and the image's `/usr/lib/steam` bootstrap is not the whole client as `steam-jupiter-stable`'s is) and there is no network, it opens `boppos-deck --welcome`
   with `BOPPOS_FIRST_BOOT_MISSING="steam network"` as the only app in a gamescope of its own (`--backend drm`, not
   Steam mode, which only shows windows Steam picks), then the Plasma network settings (`kcmshell6
   kcm_networkmanagement`) if still offline. Offline with Steam installed is not a problem: Steam has an offline
