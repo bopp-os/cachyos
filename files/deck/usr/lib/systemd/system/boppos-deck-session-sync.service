@@ -1,0 +1,7 @@
+[Unit]
+Description=Copy Steam's session choice into the plasmalogin autologin
+Documentation=file:///usr/libexec/boppos/deck-autologin
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/boppos/deck-autologin

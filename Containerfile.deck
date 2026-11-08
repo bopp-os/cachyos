@@ -50,6 +50,7 @@ RUN systemctl disable sddm.service || true && \
     systemctl disable gdm.service || true && \
     systemctl enable plasmalogin.service && \
     systemctl enable boppos-deck-autologin.service && \
+    systemctl enable boppos-deck-session-sync.path && \
     systemctl enable inputplumber.service && \
     systemctl enable steamos-manager.service && \
     systemctl enable cardwired.service || true

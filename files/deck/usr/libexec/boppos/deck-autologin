@@ -1,10 +1,11 @@
 #!/usr/bin/bash
 # Runs every boot before the display manager (the pattern Bazzite's bazzite-autologin uses).
-#  1. Autologin: the account the installer (or boppos-oobe) created, written to a plasmalogin drop-in. The session
-#     is only ever in zz-steamos-autologin.conf, which steam-set-session rewrites when Steam's "Switch to Desktop"
-#     (steamos-session-select) or the Return to Gaming Mode shortcut runs. Our file must not name a session:
-#     plasmalogin let our Session= win over that file, so Switch to Desktop came back to Game Mode (Legion Go,
-#     2026-11-07). When the file is missing (first boot), it is created for Game Mode.
+#  1. Autologin: the account the installer (or boppos-oobe) created, plus the session, written to a plasmalogin
+#     drop-in. The session choice is zz-steamos-autologin.conf, which steam-set-session rewrites when Steam's
+#     "Switch to Desktop" (steamos-session-select) or the Return to Gaming Mode shortcut runs. plasmalogin does not
+#     read that file here: with Session= in our file it used ours, without it "Unable to find autologin session
+#     entry """ (Legion Go, 2026-11-07). So its Session= is copied into our file, at boot and again whenever it
+#     changes (boppos-deck-session-sync.path). When it is missing (first boot), it is created for Game Mode.
 #  2. /home/deck: points at that account's home so Decky plugins with hard-coded /home/deck paths work.
 # With no real account yet (first boot before OOBE) it does nothing and the next boot finishes the job.
 set -u
@@ -26,14 +27,6 @@ if [ -z "$user" ] || [ "$user" = boppos-oobe ]; then
 fi
 
 mkdir -p "$CONF_DIR"
-tmp=$(mktemp "$CONF_DIR/.00-boppos-autologin.XXXXXX")
-cat > "$tmp" <<CFG
-[Autologin]
-User=$user
-Relogin=true
-CFG
-chmod 0644 "$tmp"
-mv -f "$tmp" "$CONF"
 
 # The session choice: drop one that names a session this image does not ship (e.g. left over from another image),
 # then start in Game Mode when there is none. Same content steam-set-session writes.
@@ -49,6 +42,17 @@ if [ ! -f "$zz" ]; then
     printf '[Autologin]\nSession=gamescope-session.desktop\n' > "$tmp"
     chmod 0644 "$tmp"
     mv -f "$tmp" "$zz"
+fi
+session=$(sed -n 's/^Session=//p' "$zz" | head -n1)
+
+# Our file, with the session copied in. Only replaced when it changes, so plasmalogin sees a change only when there is one.
+want=$(printf '[Autologin]\nUser=%s\nRelogin=true\nSession=%s\n' "$user" "$session")
+if [ "$(cat "$CONF" 2> /dev/null)" != "$want" ]; then
+    tmp=$(mktemp "$CONF_DIR/.00-boppos-autologin.XXXXXX")
+    printf '%s\n' "$want" > "$tmp"
+    chmod 0644 "$tmp"
+    mv -f "$tmp" "$CONF"
+    echo "autologin: $user, $session" >&2
 fi
 
 home=$(getent passwd "$user" | cut -d: -f6)

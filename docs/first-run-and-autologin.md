@@ -62,10 +62,13 @@ Its `gaming-session` is empty because no Gaming Mode session exists, so the Star
 it and Plasma (`steam-set-session` writes `/etc/plasmalogin.conf.d/zz-steamos-autologin.conf`). The image's
 `boppos-deck-autologin.service` runs before the display manager on every boot and writes the autologin user
 (`/etc/plasmalogin.conf.d/00-boppos-autologin.conf`, the account with UID 1000, falling back to the first `wheel`
-member, with `Relogin=true` and **no** `Session=`) and points `/var/home/deck` at that home, so Decky plugins with
-hard-coded `/home/deck` paths work. The session lives only in `zz-steamos-autologin.conf`: when our file also named
-one, plasmalogin used ours and Steam's "Switch to Desktop" came straight back to Game Mode (Legion Go). When that
-file is missing it writes it for Game Mode, and it drops one naming a session the image lacks. With no
+member, `Relogin=true`, and the `Session=` copied from `zz-steamos-autologin.conf`) and points `/var/home/deck` at
+that home, so Decky plugins with hard-coded `/home/deck` paths work. plasmalogin does not read
+`zz-steamos-autologin.conf` here (Legion Go: with a `Session=` in our file it used ours, so "Switch to Desktop" came
+back to Game Mode; without one it logged `Unable to find autologin session entry ""`). So
+`boppos-deck-session-sync.path` reruns the script whenever `steam-set-session` rewrites that file, and the choice is
+copied into ours before plasmalogin logs in again. When that file is missing it writes it for Game Mode, and it
+drops one naming a session the image lacks. With no
 account yet (first boot before OOBE) it does nothing. The desktop flavors (plasma, gnome, niri, cinnamon) have no
 Gaming Mode session: `start-in.conf` leaves `gaming-session` empty there.
 
