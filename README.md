@@ -90,19 +90,19 @@ Your system will download the new image and stage it for the next boot.
 
 ### 2. Installer ISO
 
-Download the newest `iso-YYYYMMDD` file set from [Releases](https://github.com/bopp-os/cachyos/releases): the ISO, `SHA256SUMS` and `SHA256SUMS.sigstore.json`. It is a UEFI net installer: it downloads the image you pick during the install. In the download folder, check the signature first, then the ISO:
+Download the newest `iso-YYYY.MM.DD` pre-release from [Releases](https://github.com/bopp-os/cachyos/releases): the ISO, its `.sha256` file and its `.sha256.sigstore.json` file. It is a UEFI net installer: it downloads the image you pick during the install. In the download folder, check the signature first, then the ISO:
 
 ```bash
-cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
+cosign verify-blob boppos-installer-*.iso.sha256 --bundle boppos-installer-*.iso.sha256.sigstore.json \
   --certificate-identity https://github.com/bopp-os/cachyos/.github/workflows/build-iso.yml@refs/heads/main \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 ```bash
-sha256sum -c SHA256SUMS
+sha256sum -c boppos-installer-*.iso.sha256
 ```
 
-The ISO is built by [build-iso.yml](.github/workflows/build-iso.yml), after each scheduled deck promotion or by hand. Each release lists the exact commits it was built from.
+The ISO is built by [build-iso.yml](.github/workflows/build-iso.yml), after each scheduled deck promotion or by hand. Each release lists the recipe commit and installer package versions it was built from.
 
 ### 3. Fresh Installation with `bootc install`
 
