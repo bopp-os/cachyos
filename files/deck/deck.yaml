@@ -55,6 +55,10 @@ deck-gamemode:
   - steamos-powerbuttond
   - inputplumber
   - scx-scheds
+  # CachyOS Handheld's desktop and device setup (KWin/input/power defaults, Steam autostart, Legion Go and ROG Ally
+  # speaker tuning). Its install-time user setup cannot work in an image; Containerfile.deck and deck-autologin
+  # make up for it.
+  - cachyos-handheld
 # Steam Deck hardware support (LCD/OLED). Harmless on other handhelds: the fan service is gated to Valve boards by
 # a drop-in in files/deck/usr/lib/systemd/system/jupiter-fan-control.service.d/.
 deck-steamdeck:

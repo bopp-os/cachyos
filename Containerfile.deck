@@ -36,6 +36,16 @@ COPY files/deck/etc/ /etc/
 RUN chmod 0755 /usr/bin/holo-update /usr/libexec/boppos/deck-autologin /usr/libexec/boppos/deck-first-boot \
     /usr/libexec/boppos/deck-before-steam /usr/libexec/boppos/deck-desktop-setup
 
+# cachyos-handheld's install script sets up the user at install time, when an image has none:
+#  - steam-deckify.conf: autologin with an empty/"deck" user and its own Session=. deck-autologin writes the real
+#    user and the session to 00-boppos-autologin.conf.
+#  - /etc/handheld-first-boot: makes CachyOS's holo-update restart graphical.target at Steam's first update check.
+#    Ours replaces that holo-update and never reads it; removed so it can never fire.
+#  - its skel desktop icon runs steamosctl switch-to-game-mode (steamos-manager writes SDDM paths); ours, which
+#    replaces /usr/share/applications/steamos-gamemode.desktop, goes through steamos-session-select.
+RUN rm -f /etc/plasmalogin.conf.d/steam-deckify.conf /etc/handheld-first-boot && \
+    install -D -m 0755 /usr/share/applications/steamos-gamemode.desktop /etc/skel/Desktop/steamos-gamemode.desktop
+
 # Remove SDDM components/KCM (plasma-login-manager is the display manager here)
 RUN pacman -Rdd --noconfirm sddm-kcm sddm cachyos-themes-sddm || true && \
     rm -f /usr/lib/qt6/plugins/plasma/kcms/systemsettings/kcm_sddm.so \

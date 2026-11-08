@@ -1,9 +1,10 @@
 [Desktop Entry]
+# Replaces cachyos-handheld's file of the same name: theirs runs `steamosctl switch-to-game-mode`, ours
+# steamos-session-select, whose session file boppos-deck-session-sync.path copies into the plasmalogin autologin.
 Name=Return to Gaming Mode
 Comment=Log out of the desktop and go back to Game Mode
 Exec=steamos-session-select gamescope
-Icon=steam
+Icon=steamdeck-gaming-return
 Terminal=false
 Type=Application
 StartupNotify=false
-Categories=System;

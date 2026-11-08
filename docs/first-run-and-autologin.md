@@ -72,19 +72,26 @@ drops one naming a session the image lacks. With no
 account yet (first boot before OOBE) it does nothing. The desktop flavors (plasma, gnome, niri, cinnamon) have no
 Gaming Mode session: `start-in.conf` leaves `gaming-session` empty there.
 
-**Deck desktop (Plasma), like SteamOS and CachyOS Handheld.** Plasma defaults otherwise.
-- "Return to Gaming Mode" (`/usr/share/applications/steamos-gamemode.desktop`, runs `steamos-session-select
-  gamescope`) is in the menu, and `/usr/libexec/boppos/deck-desktop-setup` (XDG autostart, once per account) puts an
-  executable copy in `~/Desktop`, which Plasma's default desktop shows. Deleted, it stays gone.
-- `/etc/xdg/autostart/steam.desktop` starts `steam -silent` at desktop login, as SteamOS does: Steam's desktop
-  controller layout is what makes the handheld's controls work as a mouse and keyboard ("lizard mode"). Same name as
-  the file Steam's own "Run Steam when my computer starts" writes, so that setting or Plasma's Autostart page
-  overrides it.
-- Steam's desktop controls go through the remote-desktop portal, and Plasma asks "allow control" first.
-  `deck-desktop-setup` pre-authorizes it once per account in KDE's `kde-authorized` permission table (Plasma 6.3+,
-  [KDE docs](https://develop.kde.org/docs/administration/portal-permissions/)) for the app id `steam` only (Steam
-  started by Plasma from `steam.desktop`), not the empty app id Nobara uses, which would cover every host app.
-  Revocable in System Settings > Application Permissions.
+**Deck desktop (Plasma): CachyOS Handheld's.** The image installs `cachyos-handheld` (CachyOS Handheld's own
+package, with `steam-jupiter-stable` in place of `steam`, which it conflicts with; same Steam bootstrap tarball the
+installer's preload uses). It brings the handheld KWin/input/power/screen-lock defaults, the Vapor look, the Plasma
+on-screen keyboard, `/etc/xdg/autostart/steam.desktop` (`steam -silent -steamdeck`: Steam's desktop controller layout
+is what makes the controls work as a mouse and keyboard), `XwaylandEisNoPrompt=true` in `kwinrc` (Steam may control
+input without Plasma's "allow control" prompt), and Legion Go / ROG Ally speaker tuning.
+
+Its install script sets things up for the user at install time; an image is built before any user exists, so:
+- `/etc/plasmalogin.conf.d/steam-deckify.conf` (autologin with an empty/`deck` user and its own `Session=`) is
+  deleted in `Containerfile.deck`; `deck-autologin` writes the real user and session.
+- `/etc/handheld-first-boot` is deleted. Only CachyOS's `holo-update` reads it (the first time Steam checks for a
+  system update it removes the file and restarts `graphical.target`); the image replaces that `holo-update` with
+  BoppOS's, so it would never be read, and removing it means it can never fire.
+- `DECKY_USER` / `DECKY_USER_HOME` in `/etc/environment.d/handheld.conf` are written every boot by `deck-autologin`.
+- "Return to Gaming Mode": the package's entry runs `steamosctl switch-to-game-mode`, and steamos-manager writes
+  SDDM paths (`/etc/sddm.conf.d`, `zzt-steamos-temp-login.conf`), unproven with plasmalogin. The image replaces
+  `/usr/share/applications/steamos-gamemode.desktop` and `/etc/skel/Desktop/steamos-gamemode.desktop` with one that
+  runs `steamos-session-select gamescope` (followed by `boppos-deck-session-sync.path`), keeping its
+  `steamdeck-gaming-return` icon. `deck-desktop-setup` (XDG autostart, once per account) copies it to `~/Desktop`
+  for accounts made before the image shipped it.
 
 ## Turning autologin on (user + session), per flavor
 

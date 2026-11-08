@@ -7,6 +7,8 @@
 #     entry """ (Legion Go, 2026-11-07). So its Session= is copied into our file, at boot and again whenever it
 #     changes (boppos-deck-session-sync.path). When it is missing (first boot), it is created for Game Mode.
 #  2. /home/deck: points at that account's home so Decky plugins with hard-coded /home/deck paths work.
+#  3. Decky loader's user: DECKY_USER / DECKY_USER_HOME in cachyos-handheld's /etc/environment.d/handheld.conf, which
+#     its install script fills in at install time (no user exists when the image is built).
 # With no real account yet (first boot before OOBE) it does nothing and the next boot finishes the job.
 set -u
 
@@ -63,5 +65,19 @@ if [ -n "$home" ] && [ "$user" != deck ] && [ "$home" != /home/deck ] && [ "$hom
         ln -sfn "$home" "$link"
     else
         echo "$link exists and is not a link, leaving it alone" >&2
+    fi
+fi
+
+# Decky loader's user (cachyos-handheld). Its install script left these empty (and renamed DECKY_USER_HOME to
+# DECK_USER_HOME by a typo); rewritten only when they differ.
+env_file=/etc/environment.d/handheld.conf
+if [ -f "$env_file" ] && [ -n "$home" ]; then
+    want=$(grep -vE '^(DECKY_USER|DECKY_USER_HOME|DECK_USER_HOME)=' "$env_file"
+        printf 'DECKY_USER=%s\nDECKY_USER_HOME=%s\n' "$user" "$home")
+    if [ "$(cat "$env_file")" != "$want" ]; then
+        tmp=$(mktemp /etc/environment.d/.handheld.XXXXXX)
+        printf '%s\n' "$want" > "$tmp"
+        chmod 0644 "$tmp"
+        mv -f "$tmp" "$env_file"
     fi
 fi
