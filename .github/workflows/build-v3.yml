@@ -146,7 +146,10 @@ env:
   BUILD_NETWORK: "${{ inputs.allow_build_network && 'host' || 'none' }}"
 
 concurrency:
-  group: boppos-build-queue
+  # Everything on the build machines waits in boppos-build-queue, in request order. A scheduled cycle holds that queue
+  # for its whole run (see schedule.yml), so its stages use a group of their own: taking the caller's group would
+  # deadlock, and taking it per stage would let a waiting build in between two stages.
+  group: ${{ github.workflow == 'Scheduled builds' && format('boppos-cycle-stage-{0}', github.run_id) || 'boppos-build-queue' }}
   cancel-in-progress: false
   # Keep every waiting build (default is one, and a newer one cancels it)
   queue: max

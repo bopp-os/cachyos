@@ -59,10 +59,7 @@ env:
     v4 v4 docker.io/cachyos/cachyos-v4:latest
     znver4 v4 ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest
 
-concurrency:
-  group: boppos-build-queue
-  cancel-in-progress: false
-  queue: max
+# No concurrency group: only schedule.yml calls this, and it holds boppos-build-queue for the whole cycle.
 
 jobs:
   prefetch:
