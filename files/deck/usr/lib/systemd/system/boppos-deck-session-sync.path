@@ -1,0 +1,12 @@
+[Unit]
+Description=Follow Steam's session choice (Switch to Desktop / Return to Gaming Mode) in the plasmalogin autologin
+Documentation=file:///usr/libexec/boppos/deck-autologin
+
+[Path]
+# steam-set-session rewrites this file; deck-autologin copies its Session= into 00-boppos-autologin.conf,
+# the file plasmalogin actually reads
+PathChanged=/etc/plasmalogin.conf.d/zz-steamos-autologin.conf
+Unit=boppos-deck-session-sync.service
+
+[Install]
+WantedBy=multi-user.target

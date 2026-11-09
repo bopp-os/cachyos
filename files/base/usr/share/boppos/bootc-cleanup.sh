@@ -43,8 +43,19 @@ ln -sf /usr/lib/sysimage/cache/pacman/pkg /var/cache/pacman/pkg
 echo "Generating tmpfiles for /var directories and symlinks..."
 > /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 
+# Paths a package's own tmpfiles.d already declares are left to it. tmpfiles reads files in name order and the first
+# line for a path wins, and "99-boppos-var-auto.conf" sorts before most package files (e.g. plasmalogin.conf). A
+# build-time owner here (root) then overrode the package's (plasmalogin:plasmalogin), and plasmalogin's greeter
+# could not use /var/lib/plasmalogin (Legion Go, deck image).
+declare -A DECLARED=()
+while read -r path; do
+    DECLARED["$path"]=1
+done < <(cat /usr/lib/tmpfiles.d/*.conf /etc/tmpfiles.d/*.conf 2>/dev/null |
+    awk '$1 !~ /^#/ && NF >= 2 && $2 ~ /^\/var\// {print $2}')
+
 find /var -mindepth 1 -type d -not -path "/var/tmp*" 2>/dev/null | sort | while read -r dir; do
     if [ -L "$dir" ]; then continue; fi
+    if [ -n "${DECLARED[$dir]:-}" ]; then continue; fi
     mode=$(stat -c "%a" "$dir")
     if [ ${#mode} -eq 3 ]; then mode="0$mode"; fi
     owner=$(stat -c "%U" "$dir")
@@ -55,6 +66,7 @@ find /var -mindepth 1 -type d -not -path "/var/tmp*" 2>/dev/null | sort | while 
 done
 
 find /var -mindepth 1 -type l -not -path "/var/tmp*" 2>/dev/null | sort | while read -r link; do
+    if [ -n "${DECLARED[$link]:-}" ]; then continue; fi
     target=$(readlink "$link")
     echo "L $link - - - - $target" >> /usr/lib/tmpfiles.d/99-boppos-var-auto.conf
 done

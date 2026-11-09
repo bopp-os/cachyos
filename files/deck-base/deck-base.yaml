@@ -266,7 +266,9 @@ gaming-core:
   - yad
   - mangohud
   - lib32-mangohud
-  - steam
+  # Valve's SteamOS Steam bootstrapper (provides and conflicts with steam); cachyos-handheld depends on it. Same
+  # /usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz the installer's Steam preload unpacks.
+  - steam-jupiter-stable
   - lib32-systemd
   - gamescope
   - nvtop

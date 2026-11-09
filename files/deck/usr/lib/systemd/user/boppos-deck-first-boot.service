@@ -1,0 +1,16 @@
+[Unit]
+Description=BoppOS check before Game Mode (no Steam client and no network)
+Documentation=file:///usr/libexec/boppos/deck-first-boot
+# Pulled in and waited for by gamescope-session.service (see its drop-in). Exits at once unless Steam has no client
+# and there is no network; then boppos-deck runs in a gamescope of its own, which must exit before Game Mode's
+# gamescope takes the screen.
+Before=gamescope-session.service
+
+[Service]
+Type=oneshot
+# Once per session: a Steam or gamescope restart does not run the check again
+RemainAfterExit=yes
+# The user may take as long as they like in the setup
+TimeoutStartSec=infinity
+ExecStart=/usr/libexec/boppos/deck-first-boot
+Slice=session.slice

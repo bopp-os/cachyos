@@ -1,0 +1,4 @@
+Default KDE wallet ("kdewallet", empty password), from Valve's steamdeck-kde-presets 3.9.4-2 (SteamOS, GPL-2.0):
+/usr/share/kwalletd/kdewallet.kwl and kdewallet.salt. deck-desktop-setup copies it into an account's
+~/.local/share/kwalletd at the first desktop login when the account has no wallet, as SteamOS's holo-setup-kwallet
+does, so the wallet opens without a prompt after autologin (no login password to unlock it with).
