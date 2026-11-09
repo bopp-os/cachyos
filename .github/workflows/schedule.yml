@@ -65,6 +65,14 @@ on:
         type: boolean
         default: false
 
+# The whole cycle is one entry in the build queue, so nothing can start on the build machines between its stages.
+# build-*.yml check for this workflow's name to stand aside from the queue: update them if it is renamed.
+concurrency:
+  group: boppos-build-queue
+  cancel-in-progress: false
+  # Keep every waiting build (default is one, and a newer one cancels it)
+  queue: max
+
 permissions: {}
 
 jobs:
