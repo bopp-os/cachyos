@@ -36,8 +36,86 @@ on:
         type: boolean
         default: false
 
+# Pulling the images needs the build machine's disk, so it waits in the same queue as the builds. A scheduled cycle
+# already holds that queue; see schedule.yml.
+concurrency:
+  group: ${{ github.workflow == 'Scheduled builds' && format('boppos-cycle-stage-{0}', github.run_id) || 'boppos-build-queue' }}
+  cancel-in-progress: false
+  queue: max
+
 jobs:
+  package-lists:
+    # GitHub's runners don't have the disk space to unpack every flavor
+    runs-on: self-hosted
+    permissions: {}
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Generate Package Lists from All Images
+        run: |
+          # The runner keeps its workspace between runs, and the lists below are appended to
+          rm -rf build
+          mkdir -p build
+          touch build/all-packages-temp.txt build/cachyos-packages-temp.txt build/boppos-packages-temp.txt
+          
+          # Spin up the latest version of every image flavor to build a master superset of packages
+          for FLAVOR in plasma gnome niri cinnamon deck; do
+            IMAGE_REF="ghcr.io/${{ github.repository_owner }}/cachyos-${FLAVOR}:v3"
+            USE_PODMAN=false
+            
+            if [ "${{ inputs.force_podman }}" == "true" ]; then
+              USE_PODMAN=true
+            else
+              echo "Attempting to download SBOM for $IMAGE_REF..."
+              if cosign download sbom "$IMAGE_REF" > build/sbom-${FLAVOR}.json 2>/dev/null && [ -s build/sbom-${FLAVOR}.json ]; then
+                # Validate SBOM structure (handles both flat arrays and .packages objects)
+                if jq -e 'if type=="array" then (.[0] | has("repository")) else (.packages[0] | has("repository")) end' build/sbom-${FLAVOR}.json > /dev/null 2>&1; then
+                  echo "Successfully downloaded and validated SBOM."
+                  jq -r 'if type=="array" then .[] else .packages[] end | .name' build/sbom-${FLAVOR}.json >> build/all-packages-temp.txt
+                  jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("cachyos"))) | .name' build/sbom-${FLAVOR}.json >> build/cachyos-packages-temp.txt 2>/dev/null || true
+                  jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("bopp-os"))) | .name' build/sbom-${FLAVOR}.json >> build/boppos-packages-temp.txt 2>/dev/null || true
+                else
+                  echo "SBOM format unrecognized or missing package names. Falling back to Podman."
+                  USE_PODMAN=true
+                fi
+              else
+                echo "Failed to download SBOM or SBOM is empty. Falling back to Podman."
+                USE_PODMAN=true
+              fi
+            fi
+            
+            if [ "$USE_PODMAN" == "true" ]; then
+              echo "Extracting packages using Podman mount fallback..."
+              CONTAINER_ID=$(podman create "$IMAGE_REF")
+              podman cp "$CONTAINER_ID:/usr/share/boppos/packages.json" "build/packages-${FLAVOR}.json"
+              podman rm "$CONTAINER_ID" >/dev/null 2>&1 || true
+              # Only the package list is needed, so don't leave the image taking up the build machine's disk
+              podman rmi "$IMAGE_REF" >/dev/null 2>&1 || true
+
+              jq -r 'if type=="array" then .[] else .packages[] end | .name' "build/packages-${FLAVOR}.json" >> build/all-packages-temp.txt
+              jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("cachyos"))) | .name' "build/packages-${FLAVOR}.json" >> build/cachyos-packages-temp.txt
+              jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("bopp-os"))) | .name' "build/packages-${FLAVOR}.json" >> build/boppos-packages-temp.txt
+            fi
+          done
+          
+          sort -u build/all-packages-temp.txt > build/all-packages.txt
+          sort -u build/cachyos-packages-temp.txt > build/cachyos-packages.txt
+          sort -u build/boppos-packages-temp.txt > build/boppos-packages.txt
+
+      - name: Upload Package Lists
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-lists
+          path: |
+            build/all-packages.txt
+            build/cachyos-packages.txt
+            build/boppos-packages.txt
+          retention-days: 1
+          if-no-files-found: error
+
   update-intervals:
+    needs: package-lists
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -58,60 +136,14 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
-
       - name: Install Python dependencies
         run: pip install --require-hashes -r scripts/requirements.txt
 
-      - name: Generate Package Lists from All Images
-        run: |
-          mkdir -p build
-          touch build/all-packages-temp.txt build/cachyos-packages-temp.txt build/boppos-packages-temp.txt
-          
-          # Spin up the latest version of every image flavor to build a master superset of packages
-          for FLAVOR in plasma gnome niri cinnamon deck; do
-            IMAGE_REF="ghcr.io/${{ github.repository_owner }}/cachyos-${FLAVOR}:v3"
-            USE_PODMAN=false
-            
-            if [ "${{ inputs.force_podman }}" == "true" ]; then
-              USE_PODMAN=true
-            else
-              echo "Attempting to download SBOM for $IMAGE_REF..."
-              if cosign download sbom "$IMAGE_REF" > sbom-${FLAVOR}.json 2>/dev/null && [ -s sbom-${FLAVOR}.json ]; then
-                # Validate SBOM structure (handles both flat arrays and .packages objects)
-                if jq -e 'if type=="array" then (.[0] | has("repository")) else (.packages[0] | has("repository")) end' sbom-${FLAVOR}.json > /dev/null 2>&1; then
-                  echo "Successfully downloaded and validated SBOM."
-                  jq -r 'if type=="array" then .[] else .packages[] end | .name' sbom-${FLAVOR}.json >> build/all-packages-temp.txt
-                  jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("cachyos"))) | .name' sbom-${FLAVOR}.json >> build/cachyos-packages-temp.txt 2>/dev/null || true
-                  jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("bopp-os"))) | .name' sbom-${FLAVOR}.json >> build/boppos-packages-temp.txt 2>/dev/null || true
-                else
-                  echo "SBOM format unrecognized or missing package names. Falling back to Podman."
-                  USE_PODMAN=true
-                fi
-              else
-                echo "Failed to download SBOM or SBOM is empty. Falling back to Podman."
-                USE_PODMAN=true
-              fi
-            fi
-            
-            if [ "$USE_PODMAN" == "true" ]; then
-              echo "Extracting packages using Podman mount fallback..."
-              CONTAINER_ID=$(sudo podman create "$IMAGE_REF")
-              MNT_DIR=$(sudo podman mount "$CONTAINER_ID")
-              
-              sudo cat "$MNT_DIR/usr/share/boppos/packages.json" | jq -r 'if type=="array" then .[] else .packages[] end | .name' >> build/all-packages-temp.txt || true
-              sudo cat "$MNT_DIR/usr/share/boppos/packages.json" | jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("cachyos"))) | .name' >> build/cachyos-packages-temp.txt 2>/dev/null || true
-              sudo cat "$MNT_DIR/usr/share/boppos/packages.json" | jq -r 'if type=="array" then .[] else .packages[] end | select(.repository != null and (.repository | test("bopp-os"))) | .name' >> build/boppos-packages-temp.txt 2>/dev/null || true
-              
-              sudo podman unmount "$CONTAINER_ID" >/dev/null 2>&1 || true
-              sudo podman rm "$CONTAINER_ID" >/dev/null 2>&1 || true
-            fi
-          done
-          
-          sort -u build/all-packages-temp.txt > build/all-packages.txt
-          sort -u build/cachyos-packages-temp.txt > build/cachyos-packages.txt
-          sort -u build/boppos-packages-temp.txt > build/boppos-packages.txt
+      - name: Download Package Lists
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-lists
+          path: build
 
       - name: Fetch and Calculate Chunkah Intervals
         env:
