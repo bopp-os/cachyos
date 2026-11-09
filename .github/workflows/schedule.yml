@@ -81,6 +81,7 @@ jobs:
     secrets: inherit
     permissions:
       contents: write
+      packages: read
 
   # Re-running failed jobs keeps the prefetch job's earlier result, but by then the arch cleanup may have pruned or
   # wiped the cache and the cleanup job below has removed the base images. So a build only skips its own prefetch when
