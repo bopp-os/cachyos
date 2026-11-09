@@ -47,8 +47,16 @@ jobs:
   package-lists:
     # GitHub's runners don't have the disk space to unpack every flavor
     runs-on: self-hosted
-    permissions: {}
+    permissions:
+      packages: read
     steps:
+      # The build machine keeps podman's login from earlier jobs, and ghcr rejects that token once its job has ended
+      - name: Login to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOGIN_USER: ${{ github.actor }}
+        run: echo "${GITHUB_TOKEN}" | podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
 
