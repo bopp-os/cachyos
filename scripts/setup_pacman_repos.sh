@@ -28,14 +28,31 @@ fi
 CHAOTIC_FPRS="882DCFE48E2051D48E2562ABF3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241FA48C960F9604CB EF925EA60F33D0CB85C44AD13056513887B78AEB"
 
 # Installs repository packages: with a sync when online, from the frozen databases and the package cache when offline.
+# Never a partial upgrade (newer packages on an image that is not upgraded): it breaks on a soname bump, as on
+# 2026-11-10 when the new curl pulled in openssl 4.1 while the image's pacman, sudo and openssh still needed
+# libcrypto.so=3.
+#   online (prefetch, local builds): sync and upgrade everything (-Syu).
+#   offline (Containerfile.base): refresh the keyrings, which depend on no libraries, and install only what is missing.
+#     The image itself is upgraded later by Containerfile.base's "pacman -Su", once the hook that tags every
+#     upgraded package with its update interval is in place.
 repo_install() {
   if [ "$MODE" = "offline" ]; then
     mkdir -p "$SYNC_DB_DIR"
     rm -f "$SYNC_DB_DIR"/*.db
     cp -f "$FROZEN_DB_DIR"/*.db "$SYNC_DB_DIR"/
-    pacman -S --noconfirm "$@"
+    local arg
+    local -a todo=()
+    for arg in "$@"; do
+      case "$arg" in
+        -*|*-keyring) todo+=("$arg") ;;
+        *) pacman -Q "$arg" >/dev/null 2>&1 || todo+=("$arg") ;;
+      esac
+    done
+    if printf '%s\n' "${todo[@]}" | grep -qv '^-\|^$'; then
+      pacman -S --noconfirm "${todo[@]}"
+    fi
   else
-    pacman -Sy --noconfirm "$@"
+    pacman -Syu --noconfirm "$@"
   fi
 }
 
