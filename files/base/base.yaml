@@ -398,6 +398,8 @@ gaming-core:
   - heroic-games-launcher
   - faugus-launcher
   - steam
+  # Plugin loader for the Steam client; off until bopp-decky enables decky-loader@<user> (built in bopp-os/pkgbuilds)
+  - decky-loader
   - lib32-systemd
   - winboat
   - gamescope
