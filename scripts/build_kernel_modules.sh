@@ -55,29 +55,53 @@ BUILD_WORK_DIR="/tmp/extra-kmods"
 rm -rf "$BUILD_WORK_DIR"
 mkdir -p "$BUILD_WORK_DIR"
 
-# Module sources come from the tarballs the prefetch step saved and ClamAV-scanned (prefetch_extras.sh); the build has
-# no network. ALLOW_NETWORK_BUILD=1 clones instead, for local builds without a prefetched cache.
+# Module sources come from what the prefetch step saved and ClamAV-scanned (prefetch_extras.sh); the build has no
+# network. Both kinds are pinned in kmod_sources.sh. ALLOW_NETWORK_BUILD=1 fetches them instead, for local builds
+# without a prefetched cache.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=kmod_sources.sh
 source "$SCRIPT_DIR/kmod_sources.sh"
 KMOD_SRC_DIR="${KMOD_SRC_DIR:-/var/cache/pacman/pkg/.src}"
+PKG_CACHE_DIR="${PKG_CACHE_DIR:-$(dirname "$KMOD_SRC_DIR")}"
 
+# Source of a module in KMOD_REPOS, at its pinned commit
 fetch_kmod_src() {
     local name=$1 dest=$2
+    local pinned=${KMOD_COMMITS[$name]} saved
     if [ -f "$KMOD_SRC_DIR/$name.tar" ]; then
-        echo "Using prefetched $name source at commit $(cut -d' ' -f1 "$KMOD_SRC_DIR/$name.commit" 2>/dev/null || echo unknown)"
+        saved="$(cut -d' ' -f1 "$KMOD_SRC_DIR/$name.commit" 2>/dev/null || true)"
+        if [ "$saved" != "$pinned" ]; then
+            echo "ERROR: prefetched $name source is commit ${saved:-unknown}, but kmod_sources.sh pins $pinned" >&2
+            return 1
+        fi
+        echo "Using prefetched $name source at pinned commit $pinned"
         mkdir -p "$dest" && tar -xf "$KMOD_SRC_DIR/$name.tar" -C "$dest"
     elif [ -n "${ALLOW_NETWORK_BUILD:-}" ]; then
-        git clone --depth 1 "${KMOD_REPOS[$name]}" "$dest"
+        kmod_fetch_commit "$name" "$dest"
     else
-        echo "ERROR: prefetched source $KMOD_SRC_DIR/$name.tar not found (set ALLOW_NETWORK_BUILD=1 to clone instead)" >&2
+        echo "ERROR: prefetched source $KMOD_SRC_DIR/$name.tar not found (set ALLOW_NETWORK_BUILD=1 to fetch instead)" >&2
         return 1
     fi
 }
 
-# "git describe --tags" of the prefetched commit; fails when there is none (the tarballs carry no .git)
-kmod_describe() {
-    [ -s "$KMOD_SRC_DIR/$1.describe" ] && cat "$KMOD_SRC_DIR/$1.describe"
+# Unpacks the CachyOS package of a module in KMOD_PACKAGES into $2 and prints the one source folder under usr/src.
+# pacman -Sw checks the package's signature first (the copy prefetch left in the cache; with ALLOW_NETWORK_BUILD it
+# may download it), so nothing is read from a package pacman did not verify.
+fetch_kmod_package() {
+    local name=$1 dest=$2
+    local pkg=${KMOD_PACKAGES[$name]} file srcs
+    pacman -Swdd --noconfirm --cachedir "$PKG_CACHE_DIR" "$pkg" >&2 || return 1
+    file="$PKG_CACHE_DIR/$(pacman -Sddp --print-format '%f' "$pkg")" || return 1
+    echo "Using $name source from $(basename "$file")" >&2
+    mkdir -p "$dest" && bsdtar -xf "$file" -C "$dest" usr || return 1
+    shopt -s nullglob
+    srcs=("$dest"/usr/src/*/)
+    shopt -u nullglob
+    if [ ${#srcs[@]} -ne 1 ]; then
+        echo "ERROR: expected one source folder under usr/src in $(basename "$file"), found ${#srcs[@]}" >&2
+        return 1
+    fi
+    echo "${srcs[0]%/}"
 }
 
 # 4. Build nct6687d (Nuvoton NCT6686D / NCT6687D Super I/O)
@@ -103,21 +127,18 @@ fi
 # 6. Build xpadneo (Xbox One/Series Bluetooth controller driver)
 if [ "$BUILD_XPADNEO" = "true" ]; then
     echo "--- Building xpadneo (Xbox Wireless Bluetooth) ---"
-    fetch_kmod_src xpadneo "$BUILD_WORK_DIR/xpadneo"
-    
-    # xpadneo Makefile expects a VERSION file; on shallow clones git describe fails, so provide a fallback
-    XPADNEO_VER="$(kmod_describe xpadneo || git -C "$BUILD_WORK_DIR/xpadneo" describe --tags 2>/dev/null || echo "v0.10.4")"
-    echo "$XPADNEO_VER" > "$BUILD_WORK_DIR/xpadneo/VERSION"
+    # The package's source folder is usr/src/hid-xpadneo-<version>; the version goes into the module, as dkms does.
+    XPADNEO_SRC="$(fetch_kmod_package xpadneo "$BUILD_WORK_DIR/xpadneo")"
+    XPADNEO_VER="${XPADNEO_SRC##*/hid-xpadneo-}"
 
-    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/xpadneo/hid-xpadneo/src" $LLVM_FLAGS VERSION="$XPADNEO_VER" modules
-    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/xpadneo/hid-xpadneo/src" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install
+    make -C "$KBUILD_DIR" M="$XPADNEO_SRC/src" $LLVM_FLAGS VERSION="$XPADNEO_VER" modules
+    make -C "$KBUILD_DIR" M="$XPADNEO_SRC/src" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install
 
-    # Install udev rules for xpadneo
-    if [ -d "$BUILD_WORK_DIR/xpadneo/hid-xpadneo/etc-udev-rules.d" ]; then
-        mkdir -p /usr/lib/udev/rules.d
-        cp "$BUILD_WORK_DIR/xpadneo/hid-xpadneo/etc-udev-rules.d/"*.rules /usr/lib/udev/rules.d/
-    fi
-    echo "xpadneo installed."
+    # The udev rules and modprobe aliases the package installs next to its source
+    mkdir -p /usr/lib/udev/rules.d /usr/lib/modprobe.d
+    cp "$BUILD_WORK_DIR/xpadneo/usr/lib/udev/rules.d/"*.rules /usr/lib/udev/rules.d/
+    cp "$BUILD_WORK_DIR/xpadneo/usr/lib/modprobe.d/xpadneo.conf" /usr/lib/modprobe.d/
+    echo "xpadneo $XPADNEO_VER installed."
 fi
 
 # Optional modules below are non-fatal: a build failure emits a CI warning and the image ships without that module.
@@ -130,8 +151,7 @@ build_xone() {
     fetch_kmod_src xone "$BUILD_WORK_DIR/xone" || return 1
 
     # xone sources carry a #VERSION# placeholder normally filled in by its install.sh
-    local ver
-    ver="$(kmod_describe xone || git -C "$BUILD_WORK_DIR/xone" describe --tags 2>/dev/null || echo "v0.5.7-ogc1")"
+    local ver=${KMOD_VERSIONS[xone]}
     find "$BUILD_WORK_DIR/xone" -type f -name '*.c' -exec sed -i "s/#VERSION#/${ver#v}/" {} + || return 1
 
     make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/xone" $LLVM_FLAGS modules || return 1
@@ -150,9 +170,10 @@ fi
 # 8. Build zenergy (AMD Zen CPU energy readings via hwmon, readable without root)
 # Loaded after k10temp on AMD systems via the softdep in /usr/lib/modprobe.d/zenergy.conf.
 build_zenergy() {
-    fetch_kmod_src zenergy "$BUILD_WORK_DIR/zenergy" || return 1
-    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/zenergy" $LLVM_FLAGS modules || return 1
-    make -C "$KBUILD_DIR" M="$BUILD_WORK_DIR/zenergy" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install || return 1
+    local src
+    src="$(fetch_kmod_package zenergy "$BUILD_WORK_DIR/zenergy")" || return 1
+    make -C "$KBUILD_DIR" M="$src" $LLVM_FLAGS modules || return 1
+    make -C "$KBUILD_DIR" M="$src" $LLVM_FLAGS INSTALL_MOD_DIR="extra" modules_install || return 1
 }
 
 if [ "$BUILD_ZENERGY" = "true" ]; then
