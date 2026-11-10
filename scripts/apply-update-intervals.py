@@ -127,8 +127,15 @@ def main():
                             break
                     comp_val = f"{comp}-{interval}"
                     os.setxattr(full_path, "user.component", comp_val.encode(), follow_symlinks=False)
-                except OSError:
-                    pass
+                except OSError as e:
+                    # Untagged: the package came with the upstream base image, so the ALPM hook never ran for it.
+                    # Give it its own component; otherwise the image-generated sweep below lumps every upstream
+                    # package into one ~500 MB layer that any small upgrade re-downloads in full.
+                    if e.errno in (errno.ENODATA, 61):
+                        try:
+                            os.setxattr(full_path, "user.component", f"{pkg}-{interval}".encode(), follow_symlinks=False)
+                        except OSError:
+                            pass
 
                 try:
                     os.setxattr(full_path, "user.update-interval", interval.encode(), follow_symlinks=False)
@@ -194,8 +201,13 @@ def main():
                         os.getxattr(fpath, "user.component", follow_symlinks=False)
                     except OSError as e:
                         if e.errno in (errno.ENODATA, 61):
-                            os.setxattr(fpath, "user.component", b"image-generated", follow_symlinks=False)
-                            os.setxattr(fpath, "user.update-interval", b"weekly", follow_symlinks=False)
+                            # The pacman local db gains entries after Containerfile.base tags it; keep them out of
+                            # image-generated so that layer stays stable between builds.
+                            rel = os.path.relpath(fpath, rootfs)
+                            comp = b"pacman-db" if rel.startswith("usr/lib/sysimage/") else b"image-generated"
+                            intv = b"daily" if comp == b"pacman-db" else b"weekly"
+                            os.setxattr(fpath, "user.component", comp, follow_symlinks=False)
+                            os.setxattr(fpath, "user.update-interval", intv, follow_symlinks=False)
                 except OSError:
                     pass
 

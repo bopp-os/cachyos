@@ -280,7 +280,14 @@ RUN --mount=type=tmpfs,dst=/run \
         grep -qE 'sysinit.target.wants/boppos-unl0kr-agent.path' /tmp/initrd.lst || { echo "::error::boppos-unl0kr-agent.path is not enabled in the initramfs"; exit 1; }; \
         rm -f /tmp/initrd.lst; \
     fi && \
-    find /usr/lib/modules -type f -exec setfattr -h -n user.component -v "kernel-initramfs" {} + -exec setfattr -h -n user.update-interval -v "daily" {} +
+    # Three components so each changes only when its own inputs do: the initramfs (rebuilt whenever a package it
+    # bundles changes), the out-of-tree modules plus depmod's index (change with their sources), and the kernel
+    # itself (vmlinuz + in-tree modules, ~500 MB, changes only on a kernel upgrade).
+    find /usr/lib/modules -type f -exec setfattr -h -n user.component -v "kernel" {} + -exec setfattr -h -n user.update-interval -v "weekly" {} + && \
+    find /usr/lib/modules -type f \( -path '*/extra/*' -o -path '*/updates/*' -o -name 'modules.*' \) \
+        -exec setfattr -h -n user.component -v "kernel-extra" {} + -exec setfattr -h -n user.update-interval -v "daily" {} + && \
+    find /usr/lib/modules -type f -name 'initramfs.img' \
+        -exec setfattr -h -n user.component -v "initramfs" {} + -exec setfattr -h -n user.update-interval -v "daily" {} +
 
 # Preserve /opt contents for OverlayFS
 RUN mkdir -p /usr/lib/opt && \
