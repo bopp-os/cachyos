@@ -28,6 +28,10 @@ RUN --mount=type=tmpfs,dst=/run \
     pacman -Q | sort > /tmp/all_pkgs.txt && \
     comm -13 /tmp/base_pkgs.txt /tmp/all_pkgs.txt | awk '{print $1}' > /tmp/modified_pkgs.txt
 
+# The theme package's .install makes theme.conf mode 666, and the tmpfiles C rule copies it to /var/lib/sddm/themes
+# with that mode. Fix it here so the image never ships it world-writable (the AUR package may bring 666 back).
+RUN chmod 0644 /usr/share/sddm/themes/noctalia/theme.conf
+
 # Copy Niri-specific configuration files
 COPY files/niri/etc /etc/
 COPY files/niri/usr /usr/
@@ -73,8 +77,7 @@ RUN glib-compile-schemas /usr/share/glib-2.0/schemas/ && \
 RUN systemctl enable sddm.service && \
     systemctl enable cardwired.service && \
     systemctl disable plasmalogin.service || true && \
-    systemctl disable greetd.service || true && \
-    systemctl --global enable noctalia-sddm-init.service
+    systemctl disable greetd.service || true
 
 # Preserve /opt contents for OverlayFS
 # (visual-studio-code-bin and others install here)
