@@ -11,9 +11,15 @@ name: Weekly ClamAV rescan
 # A finding fails the run. The flagged file is not recorded as clean, so the next build scans it again and fails on it.
 on:
   schedule:
-    # Sunday 03:30 UTC. The build cycle (schedule.yml, 08:13 every other day) holds the queue for its whole run; this
-    # waits in the same queue, so it never overlaps a build.
-    - cron: "30 3 * * 0"
+    # Sunday 02:23 UTC, chosen from what the build cycle (schedule.yml) really does. Its cron says 08:13 on odd days
+    # of the month, but GitHub started it 6 to 8 hours late (14:30 to 16:26 UTC in the runs of 2026-10-29 to
+    # 2026-11-05) and it ran 6 to 7 hours, ending by about 23:30 UTC. Promote deck (promote-deck.yml) starts Mondays
+    # 14:00 UTC. So the machine is quiet from about 23:30 to 14:30 UTC. 02:23 leaves nearly 3 hours after the latest
+    # cycle end, and if GitHub delays this run by 8 hours too it still starts at about 10:30 and, with up to 2 hours of
+    # scanning, ends before the earliest cycle start. Off the :00 and :30 marks, where GitHub is slowest to start
+    # schedules. If a build does hold the queue, this waits for it (and the next build waits for this), so they never
+    # overlap; re-check the times above if the build schedule changes.
+    - cron: "23 2 * * 0"
   workflow_dispatch:
 
 # The same queue as the builds: they write the scan record and read the package caches, so only one of them runs at a
