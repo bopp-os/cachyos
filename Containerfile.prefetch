@@ -38,7 +38,7 @@ RUN chmod +x /tmp/scripts/*.sh && \
     /tmp/scripts/setup_pacman_repos.sh --online
 
 # Install yara and python-yaml from extra repository, pre-fetch packages, and scan package cache
-RUN pacman -Sy --noconfirm yara python-yaml yq git && \
+RUN pacman -Syu --noconfirm yara python-yaml yq git && \
     if [ "$VERBOSE" = "true" ]; then VERBOSE_ARG="--verbose"; else VERBOSE_ARG=""; fi && \
     if [ "$BUILD_BASE" == "true" ]; then \
         echo "::group::Pre-fetching base packages..."; \
