@@ -157,6 +157,8 @@ concurrency:
 jobs:
   build_base:
     name: Build base image (v3)
+    # Fork PRs must never reach the self-hosted runner (their code would run on it with the host's cache and credentials).
+    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: self-hosted
     outputs:
       should_skip: ${{ steps.check_compatibility.outputs.should_skip }}
@@ -370,7 +372,7 @@ jobs:
         run: |
           CACHE_DIR="${{ env.HOST_PKG_CACHE_DIR }}/${{ env.TARGET_MARCH }}"
           mkdir -p "$CACHE_DIR"
-          chmod 777 "$CACHE_DIR"
+          chmod 755 "$CACHE_DIR"
           
           # After prefetch.yml the cache is ready (it already did this cleanup and any wipe); deleting now would
           # remove packages the offline build needs
@@ -600,7 +602,9 @@ jobs:
   build_flavors:
     name: Build ${{ matrix.flavor }} (v3)
     needs: build_base
-    if: needs.build_base.outputs.should_skip != 'true' && needs.build_base.outputs.flavors != '[]'
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      needs.build_base.outputs.should_skip != 'true' && needs.build_base.outputs.flavors != '[]'
     runs-on: self-hosted
     strategy:
       fail-fast: false
@@ -977,7 +981,10 @@ jobs:
   cleanup:
     name: Cleanup Runner Workspace (v3)
     needs: [build_base, build_flavors]
-    if: always() && needs.build_base.outputs.should_skip != 'true'
+    # always() overrides the skip from a gated build_base, so the fork-PR gate is repeated here.
+    if: >-
+      always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      needs.build_base.outputs.should_skip != 'true'
     runs-on: self-hosted
     steps:
       - name: Prune Package Cache
