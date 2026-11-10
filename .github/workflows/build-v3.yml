@@ -858,11 +858,8 @@ jobs:
             ./scripts/compare-chunkah-layers.sh "$IMAGE_REF" "$CHUNKAH_IMAGE" "$BASE_CHUNKAH"
           else
             echo "Rechunking $FLAVOR (PR Dry Run)..."
-            podman run --rm --network=none \
-              --mount=type=image,source=$IMAGE_REF,target=/chunkah \
-              -e SOURCE_DATE_EPOCH=0 \
-              -e CHUNKAH_CONFIG_STR="$(podman inspect $IMAGE_REF)" \
-              --pull=never "$CHUNKAH_IMAGE" build --label containers.bootc=1 --max-layers 450 --prune /var/cache/ --prune /var/log/ --prune /tmp/ --prune /var/tmp/ > /dev/null
+            chmod +x scripts/report-chunkah-layers.sh
+            ./scripts/report-chunkah-layers.sh "$IMAGE_REF" "$CHUNKAH_IMAGE"
           fi
 
       - name: Rechunk & Push Flavor Image to GHCR
