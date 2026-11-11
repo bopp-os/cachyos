@@ -35,6 +35,26 @@ CHAOTIC_FPRS="882DCFE48E2051D48E2562ABF3B607488DB35A47 5DE6BF3EBC86402E7A5C5D241
 #   offline (Containerfile.base): refresh the keyrings, which depend on no libraries, and install only what is missing.
 #     The image itself is upgraded later by Containerfile.base's "pacman -Su", once the hook that tags every
 #     upgraded package with its update interval is in place.
+# Syncs the package databases, retrying a failed sync. A mirror can briefly serve a new database with the previous
+# signature (2026-11-11: "cachyos-extra-znver4: signature ... is invalid") until it finishes syncing, so a failure is
+# retried after 30 s and 90 s, each time downloading every database again (-Syy). A sync that still fails fails the
+# step, so nothing is ever installed from databases pacman could not verify.
+sync_databases() {
+  local attempt
+  for attempt in 1 2 3; do
+    if [ "$attempt" -eq 1 ]; then
+      pacman -Sy --noconfirm && return 0
+    else
+      pacman -Syy --noconfirm && return 0
+    fi
+    [ "$attempt" -lt 3 ] || break
+    echo "::warning::Package database sync failed (attempt $attempt of 3); retrying in $((attempt == 1 ? 30 : 90)) s"
+    sleep $((attempt == 1 ? 30 : 90))
+  done
+  echo "::error::Package database sync failed 3 times"
+  return 1
+}
+
 repo_install() {
   if [ "$MODE" = "offline" ]; then
     mkdir -p "$SYNC_DB_DIR"
@@ -52,7 +72,9 @@ repo_install() {
       pacman -S --noconfirm "${todo[@]}"
     fi
   else
-    pacman -Syu --noconfirm "$@"
+    # Synced first (with retries), then the full upgrade from those databases: never a partial upgrade
+    sync_databases
+    pacman -Su --noconfirm "$@"
   fi
 }
 
