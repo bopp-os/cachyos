@@ -1,0 +1,125 @@
+name: Weekly ClamAV rescan
+# Scans everything in the package caches of all three arches (v3, v4, znver4), the brew image, the tool images and the
+# three upstream base images again with the current signature database, and builds nothing. The builds skip what
+# scanned clean recently (scripts/clamscan-prefetch.sh keeps a dated record, 7 days by default); this run makes the
+# whole set fresh on a schedule, so a build in between rarely has to rescan anything old itself.
+#
+# One job covers every arch: ClamAV only reads files, so a package's architecture does not matter to the scanner, and
+# the base images are only mounted, never run. The arch caches share one scan record, so packages and images common to
+# several arches are rescanned once (CLAMAV_RESCAN_SINCE is this run's start time for all three scans).
+#
+# A finding fails the run. The flagged file is not recorded as clean, so the next build scans it again and fails on it.
+on:
+  schedule:
+    # Days 2, 8, 14, 20 and 26 of the month at 02:23 UTC: always an even day, chosen from what the build cycle
+    # (schedule.yml) really does. The cycle runs on the odd days ("*/2": 1, 3, ... 31). Its cron says 08:13, but GitHub
+    # started it 6 to 8 hours late (14:30 to 16:26 UTC in the runs of 2026-10-29 to 2026-11-05) and it ran 6 to 7 hours,
+    # ending by about 23:30 UTC. This rescan is planned at 4 hours or more: the first full scan of just the v3 side took
+    # over 1.5 hours, and the v4 and znver4 caches and three base images come on top. On an even day nothing else is
+    # scheduled from about 23:30 the evening before until about 14:30 the next day (39 hours), so even a start 8 hours
+    # late and a 6 hour run end long before the next cycle. The gaps between runs are 4 to 7 days, never past the 7 day
+    # record expiry. 02:23 is off the :00 and :30 marks, where GitHub is slowest to start schedules. Promote deck
+    # (promote-deck.yml) starts Mondays 14:00 UTC and may share this window. If a build does hold the queue, this waits
+    # for it (and the next build waits for this), so they never overlap; re-check these times if the build schedule
+    # changes. Cron cannot say "weekly on an even day", hence the list.
+    - cron: "23 2 2,8,14,20,26 * *"
+  workflow_dispatch:
+
+# The same queue as the builds: they write the scan record and read the package caches, so only one of them runs at a
+# time.
+concurrency:
+  group: boppos-build-queue
+  cancel-in-progress: false
+  queue: max
+
+permissions: {}
+
+env:
+  HOST_PKG_CACHE_DIR: "/opt/boppos-pkg-cache"
+  # <march> <base image>, one arch per line. Must match the ARCHES table in prefetch.yml and the env blocks of
+  # build-v3.yml, build-v4.yml and build-znver4.yml.
+  ARCHES: |
+    v3 docker.io/cachyos/cachyos-v3:latest
+    v4 docker.io/cachyos/cachyos-v4:latest
+    znver4 ghcr.io/bopp-os/cachyos-docker/cachyos-znver4:latest
+
+jobs:
+  rescan:
+    name: Rescan all arches
+    # The one build machine (the znver4 label is how prefetch.yml reaches it). Nothing here needs a Zen 4 CPU.
+    runs-on: znver4
+    # Planned at 4 hours or more; 8 hours leaves room to grow without letting a hung scan hold the build queue for days
+    timeout-minutes: 480
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Clean leftovers from earlier runs
+        run: |
+          podman unshare rm -rf /var/tmp/clamscan-prefetch.* || true
+          # Root-owned files from earlier runs break checkout
+          podman unshare rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Login to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOGIN_USER: ${{ github.actor }}
+        run: echo "${GITHUB_TOKEN}" | podman login -u "${LOGIN_USER}" --password-stdin "ghcr.io"
+
+      - name: ClamAV rescan (v3, v4, znver4)
+        run: |
+          # Fresh copies of the base images, except where the machine already has one. The ones pulled here are removed
+          # again at the end, so the next build pulls its own instead of finding a copy that is days old.
+          : > "$RUNNER_TEMP/pulled-images"
+          while read -r _ image; do
+            [ -n "$image" ] || continue
+            if ! podman image exists "$image"; then
+              echo "Pulling $image..."
+              podman pull -q "$image" > /dev/null
+              echo "$image" >> "$RUNNER_TEMP/pulled-images"
+            fi
+          done <<< "$ARCHES"
+
+          BREW_IMAGE=$(awk '$1 == "FROM" && $3 == "AS" && $4 == "brew" { print $2 }' Containerfile.base)
+          mapfile -t TOOL_IMAGES < <(sed -n 's/^FROM //p' ci/chunkah/Containerfile ci/syft/Containerfile ci/grype/Containerfile)
+
+          # Everything scanned before this moment counts as not scanned
+          export CLAMAV_RESCAN_SINCE
+          CLAMAV_RESCAN_SINCE=$(date +%s)
+
+          failed=()
+          while read -r march image; do
+            [ -n "$march" ] || continue
+            cache="$HOST_PKG_CACHE_DIR/$march"
+            if [ ! -d "$cache" ]; then
+              echo "::warning::No package cache at $cache; the $march packages were not rescanned."
+              continue
+            fi
+            echo "::group::Rescan $march"
+            if ! bash scripts/clamscan-prefetch.sh "$cache" "$image" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"; then
+              failed+=("$march")
+            fi
+            echo "::endgroup::"
+          done <<< "$ARCHES"
+
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::ClamAV rescan failed for: ${failed[*]}"
+            exit 1
+          fi
+
+      - name: Clean Workspace
+        if: always()
+        run: |
+          podman rm -af || true
+          # The base images this run pulled; images that were already there stay
+          if [ -s "$RUNNER_TEMP/pulled-images" ]; then
+            xargs -r podman rmi < "$RUNNER_TEMP/pulled-images" || true
+          fi
+          podman system prune --force || true
+          podman unshare rm -rf /var/tmp/clamscan-prefetch.* ${{ github.workspace }}/* ${{ github.workspace }}/.[!.]* 2>/dev/null || true
+          df -h /

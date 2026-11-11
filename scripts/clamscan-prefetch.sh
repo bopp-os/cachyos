@@ -10,7 +10,10 @@
 # Uses the clamav/clamav container, like the pkgbuilds repo, running one clamd for the whole step: the signature
 # database loads once, and --multiscan spreads the files over every core (the scan runs before the build, so the cores
 # are otherwise idle). Anything already scanned clean (package by SHA-256,
-# image by ID) is recorded and skipped on later runs. The record sits one level up from <cache_dir>, so it is shared by
+# image by ID) is recorded with the date of that scan and skipped on later runs for CLAMAV_RECORD_MAX_AGE_DAYS (default
+# 7); after that it is scanned again, so everything in the cache is checked against signatures at most that old.
+# CLAMAV_RESCAN_SINCE=<epoch> also distrusts anything scanned before then (the weekly full rescan, clamav-rescan.yml,
+# passes its start time, so the arch caches it scans one after another share what it has already rescanned). The record sits one level up from <cache_dir>, so it is shared by
 # the per-arch caches (<root>/v3, <root>/v4, ...): any-arch packages, packages from the shared repos and the brew image
 # are scanned once for all arches. The build workflows share one concurrency group, so only one run writes it at a time.
 #
@@ -33,6 +36,14 @@ LEGACY_CACHE_FILE="$CACHE_DIR/.clamav_scan_cache"
 # keeps what it already scanned.
 BATCH_BYTES=$((2 * 1024 * 1024 * 1024))
 SUMMARY=${GITHUB_STEP_SUMMARY:-/dev/null}
+NOW=$(date +%s)
+MAX_AGE_DAYS=${CLAMAV_RECORD_MAX_AGE_DAYS:-7}
+[[ $MAX_AGE_DAYS =~ ^[0-9]+$ ]] || { echo "::error::CLAMAV_RECORD_MAX_AGE_DAYS must be a number of days"; exit 1; }
+# Clean results from before CUTOFF no longer count
+CUTOFF=$((NOW - MAX_AGE_DAYS * 86400))
+if [[ ${CLAMAV_RESCAN_SINCE:-} =~ ^[0-9]+$ ]] && ((CLAMAV_RESCAN_SINCE > CUTOFF)); then
+  CUTOFF=$CLAMAV_RESCAN_SINCE
+fi
 
 WORK_DIR=$(mktemp -d /var/tmp/clamscan-prefetch.XXXXXX)
 CLAMD_CTR="clamscan-prefetch-$$"
@@ -48,15 +59,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Both are sets of "<sha256-or-image-id> <package-file-or-image:ref>" entries.
+# Both map "<sha256-or-image-id> <package-file-or-image:ref>" entries to the time (epoch) of their clean scan. The record
+# holds one "<id> <name> <epoch>" line per entry.
 declare -A SCANNED=()
 for f in "$CACHE_FILE" "$LEGACY_CACHE_FILE"; do
   [ -f "$f" ] || continue
-  while IFS=' ' read -r hash name; do
-    [[ -n "$name" && -n "$hash" ]] && SCANNED["$hash $name"]=1
+  while IFS=' ' read -r hash name ts _; do
+    [[ -n "$name" && -n "$hash" ]] || continue
+    # Entries from before scan dates were recorded count as stale
+    [[ $ts =~ ^[0-9]+$ ]] || ts=0
+    SCANNED["$hash $name"]=$ts
   done < "$f"
 done
 declare -A KEEP=()
+# True when the entry was scanned clean recently enough to skip
+is_clean() {
+  [[ -n "${SCANNED["$1"]:-}" ]] && ((${SCANNED["$1"]} >= CUTOFF))
+}
 FINDINGS=()
 # Accepted scan-limit findings: "<sha256> <finding name>" from files/security/clamav-limit-allow.conf
 declare -A LIMIT_ALLOW=()
@@ -111,15 +130,16 @@ clamd_scan() {
 
 # Sets IMAGE_ID and IMAGE_MNT (the read-only rootfs). IMAGE_MNT stays empty if this image ID is already clean,
 # unless a second argument names a file that must exist (it is then mounted anyway, so that file can be created).
+# A third argument "rescan" treats the image as not scanned.
 # Pulls only when missing, the same policy podman build uses, so the scanned image is the one the build gets.
 mount_unscanned_image() {
-  local ref=$1 needed=${2:-}
+  local ref=$1 needed=${2:-} rescan=${3:-}
   IMAGE_MNT=""
   IMAGE_CLEAN=""
   podman image exists "$ref" || podman pull -q "$ref" >/dev/null
   IMAGE_ID=$(podman image inspect --format '{{.Id}}' "$ref")
-  if [[ -n "${SCANNED["$IMAGE_ID image:$ref"]:-}" ]]; then
-    KEEP["$IMAGE_ID image:$ref"]=1
+  if [[ -z "$rescan" ]] && is_clean "$IMAGE_ID image:$ref"; then
+    KEEP["$IMAGE_ID image:$ref"]=${SCANNED["$IMAGE_ID image:$ref"]}
     IMAGE_CLEAN=1
     echo "  ✓ $ref already scanned clean, skipping."
     [[ -z "$needed" || -f "$needed" ]] && return 0
@@ -134,11 +154,17 @@ save_record() {
   local tmp="$WORK_DIR/clamav_scan_cache"
   # Sorted by name, but unique by the whole entry: one name can have several entries, because the arch caches can hold
   # different files under the same name (packages rebuilt without a version bump)
-  if [ "${1:-}" = "final" ]; then
-    printf '%s\n' "${!KEEP[@]}" | sort -u -k2,2 -k1,1 > "$tmp"
-  else
-    printf '%s\n' "${!SCANNED[@]}" "${!KEEP[@]}" | sort -u -k2,2 -k1,1 > "$tmp"
-  fi
+  local e
+  {
+    for e in "${!KEEP[@]}"; do
+      printf '%s %s\n' "$e" "${KEEP[$e]}"
+    done
+    if [ "${1:-}" != "final" ]; then
+      for e in "${!SCANNED[@]}"; do
+        [[ -n "${KEEP[$e]:-}" ]] || printf '%s %s\n' "$e" "${SCANNED[$e]}"
+      done
+    fi
+  } | sort -k2,2 -k1,1 > "$tmp"
   # The cache root is created by root, and the per-arch folders are not world-writable everywhere.
   install -m 0644 "$tmp" "$CACHE_FILE"
 }
@@ -179,8 +205,16 @@ BREW_ID=$IMAGE_ID
 # The upstream base image is rebuilt often (daily for CachyOS), but most of its files stay the same. The SHA-256 of
 # every file in the last clean rootfs is recorded per image ref, and a new image only has its new or changed files
 # scanned.
+# The record's first line, "# full-scan <epoch>", dates the last scan of every file; incremental scans keep that date,
+# so once it is older than CUTOFF the whole rootfs is scanned again.
 BASE_FILES_RECORD="$CACHE_ROOT/.clamav_files.$(printf '%s' "$BASE_IMAGE" | tr -c 'A-Za-z0-9._-' '_')"
-mount_unscanned_image "$BASE_IMAGE" "$BASE_FILES_RECORD"
+BASE_RECORD_TS=$(sed -n '1s/^# full-scan \([0-9][0-9]*\)$/\1/p' "$BASE_FILES_RECORD" 2>/dev/null || true)
+if [[ -n "$BASE_RECORD_TS" ]] && ((BASE_RECORD_TS >= CUTOFF)); then
+  mount_unscanned_image "$BASE_IMAGE" "$BASE_FILES_RECORD"
+else
+  BASE_RECORD_TS=""
+  mount_unscanned_image "$BASE_IMAGE" "$BASE_FILES_RECORD" rescan
+fi
 BASE_MNT=$IMAGE_MNT
 BASE_ID=$IMAGE_ID
 BASE_CLEAN=$IMAGE_CLEAN
@@ -255,7 +289,7 @@ scan_batch() {
   log_excluded /scan/work/pkgs "$PKG_DIR"
   if clamd_scan /scan/work/pkgs; then
     for entry in "${BATCH[@]}"; do
-      KEEP["$entry"]=1
+      KEEP["$entry"]=$NOW
     done
     save_record
   elif [ "$SCAN_RC" -eq 1 ]; then
@@ -266,7 +300,7 @@ scan_batch() {
       flagged["${path%%/*}"]=1
     done
     for entry in "${BATCH[@]}"; do
-      [[ -z "${flagged[${entry#* }]:-}" ]] && KEEP["$entry"]=1
+      [[ -z "${flagged[${entry#* }]:-}" ]] && KEEP["$entry"]=$NOW
     done
     save_record
   fi
@@ -278,8 +312,8 @@ scan_batch() {
 while IFS= read -r -d '' pkg_file; do
   pkg_name=$(basename "$pkg_file")
   pkg_hash=$(sha256sum "$pkg_file" | awk '{print $1}')
-  if [[ -n "${SCANNED["$pkg_hash $pkg_name"]:-}" ]]; then
-    KEEP["$pkg_hash $pkg_name"]=1
+  if is_clean "$pkg_hash $pkg_name"; then
+    KEEP["$pkg_hash $pkg_name"]=${SCANNED["$pkg_hash $pkg_name"]}
     SKIPPED_PKGS=$((SKIPPED_PKGS + 1))
     continue
   fi
@@ -312,7 +346,7 @@ if [ -n "$BREW_MNT" ]; then
     $TAR_CMD -xf "$tarball" -C "$out"
   done < <(find "$BREW_MNT/system_files" -type f -name "*.tar.*" -print0)
   if clamd_scan /scan/brew /scan/work/brew; then
-    KEEP["$BREW_ID image:$BREW_IMAGE"]=1
+    KEEP["$BREW_ID image:$BREW_IMAGE"]=$NOW
   fi
   rm -rf "$BREW_UNPACKED"
   printf -- '- Brew image `%s`: scanned\n' "$BREW_IMAGE" >> "$SUMMARY"
@@ -329,7 +363,7 @@ for i in "${!TOOL_IMAGES[@]}"; do
     echo "  🔍 Scanning $ref..."
     before=${#FINDINGS[@]}
     if clamd_scan "/scan/${TOOL_LABELS[$i]}"; then
-      KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+      KEEP["${TOOL_IDS[$i]} image:$ref"]=$NOW
     elif [ "$SCAN_RC" -eq 1 ] && ! printf '%s\n' "${FINDINGS[@]:$before}" | grep -qv 'Heuristics\.Limits\.Exceeded\.[A-Za-z]* FOUND$'; then
       # These images are pinned and only run tools; a file that hits a scan limit was scanned up to that limit with no
       # signature match, so it is reported but does not fail the step. Any real signature hit still does.
@@ -338,7 +372,7 @@ for i in "${!TOOL_IMAGES[@]}"; do
         printf -- '- Scan limit reached (warning only): `%s`\n' "$finding" >> "$SUMMARY"
       done
       FINDINGS=("${FINDINGS[@]:0:$before}")
-      KEEP["${TOOL_IDS[$i]} image:$ref"]=1
+      KEEP["${TOOL_IDS[$i]} image:$ref"]=$NOW
     fi
     printf -- '- Tool image `%s`: scanned\n' "$ref" >> "$SUMMARY"
   else
@@ -358,7 +392,7 @@ if [ -n "$BASE_MNT" ]; then
   # sha256sum prints "<64 hex>  <path>"; paths are rewritten to where the rootfs is mounted in the container
   awk -v mnt="$BASE_MNT/" 'FILENAME == ARGV[1] { clean[$1] = 1; next }
     !($1 in clean) { print "/scan/base/" substr($0, 67 + length(mnt)) }' \
-    <(cat "$BASE_FILES_RECORD" 2>/dev/null) "$BASE_HASHES" > "$SCAN_LIST"
+    <([ -n "$BASE_RECORD_TS" ] && tail -n +2 "$BASE_FILES_RECORD" 2>/dev/null) "$BASE_HASHES" > "$SCAN_LIST"
   BASE_TOTAL=$(wc -l < "$BASE_HASHES")
   BASE_NEW=$(wc -l < "$SCAN_LIST")
   if [ -n "$BASE_CLEAN" ]; then
@@ -371,8 +405,9 @@ if [ -n "$BASE_MNT" ]; then
     clamd_scan --file-list=/scan/work/base-scan-list && BASE_CLEAN=1
   fi
   if [ -n "$BASE_CLEAN" ]; then
-    KEEP["$BASE_ID image:$BASE_IMAGE"]=1
-    cut -c1-64 "$BASE_HASHES" | sort -u > "$WORK_DIR/base-files-record"
+    [[ -n "${KEEP["$BASE_ID image:$BASE_IMAGE"]:-}" ]] || KEEP["$BASE_ID image:$BASE_IMAGE"]=$NOW
+    # A full scan starts a new date; an incremental one keeps the date of the full scan it builds on
+    { echo "# full-scan ${BASE_RECORD_TS:-$NOW}"; cut -c1-64 "$BASE_HASHES" | sort -u; } > "$WORK_DIR/base-files-record"
     install -m 0644 "$WORK_DIR/base-files-record" "$BASE_FILES_RECORD"
   fi
   echo "  Base image: $BASE_NEW of $BASE_TOTAL files scanned."
@@ -392,12 +427,12 @@ for entry in "${!SCANNED[@]}"; do
     for ref in "$BASE_IMAGE" "$BREW_IMAGE" "${TOOL_IMAGES[@]}"; do
       [[ "$name" == "image:$ref" ]] && used=1
     done
-    [ "$used" = 0 ] && KEEP["$entry"]=1
+    [ "$used" = 0 ] && KEEP["$entry"]=${SCANNED["$entry"]}
     continue
   fi
   for other in "$CACHE_ROOT"/*/"$name" "$CACHE_ROOT"/*/.bootstrap/"$name" "$CACHE_ROOT"/*/.src/"$name"; do
     if [[ -f "$other" && "$(dirname "$other")" != "$CACHE_DIR" ]]; then
-      KEEP["$entry"]=1
+      KEEP["$entry"]=${SCANNED["$entry"]}
       break
     fi
   done

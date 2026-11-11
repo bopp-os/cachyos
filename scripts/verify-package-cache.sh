@@ -17,9 +17,10 @@ if [ ! -f "$RECORD" ]; then
   exit 1
 fi
 
-# The record holds "<sha256> <package file name>" lines (and image entries, which never match a file here).
+# The record holds "<sha256> <package file name> <scan epoch>" lines (and image entries, which never match a file
+# here). Any clean entry counts here, however old: the scan step just rescanned whatever was too old.
 declare -A CLEAN=()
-while IFS=' ' read -r hash name; do
+while IFS=' ' read -r hash name _; do
   [[ -n "$hash" && -n "$name" ]] && CLEAN["$hash $name"]=1
 done < "$RECORD"
 
