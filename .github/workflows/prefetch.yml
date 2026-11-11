@@ -3,6 +3,7 @@ name: Pre-fetch all architectures
 # Called by schedule.yml before the v3, v4 and znver4 builds. One job fills every arch's package cache and pulls the
 # upstream base images, then ClamAV-scans all of it, so the build workflows (called with prefetched: true) skip their
 # own prefetch and scan. Running a build workflow on its own still does its own prefetch, exactly as before.
+# An arch whose prefetch or scan fails is not built in that run (see require_prefetched in schedule.yml).
 #
 # The arch settings below must match the env blocks of build-v3.yml, build-v4.yml and build-znver4.yml.
 on:
@@ -71,8 +72,8 @@ jobs:
       packages: read
       issues: write
     outputs:
-      # An arch whose prefetch or scan failed gets 'false'; its build workflow then does its own prefetch and scan,
-      # and fails there if the problem is still there. The other arches go ahead.
+      # An arch whose prefetch or scan failed gets 'false'; its build then fails at once in the first attempt (the run
+      # turns red) and is not built. The other arches go ahead. Re-running the failed jobs is the retry.
       v3: ${{ steps.scan_v3.outcome == 'success' }}
       v4: ${{ steps.scan_v4.outcome == 'success' }}
       znver4: ${{ steps.scan_znver4.outcome == 'success' }}
@@ -200,7 +201,7 @@ jobs:
             if [ "$rc" = 0 ]; then
               echo "$march=true" >> "$GITHUB_OUTPUT"
             else
-              echo "::error::Prefetch failed for $march (exit $rc); its build will prefetch on its own."
+              echo "::error::Prefetch failed for $march (exit $rc); $march is not built in this run. Re-run the failed jobs to retry it."
               echo "$march=false" >> "$GITHUB_OUTPUT"
             fi
           done

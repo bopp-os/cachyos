@@ -87,7 +87,9 @@ jobs:
   # wiped the cache and the cleanup job below has removed the base images. So a build only skips its own prefetch when
   # the shared prefetch ran in the same attempt; otherwise it prefetches and scans itself, like a manual build.
   # One prefetch for every arch: fills all three package caches, pulls the base images and scans everything, so the
-  # builds below skip their own prefetch. An arch whose prefetch failed falls back to its build's own prefetch.
+  # builds below skip their own prefetch. An arch whose prefetch or scan failed is not built in this run: its build job
+  # fails at once (require_prefetched, first attempt only), so the run is red, and the other arches carry on. Re-running
+  # the failed jobs is the retry: that attempt has require_prefetched off, and the build prefetches and scans itself.
   prefetch:
     needs: intervals
     if: ${{ !cancelled() }}
@@ -130,6 +132,7 @@ jobs:
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
       prefetched: ${{ needs.prefetch.outputs.v3 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
+      require_prefetched: ${{ github.run_attempt == 1 }}
 
   v4:
     needs: [prefetch, v3]
@@ -155,6 +158,7 @@ jobs:
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
       prefetched: ${{ needs.prefetch.outputs.v4 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
+      require_prefetched: ${{ github.run_attempt == 1 }}
 
   znver4:
     needs: [prefetch, v4]
@@ -180,6 +184,7 @@ jobs:
       allow_build_network: ${{ inputs.allow_build_network == true }}
       allow_critical_vulns: ${{ inputs.allow_critical_vulns == true }}
       prefetched: ${{ needs.prefetch.outputs.znver4 == 'true' && needs.prefetch.outputs.attempt == github.run_attempt }}
+      require_prefetched: ${{ github.run_attempt == 1 }}
 
   # Remove the base images prefetch pulled once the cycle is over, whatever the builds' results
   cleanup:

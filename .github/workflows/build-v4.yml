@@ -122,6 +122,11 @@ on:
         required: false
         type: boolean
         default: false
+      require_prefetched:
+        description: 'Fail this build when prefetched is false (schedule.yml, first attempt): an arch whose prefetch or scan failed is not built. A re-run of failed jobs leaves this off, and the build then prefetches and scans on its own'
+        required: false
+        type: boolean
+        default: false
 
 env:
   IMAGE_DESC: "CachyOS BoppOS Bootc image (v4)"
@@ -202,6 +207,16 @@ jobs:
             echo "::warning::Runner CPU does not support x86-64-v4 (AVX512F missing). Skipping build."
             echo "should_skip=true" >> $GITHUB_OUTPUT # Set an output variable
           fi
+
+      - name: Require the scheduled prefetch and scan
+        # schedule.yml prefetches and ClamAV-scans every arch first. An arch where that failed is not built in this
+        # run: failing here, before anything is built or published, keeps the run red instead of quietly trying again.
+        # "Re-run failed jobs" starts a new attempt (require_prefetched is then false), and this build prefetches and
+        # scans on its own.
+        if: steps.check_compatibility.outputs.should_skip != 'true' && inputs.require_prefetched == true && inputs.prefetched != true
+        run: |
+          echo "::error::The prefetch or the ClamAV scan for v4 failed in this run, so v4 is not built. Re-run the failed jobs: the build then prefetches and scans on its own."
+          exit 1
 
       - name: Determine Target Flavors
         id: set_flavors
