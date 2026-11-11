@@ -48,8 +48,9 @@ jobs:
     name: Rescan all arches
     # The one build machine (the znver4 label is how prefetch.yml reaches it). Nothing here needs a Zen 4 CPU.
     runs-on: znver4
-    # Planned at 4 hours or more; 8 hours leaves room to grow without letting a hung scan hold the build queue for days
-    timeout-minutes: 480
+    # Estimated at about 6 hours (v3 alone took 3h26m cold, v4 1h18m); 10 hours leaves room to grow without letting a
+    # hung scan hold the build queue for days
+    timeout-minutes: 600
     permissions:
       contents: read
       packages: read
