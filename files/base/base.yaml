@@ -390,6 +390,8 @@ gaming-core:
   - xorg-xwininfo
   - xdotool
   - scopebuddy-git
+  # ScopeBuddy config editor (CLI + GTK4 GUI), built in bopp-os/pkgbuilds from bopp-os/scopeedit
+  - scopeedit
   - afmf-linux
   - yad
   - mangohud
