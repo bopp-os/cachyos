@@ -3900,7 +3900,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:57.371143+00:00"
+    "fetched_at": "2026-11-21T16:21:58.116797+00:00"
   },
   "cachyos-hooks": {
     "history": {
@@ -6172,9 +6172,9 @@
       "3.3.1-1": "2026-11-01T23:17:00+00:00"
     },
     "interval": "monthly",
-    "avg_days": 22.5,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:57.371909+00:00"
+    "avg_days": 23.0,
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:21:58.117774+00:00"
   },
   "dav1d": {
     "history": {
@@ -6471,7 +6471,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:57.372056+00:00"
+    "fetched_at": "2026-11-21T16:21:58.118049+00:00"
   },
   "default-cursors": {
     "history": {
@@ -7219,8 +7219,8 @@
     },
     "interval": "monthly",
     "avg_days": 27,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:57.372268+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:21:58.118348+00:00"
   },
   "double-conversion": {
     "history": {
@@ -9946,7 +9946,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:57.373000+00:00"
+    "fetched_at": "2026-11-21T16:21:58.119243+00:00"
   },
   "game-devices-udev": {
     "history": {
@@ -18150,7 +18150,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:57.374869+00:00"
+    "fetched_at": "2026-11-21T16:21:58.121746+00:00"
   },
   "jupiter-hw-support": {
     "history": {},
@@ -42057,7 +42057,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:57.381059+00:00"
+    "fetched_at": "2026-11-21T16:21:58.129592+00:00"
   },
   "noto-color-emoji-fontconfig": {
     "history": {
@@ -43136,8 +43136,8 @@
     },
     "interval": "weekly",
     "avg_days": 7,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:57.381389+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:21:58.130020+00:00"
   },
   "opentabletdriver": {
     "history": {},
@@ -48287,8 +48287,8 @@
     },
     "interval": "monthly",
     "avg_days": 30.0,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:57.382686+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:21:58.131727+00:00"
   },
   "python-aiohttp": {
     "history": {
@@ -48344,9 +48344,9 @@
       "3.14.5-1": "2026-10-13T13:30:00+00:00"
     },
     "interval": "biweekly",
-    "avg_days": 13.5,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:57.382736+00:00"
+    "avg_days": 12.5,
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:21:58.131801+00:00"
   },
   "python-aiohttp-cors": {
     "history": {
@@ -48360,15 +48360,15 @@
     },
     "interval": "quarterly",
     "avg_days": 61.5,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:57.899272+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.391726+00:00"
   },
   "python-aiohttp-jinja2": {
     "history": {},
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:57.900660+00:00"
+    "fetched_at": "2026-11-21T16:22:47.391973+00:00"
   },
   "python-aiosignal": {
     "history": {
@@ -48389,8 +48389,8 @@
     },
     "interval": "quarterly",
     "avg_days": 113,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:57.969989+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.392053+00:00"
   },
   "python-annotated-types": {
     "history": {
@@ -49166,8 +49166,8 @@
     },
     "interval": "biweekly",
     "avg_days": 21,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.105598+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.392572+00:00"
   },
   "python-defusedxml": {
     "history": {
@@ -49531,8 +49531,8 @@
     },
     "interval": "quarterly",
     "avg_days": 89,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.105952+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.392838+00:00"
   },
   "python-gbinder": {
     "history": {
@@ -50077,10 +50077,10 @@
     "history": {
       "0.1.0-1": "2026-11-10T09:13:00+00:00"
     },
-    "interval": "weekly",
+    "interval": "biweekly",
     "avg_days": 0.0,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.183317+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.393197+00:00"
   },
   "python-lxml": {
     "history": {
@@ -50397,8 +50397,8 @@
     },
     "interval": "monthly",
     "avg_days": 29,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.750657+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.393407+00:00"
   },
   "python-mutagen": {
     "history": {
@@ -51005,8 +51005,8 @@
     },
     "interval": "quarterly",
     "avg_days": 59.0,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.751202+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.393839+00:00"
   },
   "python-protobuf": {
     "history": {
@@ -51455,26 +51455,6 @@
     "source": "ala",
     "fetched_at": "2026-11-19T17:36:47.998316+00:00"
   },
-  "python-pyinotify": {
-    "history": {
-      "0.9.6-10": "2021-11-30T20:28:00+00:00",
-      "0.9.6-11": "2021-12-01T21:34:00+00:00",
-      "0.9.6-12": "2023-04-06T18:11:00+00:00",
-      "0.9.6-13": "2024-04-13T09:51:00+00:00",
-      "0.9.6-14": "2024-04-13T10:01:00+00:00",
-      "0.9.6-15": "2024-11-16T17:06:00+00:00",
-      "0.9.6-16": "2025-12-14T13:48:00+00:00",
-      "0.9.6-5": "2019-10-25T15:55:00+00:00",
-      "0.9.6-6": "2019-10-31T17:06:00+00:00",
-      "0.9.6-7": "2020-02-13T17:22:00+00:00",
-      "0.9.6-8": "2020-11-09T16:10:00+00:00",
-      "0.9.6-9": "2020-11-11T10:49:00+00:00"
-    },
-    "interval": "yearly",
-    "avg_days": 243.0,
-    "source": "ala",
-    "fetched_at": "2026-11-19T17:36:48.047475+00:00"
-  },
   "python-pymediainfo": {
     "history": {
       "3.1-1": "2019-03-05T13:36:00+00:00",
@@ -51747,46 +51727,6 @@
     "avg_days": 323,
     "source": "ala",
     "fetched_at": "2026-11-19T17:36:48.319339+00:00"
-  },
-  "python-pytz": {
-    "history": {
-      "2019.1-1": "2019-04-23T20:06:00+00:00",
-      "2019.2-1": "2019-08-04T11:34:00+00:00",
-      "2019.3-1": "2019-10-09T19:51:00+00:00",
-      "2019.3-2": "2019-10-25T15:35:00+00:00",
-      "2019.3-3": "2019-10-31T18:09:00+00:00",
-      "2020.1-1": "2020-05-03T15:12:00+00:00",
-      "2020.1-2": "2020-08-20T14:58:00+00:00",
-      "2020.4-1": "2020-11-03T17:33:00+00:00",
-      "2020.4-2": "2020-11-09T12:50:00+00:00",
-      "2020.4-3": "2020-11-11T10:30:00+00:00",
-      "2020.4-4": "2020-12-13T14:13:00+00:00",
-      "2020.5-1": "2021-01-01T16:13:00+00:00",
-      "2021.1-1": "2021-02-04T21:05:00+00:00",
-      "2021.3-1": "2021-10-21T21:57:00+00:00",
-      "2021.3-2": "2021-11-01T08:46:00+00:00",
-      "2021.3-3": "2021-11-30T14:54:00+00:00",
-      "2021.3-4": "2021-12-01T21:34:00+00:00",
-      "2022.1-1": "2022-03-22T19:31:00+00:00",
-      "2022.6-1": "2022-11-11T16:32:00+00:00",
-      "2022.7-1": "2023-01-11T19:22:00+00:00",
-      "2022.7.1-1": "2023-03-12T13:50:00+00:00",
-      "2022.7.1-2": "2023-04-05T17:45:00+00:00",
-      "2022.7.1-3": "2023-04-09T20:08:00+00:00",
-      "2023.3.post1-1": "2023-09-10T12:31:00+00:00",
-      "2024.1-1": "2024-02-05T15:39:00+00:00",
-      "2024.1-2": "2024-04-03T18:32:00+00:00",
-      "2024.2-1": "2024-09-15T13:09:00+00:00",
-      "2024.2-2": "2024-11-16T17:25:00+00:00",
-      "2025.1-1": "2025-02-15T10:11:00+00:00",
-      "2025.2-1": "2025-05-05T11:27:00+00:00",
-      "2025.2-2": "2025-12-14T11:38:00+00:00",
-      "2026.1-1": "2026-03-20T18:52:00+00:00"
-    },
-    "interval": "quarterly",
-    "avg_days": 62,
-    "source": "ala",
-    "fetched_at": "2026-11-19T17:36:48.437894+00:00"
   },
   "python-pyusb": {
     "history": {
@@ -52748,8 +52688,8 @@
     },
     "interval": "biweekly",
     "avg_days": 13,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.796248+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.395014+00:00"
   },
   "python-webencodings": {
     "history": {
@@ -52881,8 +52821,8 @@
     },
     "interval": "quarterly",
     "avg_days": 108.5,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.974060+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:22:47.395203+00:00"
   },
   "python-xlib": {
     "history": {
@@ -53057,8 +52997,8 @@
     },
     "interval": "quarterly",
     "avg_days": 76,
-    "source": "ala",
-    "fetched_at": "2026-11-17T17:50:58.981862+00:00"
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:23:42.392064+00:00"
   },
   "python-zipp": {
     "history": {
@@ -55981,6 +55921,13 @@
     "source": "ala_not_found",
     "fetched_at": "2026-11-19T17:36:52.776379+00:00"
   },
+  "scopeedit": {
+    "history": {},
+    "interval": "daily",
+    "avg_days": 0.0,
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:23:42.393422+00:00"
+  },
   "screen": {
     "history": {
       "4.7.0-1": "2019-10-02T21:09:00+00:00",
@@ -57782,14 +57729,14 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:59.578710+00:00"
+    "fetched_at": "2026-11-21T16:23:42.394370+00:00"
   },
   "steamdeck-dsp": {
     "history": {},
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:59.485005+00:00"
+    "fetched_at": "2026-11-21T16:23:42.394290+00:00"
   },
   "steamos-manager": {
     "history": {},
@@ -57810,7 +57757,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:59.810529+00:00"
+    "fetched_at": "2026-11-21T16:23:42.394467+00:00"
   },
   "sticky": {
     "history": {
@@ -59811,7 +59758,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-17T17:50:59.811591+00:00"
+    "fetched_at": "2026-11-21T16:23:42.395405+00:00"
   },
   "unp": {
     "history": {
@@ -65645,6 +65592,13 @@
     "avg_days": 22,
     "source": "ala",
     "fetched_at": "2026-11-19T17:36:58.525489+00:00"
+  },
+  "xenity": {
+    "history": {},
+    "interval": "daily",
+    "avg_days": 0.0,
+    "source": "ala_not_found",
+    "fetched_at": "2026-11-21T16:23:42.397835+00:00"
   },
   "xf86-input-libinput": {
     "history": {
