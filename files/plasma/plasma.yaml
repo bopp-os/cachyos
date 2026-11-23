@@ -57,7 +57,6 @@ kde-media:
   - libcec
 kde-themes-aesthetics:
   - cachyos-kde-settings
-  - cachyos-iridescent-kde
   - char-white
   - breeze-gtk
 kde-additions:

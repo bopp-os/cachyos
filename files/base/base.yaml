@@ -275,6 +275,7 @@ cli-utilities:
   - sysstat
   - htop
   - fastfetch
+  - inxi
   - glances
   - procs
   - bottom
@@ -336,6 +337,7 @@ schedulers:
   - scx-scheds
   - scx-tools
   - scx-manager
+  - bpftune-gaming
 desktop-integration:
   - xorg-xwayland
   - xdg-utils
@@ -378,6 +380,7 @@ media-video:
   - gpu-screen-recorder-ui
   - ffmpegthumbnailer
   - gst-plugin-pipewire
+  - gst-plugin-dav1d
   - gst-plugin-va
   - gst-plugins-good
   - gst-plugins-bad

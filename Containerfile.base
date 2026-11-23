@@ -224,13 +224,14 @@ RUN systemctl enable var-opt.mount && \
     systemctl enable scx_loader.service && \
     systemctl enable brew-setup.service && \
     systemctl enable power-profiles-daemon.service && \
+    systemctl enable systemd-oomd.service && \
     systemctl enable fstrim.timer && \
     systemctl enable boppos-update-monitor.timer && \
     systemctl --global enable bopp-tray.service || true && \
     systemctl disable asusd.service || true
 
-# Units whose packages the slim deck list leaves out: enable them only when the package is installed
-RUN for unit in ModemManager.service cups.socket docker.socket; do \
+# Units whose packages may be left out (slim deck list, or a package missing from the repo): enable only when installed
+RUN for unit in ModemManager.service cups.socket docker.socket bpftune.service; do \
         if [ -e "/usr/lib/systemd/system/$unit" ]; then systemctl enable "$unit"; \
         else echo "Skipping $unit (not installed)"; fi; \
     done

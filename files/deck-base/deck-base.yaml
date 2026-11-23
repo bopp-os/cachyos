@@ -195,6 +195,7 @@ cli-utilities:
   - iotop-c
   - htop
   - fastfetch
+  - inxi
   - rsync
   - wl-clipboard
   - procps-ng
@@ -223,6 +224,7 @@ schedulers:
   - scx-scheds
   - scx-tools
   - scx-manager
+  - bpftune-gaming
 desktop-integration:
   - xorg-xwayland
   - xdg-utils
@@ -254,6 +256,7 @@ media-video:
   - ffmpeg
   - ffmpegthumbnailer
   - gst-plugin-pipewire
+  - gst-plugin-dav1d
   - gst-plugin-va
   - gst-plugins-good
   - gst-plugins-bad
