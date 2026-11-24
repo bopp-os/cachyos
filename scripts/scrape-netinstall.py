@@ -2,8 +2,8 @@
 import urllib.request
 import yaml
 
-# CachyOS maintains their active Calamares config in the cachyos-dev branch
-URL = "https://raw.githubusercontent.com/CachyOS/cachyos-calamares/cachyos-dev/src/modules/netinstall/netinstall.yaml"
+# The released ISO builds from cachyos-staging (cachyos-dev lags behind it; checked 2026-11-23)
+URL = "https://raw.githubusercontent.com/CachyOS/cachyos-calamares/cachyos-staging/src/modules/netinstall/netinstall.yaml"
 
 def print_group(group, indent=0):
     # Fallbacks in case a group is missing a name

@@ -7,11 +7,11 @@ set -eo pipefail
 
 OUT_DIR="${1:-/workspace-mirrors}"
 
-# Wrapper from CachyOS-PKGBUILDS (same file as the cachyos-rate-mirrors 24-1 package)
-WRAPPER_COMMIT="abc9145fcfb00302831ffbf6399782c9ee64917f"
-WRAPPER_SHA256="47eff7dd429e17b5445f3b47c46bdc51aa6145496d82650b46420310d9b1dcc0"
-RATE_MIRRORS_VERSION="v0.34.0"
-RATE_MIRRORS_SHA256="2b92259a16bcf0af8bb788f703c1c3da8b690f0f8b77945d64844ea081ef3c2e"
+# Wrapper from CachyOS-PKGBUILDS (same file as the cachyos-rate-mirrors 27-1 package)
+WRAPPER_COMMIT="0c7ddbc1357387a1144cdfe81fb72798655c9ebe"
+WRAPPER_SHA256="9dc90de3851c633d70c2c86505c8e2130f34ee46c8dbe70c677021393bdcffbe"
+RATE_MIRRORS_VERSION="v0.34.1"
+RATE_MIRRORS_SHA256="7c90c3f13a829b1493a7381dc4743e8b4a4d4774a41abd6e954d64deb9f47016"
 
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
