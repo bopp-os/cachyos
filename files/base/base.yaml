@@ -416,6 +416,12 @@ gaming-core:
   - openrgb-plugin-effects-git
   - nvtop
   - lsfg-vk
+  # MAKO Renderer (built in bopp-os/pkgbuilds): opt-in via mako-launch %command%; desktop only, kept out of deck-base where
+  # the MAKO Decky plugin installs its own user-local copy. vkd3d provides libvkd3d-shader for its LSFG/LS1 shaders.
+  - mako-render
+  - lib32-mako-render
+  - vkd3d
+  - lib32-vkd3d
   - game-devices-udev
   - udev-joystick-blacklist-git
   - waydroid
