@@ -3900,7 +3900,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.116797+00:00"
+    "fetched_at": "2026-11-25T18:52:43.616205+00:00"
   },
   "cachyos-hooks": {
     "history": {
@@ -6120,7 +6120,6 @@
   },
   "cython": {
     "history": {
-      "0.29.34-2": "2023-04-08T21:20:00+00:00",
       "0.29.35-1": "2023-05-24T21:09:00+00:00",
       "0.29.35-2": "2023-06-19T06:59:00+00:00",
       "0.29.36-1": "2023-07-04T22:55:00+00:00",
@@ -6169,12 +6168,13 @@
       "3.2.9-1": "2026-07-24T09:46:00+00:00",
       "3.3.0-1": "2026-08-28T14:05:00+00:00",
       "3.3.0-2": "2026-09-20T20:25:00+00:00",
-      "3.3.1-1": "2026-11-01T23:17:00+00:00"
+      "3.3.1-1": "2026-11-01T23:17:00+00:00",
+      "3.3.2-1": "2026-11-25T08:26:00+00:00"
     },
     "interval": "monthly",
-    "avg_days": 23.0,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.117774+00:00"
+    "avg_days": 23,
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:43.617002+00:00"
   },
   "dav1d": {
     "history": {
@@ -6471,7 +6471,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.118049+00:00"
+    "fetched_at": "2026-11-25T18:52:43.617151+00:00"
   },
   "default-cursors": {
     "history": {
@@ -7220,8 +7220,8 @@
     },
     "interval": "monthly",
     "avg_days": 27,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.118348+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:43.617360+00:00"
   },
   "double-conversion": {
     "history": {
@@ -9951,7 +9951,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.119243+00:00"
+    "fetched_at": "2026-11-25T18:52:43.618108+00:00"
   },
   "game-devices-udev": {
     "history": {
@@ -18159,7 +18159,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.121746+00:00"
+    "fetched_at": "2026-11-25T18:52:43.619997+00:00"
   },
   "jupiter-hw-support": {
     "history": {},
@@ -42077,7 +42077,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.129592+00:00"
+    "fetched_at": "2026-11-25T18:52:43.625829+00:00"
   },
   "noto-color-emoji-fontconfig": {
     "history": {
@@ -43156,8 +43156,8 @@
     },
     "interval": "weekly",
     "avg_days": 7,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.130020+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:43.626170+00:00"
   },
   "opentabletdriver": {
     "history": {},
@@ -48307,8 +48307,8 @@
     },
     "interval": "monthly",
     "avg_days": 30.0,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.131727+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:43.627474+00:00"
   },
   "python-aiohttp": {
     "history": {
@@ -48364,9 +48364,9 @@
       "3.14.5-1": "2026-10-13T13:30:00+00:00"
     },
     "interval": "biweekly",
-    "avg_days": 12.5,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:21:58.131801+00:00"
+    "avg_days": 13.5,
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:43.627524+00:00"
   },
   "python-aiohttp-cors": {
     "history": {
@@ -48380,15 +48380,15 @@
     },
     "interval": "quarterly",
     "avg_days": 61.5,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.391726+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:45.200226+00:00"
   },
   "python-aiohttp-jinja2": {
     "history": {},
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.391973+00:00"
+    "fetched_at": "2026-11-25T18:52:45.372459+00:00"
   },
   "python-aiosignal": {
     "history": {
@@ -48409,8 +48409,8 @@
     },
     "interval": "quarterly",
     "avg_days": 113,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.392053+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:45.491231+00:00"
   },
   "python-annotated-types": {
     "history": {
@@ -49188,8 +49188,8 @@
     },
     "interval": "biweekly",
     "avg_days": 21,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.392572+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:45.558480+00:00"
   },
   "python-defusedxml": {
     "history": {
@@ -49553,8 +49553,8 @@
     },
     "interval": "quarterly",
     "avg_days": 89,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.392838+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:45.559686+00:00"
   },
   "python-gbinder": {
     "history": {
@@ -50101,8 +50101,8 @@
     },
     "interval": "biweekly",
     "avg_days": 0.0,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.393197+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:45.677940+00:00"
   },
   "python-lxml": {
     "history": {
@@ -50419,8 +50419,8 @@
     },
     "interval": "monthly",
     "avg_days": 29,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.393407+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:45.679843+00:00"
   },
   "python-mutagen": {
     "history": {
@@ -51027,8 +51027,8 @@
     },
     "interval": "quarterly",
     "avg_days": 59.0,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.393839+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:45.857859+00:00"
   },
   "python-protobuf": {
     "history": {
@@ -52706,12 +52706,13 @@
       "6.0.0-1": "2025-03-07T09:08:00+00:00",
       "6.0.0-2": "2025-12-15T14:02:00+00:00",
       "7.0.0-1": "2026-10-31T14:07:00+00:00",
-      "7.1.0-1": "2026-11-04T20:28:00+00:00"
+      "7.1.0-1": "2026-11-04T20:28:00+00:00",
+      "7.1.1-1": "2026-11-21T17:34:00+00:00"
     },
     "interval": "biweekly",
-    "avg_days": 13,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.395014+00:00"
+    "avg_days": 14.0,
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:46.484550+00:00"
   },
   "python-webencodings": {
     "history": {
@@ -52843,8 +52844,8 @@
     },
     "interval": "quarterly",
     "avg_days": 108.5,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:22:47.395203+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:46.628947+00:00"
   },
   "python-xlib": {
     "history": {
@@ -53020,8 +53021,8 @@
     },
     "interval": "quarterly",
     "avg_days": 76,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:23:42.392064+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:46.682166+00:00"
   },
   "python-zipp": {
     "history": {
@@ -55949,7 +55950,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:23:42.393422+00:00"
+    "fetched_at": "2026-11-25T18:52:47.072553+00:00"
   },
   "screen": {
     "history": {
@@ -56586,6 +56587,26 @@
     "avg_days": 351.5,
     "source": "ala",
     "fetched_at": "2026-11-23T20:35:39.970558+00:00"
+  },
+  "simdutf": {
+    "history": {
+      "9.0.0-1": "2026-07-10T16:05:00+00:00",
+      "9.0.0-2": "2026-07-10T16:12:00+00:00",
+      "9.1.0-1": "2026-08-30T12:03:00+00:00",
+      "9.1.1-1": "2026-09-08T16:13:00+00:00",
+      "9.1.2-1": "2026-09-15T16:23:00+00:00",
+      "9.2.0-1": "2026-09-27T13:49:00+00:00",
+      "9.2.1-1": "2026-09-29T04:24:00+00:00",
+      "9.2.1-2": "2026-10-02T12:08:00+00:00",
+      "9.2.2-1": "2026-11-01T08:30:00+00:00",
+      "9.3.0-1": "2026-11-19T04:27:00+00:00",
+      "9.3.1-1": "2026-11-24T07:13:00+00:00",
+      "9.3.2-1": "2026-11-25T13:18:00+00:00"
+    },
+    "interval": "weekly",
+    "avg_days": 8.0,
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:47.697822+00:00"
   },
   "simple-scan": {
     "history": {
@@ -57754,14 +57775,14 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:23:42.394370+00:00"
+    "fetched_at": "2026-11-25T18:52:48.039645+00:00"
   },
   "steamdeck-dsp": {
     "history": {},
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:23:42.394290+00:00"
+    "fetched_at": "2026-11-25T18:52:47.770676+00:00"
   },
   "steamos-manager": {
     "history": {},
@@ -57782,7 +57803,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:23:42.394467+00:00"
+    "fetched_at": "2026-11-25T18:52:48.310403+00:00"
   },
   "sticky": {
     "history": {
@@ -59785,7 +59806,7 @@
     "interval": "daily",
     "avg_days": 0.0,
     "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:23:42.395405+00:00"
+    "fetched_at": "2026-11-25T18:52:48.354942+00:00"
   },
   "unp": {
     "history": {
@@ -65849,11 +65870,13 @@
     "fetched_at": "2026-11-23T20:36:50.136999+00:00"
   },
   "xenity": {
-    "history": {},
-    "interval": "daily",
+    "history": {
+      "3.44.6-1": "2026-11-18T04:23:00+00:00"
+    },
+    "interval": "weekly",
     "avg_days": 0.0,
-    "source": "ala_not_found",
-    "fetched_at": "2026-11-21T16:23:42.397835+00:00"
+    "source": "ala",
+    "fetched_at": "2026-11-25T18:52:48.549628+00:00"
   },
   "xf86-input-libinput": {
     "history": {
